@@ -26,13 +26,22 @@ just test-integration
 # Format check
 cargo fmt --all -- --check
 
-# Lint (requires contracts built first)
-cargo clippy --all
+# Lint across entire workspace (matches CI)
+just clippy
 
 # Run CLI directly during development
 just scaffold <args>    # runs stellar-scaffold
 just registry <args>    # runs stellar-registry
 ```
+
+## Code Quality Checklist
+
+After making changes to Rust code, always run in order:
+1. `cargo build -p <crate>` — confirm it compiles
+2. `cargo test -p <crate>` — confirm tests pass (`cargo t` is aliased to `cargo nextest run`)
+3. `cargo clippy -p <crate>` — fix any lint errors before considering work done
+
+Clippy and warning flags are configured in `.cargo/config.toml` `rustflags` and apply automatically to every `cargo` invocation — no extra flags needed. `just clippy` runs across the whole workspace with additional allow-list overrides and matches CI.
 
 ## Architecture
 
@@ -40,12 +49,14 @@ just registry <args>    # runs stellar-registry
 
 | Crate | Purpose |
 |-------|---------|
-| `stellar-scaffold-cli` | Main CLI: init, build, generate, watch commands |
-| `stellar-registry-cli` | Registry CLI: publish, deploy, download, upgrade commands |
+| `stellar-scaffold-cli` | Main Scaffold CLI: init, build, generate, watch commands |
+| `stellar-registry-cli` | Main Registry CLI: publish, deploy, download, upgrade commands |
 | `stellar-build` | Contract building logic and dependency resolution |
+| `stellar-scaffold-ext-types` | Rust types for Scaffold CLI extensions |
 | `stellar-registry-build` | Registry interaction and contract deployment logic |
 | `stellar-registry` | Shared registry types and utilities |
 | `stellar-scaffold-macro` | Procedural macros |
+| `stellar-scaffold-reporter` | Reference extension for Scaffold CLI reporting useful build metrics |
 | `stellar-scaffold-test` | Test utilities and fixture contracts |
 
 ### Key Contracts
@@ -56,8 +67,9 @@ just registry <args>    # runs stellar-registry
 
 ### CLI Command Flow
 
-**stellar-scaffold commands:** init → build → generate → watch
-- `init` - Scaffolds new project from template (uses degit to fetch from scaffold-stellar-frontend repo)
+**stellar-scaffold commands:** init → setup → build → generate → watch
+- `init` - Clones a template repo via degit (`--template user/repo`, defaults to official frontend template), then runs `setup`
+- `setup` - Idempotent project setup: copies `.env.example` → `.env`, checks extensions, selects package manager, installs deps, compiles contracts, git init
 - `build` - Builds contracts and generates TypeScript clients based on `environments.toml`
 - `generate contract` - Adds new contract to existing project
 - `watch` - Monitors and rebuilds on changes
@@ -69,7 +81,7 @@ just registry <args>    # runs stellar-registry
 
 ## Testing
 
-- Unit tests run without external dependencies: `cargo t`
+- Unit tests run without external dependencies: `cargo t` (aliased to `cargo nextest run` — requires `cargo-nextest`)
 - Integration tests require local Stellar RPC running via Docker (stellar/quickstart image)
 - Feature flag `integration-tests` enables RPC-dependent tests
 - Test fixtures in `crates/stellar-scaffold-test/fixtures/`
