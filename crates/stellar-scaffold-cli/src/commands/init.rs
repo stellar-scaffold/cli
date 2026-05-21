@@ -255,6 +255,7 @@ impl Cmd {
             from: Some(example_name.to_owned()),
             ls: false,
             from_wizard: false,
+            from_cli: false,
             output: Some(all_contracts_path.join(example_path)),
             force: false,
         }

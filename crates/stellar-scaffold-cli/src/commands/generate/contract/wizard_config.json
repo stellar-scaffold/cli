@@ -1,0 +1,447 @@
+{
+  "wizard": {
+    "license": [
+      "// SPDX-License-Identifier: MIT",
+      "// Compatible with OpenZeppelin Stellar Soroban Contracts ^0.5.1"
+    ],
+    "settings": {
+      "fungible": {
+        "constructor": [
+          "        Base::set_metadata(e, 18, String::from_str(e, \"<NAME>\"), String::from_str(e, \"<SYMBOL>\"));"
+        ],
+        "settings_implementation": [
+          "#[default_impl]",
+          "#[contractimpl]",
+          "impl FungibleToken for <NAME> {",
+          "    type ContractType = Base;",
+          "}"
+        ]
+      },
+      "non_fungible": {
+        "constructor": [
+          "        let uri = String::from_str(e, \"<URI>\");",
+          "        let name = String::from_str(e, \"<NAME>\");",
+          "        let symbol = String::from_str(e, \"<SYMBOL>\");",
+          "        Base::set_metadata(e, uri, name, symbol);"
+        ],
+        "settings_implementation": [
+          "#[default_impl]",
+          "#[contractimpl]",
+          "impl NonFungibleToken for <NAME> {",
+          "    type ContractType = Base;",
+          "}"
+        ],
+        "settings_implementation_enumerable": [
+          "#[default_impl]",
+          "#[contractimpl]",
+          "impl NonFungibleToken for <NAME> {",
+          "    type ContractType = Enumerable;",
+          "}"
+        ],
+        "settings_implementation_consecutive": [
+          "#[default_impl]",
+          "#[contractimpl]",
+          "impl NonFungibleToken for <NAME> {",
+          "    type ContractType = Consecutive;",
+          "}"
+        ]
+      }
+    },
+    "features": {
+      "mintable": {
+        "constructor_args": [],
+        "constructor_args_ownable": [],
+        "constructor_args_roles": [
+          "minter: Address"
+        ],
+        "constructor": [],
+        "constructor_ownable": [],
+        "constructor_roles": [
+          "        access_control::grant_role_no_auth(e, &admin, &minter, &Symbol::new(e, \"minter\"));"
+        ],
+        "implementation": [
+          "    #[<ROLE>]",
+          "    pub fn mint(e: &Env, account: Address, amount: i128) {",
+          "        Base::mint(e, &account, amount);",
+          "    }"
+        ],
+        "implementation_nft": [
+          "    #[<ROLE>]",
+          "    pub fn mint(e: &Env, to: Address) -> u32 {",
+          "        Base::sequential_mint(e, &to)",
+          "    }"
+        ],
+        "implementation_nft_enumerable": [
+          "    #[<ROLE>]",
+          "    pub fn mint(e: &Env, to: Address) -> u32 {",
+          "        Enumerable::sequential_mint(e, &to)",
+          "    }"
+        ],
+        "implementation_nft_consecutive": [
+          "    #[<ROLE>]",
+          "    pub fn mint_batch(e: &Env, to: Address, amount: u32) {",
+          "        Consecutive::mint_consecutive(e, &to, amount);",
+          "    }"
+        ],
+        "implementation_pausable": [
+          "    #[when_not_paused]",
+          "    #[<ROLE>]",
+          "    pub fn mint(e: &Env, account: Address, amount: i128) {",
+          "        Base::mint(e, &account, amount);",
+          "    }"
+        ],
+        "implementation_nft_pausable": [
+          "    #[when_not_paused]",
+          "    #[<ROLE>]",
+          "    pub fn mint(e: &Env, to: Address) -> u32 {",
+          "        Base::sequential_mint(e, &to)",
+          "    }"
+        ],
+        "implementation_nft_enumerable_pausable": [
+          "    #[when_not_paused]",
+          "    #[<ROLE>]",
+          "    pub fn mint(e: &Env, to: Address) -> u32 {",
+          "        Enumerable::sequential_mint(e, &to)",
+          "    }"
+        ],
+        "implementation_nft_consecutive_pausable": [
+          "    #[when_not_paused]",
+          "    #[<ROLE>]",
+          "    pub fn mint_batch(e: &Env, to: Address, amount: u32) {",
+          "        Consecutive::mint_consecutive(e, &to, amount);",
+          "    }"
+        ],
+        "utils": [],
+        "extensions": [],
+        "settings_implementation": [],
+        "dependencies": [
+          "access_control"
+        ],
+        "imports": [
+          "use stellar_macros::only_owner;"
+        ]
+      },
+      "burnable": {
+        "constructor_args": [],
+        "constructor_args_ownable": [],
+        "constructor_args_roles": [],
+        "constructor": [],
+        "constructor_ownable": [],
+        "constructor_roles": [],
+        "implementation": [],
+        "implementation_ownable": [],
+        "implementation_roles": [],
+        "utils": [],
+        "extensions": [
+          "#[default_impl]",
+          "#[contractimpl]",
+          "impl FungibleBurnable for <NAME> {}"
+        ],
+        "extensions_pausable": [
+          "#[default_impl]",
+          "#[contractimpl]",
+          "impl FungibleBurnable for <NAME> {",
+          "    #[when_not_paused]",
+          "    fn burn(e: &Env, from: Address, amount: i128) {",
+          "        Self::ContractType::burn(e, &from, amount);",
+          "    }",
+          " ",
+          "    #[when_not_paused]",
+          "    fn burn_from(e: &Env, spender: Address, from: Address, amount: i128) {",
+          "        Self::ContractType::burn_from(e, &spender, &from, amount);",
+          "    }",
+          "}"
+        ],
+        "extensions_nft": [
+          "#[default_impl]",
+          "#[contractimpl]",
+          "impl NonFungibleBurnable for <NAME> {}"
+        ],
+        "extensions_nft_pausable": [
+          "#[default_impl]",
+          "#[contractimpl]",
+          "impl NonFungibleBurnable for <NAME> {",
+          "    #[when_not_paused]",
+          "    fn burn(e: &Env, from: Address, token_id: u32) {",
+          "        Self::ContractType::burn(e, &from, token_id);",
+          "    }",
+          " ",
+          "    #[when_not_paused]",
+          "    fn burn_from(e: &Env, spender: Address, from: Address, token_id: u32) {",
+          "        Self::ContractType::burn_from(e, &spender, &from, token_id);",
+          "    }",
+          "}"
+        ],
+        "settings_implementation": [],
+        "dependencies": [],
+        "imports": [
+          "use stellar_tokens::fungible::burnable::FungibleBurnable;"
+        ],
+        "imports_nft": [
+          "use stellar_tokens::non_fungible::burnable::NonFungibleBurnable;"
+        ]
+      },
+      "pausable": {
+        "constructor_args": [],
+        "constructor_args_ownable": [],
+        "constructor_args_roles": [
+          "pauser: Address"
+        ],
+        "constructor": [],
+        "constructor_ownable": [],
+        "constructor_roles": [
+          "        access_control::grant_role_no_auth(e, &admin, &pauser, &Symbol::new(e, \"pauser\"));"
+        ],
+        "implementation": [],
+        "macros": [
+          "    #[when_not_paused]"
+        ],
+        "utils": [
+          "#[contractimpl]",
+          "impl Pausable for <NAME> {",
+          "    fn paused(e: &Env) -> bool {",
+          "        pausable::paused(e)",
+          "    }",
+          " ",
+          "    #[<ROLE>]",
+          "    fn pause(e: &Env, _caller: Address) {",
+          "        pausable::pause(e);",
+          "    }",
+          " ",
+          "    #[<ROLE>]",
+          "    fn unpause(e: &Env, _caller: Address) {",
+          "        pausable::unpause(e);",
+          "    }",
+          "}"
+        ],
+        "extensions": [],
+        "settings_implementation": [
+          "    #[when_not_paused]",
+          "    fn transfer(e: &Env, from: Address, to: Address, amount: i128) {",
+          "        Self::ContractType::transfer(e, &from, &to, amount);",
+          "    }",
+          " ",
+          "    #[when_not_paused]",
+          "    fn transfer_from(e: &Env, spender: Address, from: Address, to: Address, amount: i128) {",
+          "        Self::ContractType::transfer_from(e, &spender, &from, &to, amount);",
+          "    }"
+        ],
+        "settings_implementation_nft": [
+          "    #[when_not_paused]",
+          "    fn transfer(e: &Env, from: Address, to: Address, token_id: u32) {",
+          "        Self::ContractType::transfer(e, &from, &to, token_id);",
+          "    }",
+          " ",
+          "    #[when_not_paused]",
+          "    fn transfer_from(e: &Env, spender: Address, from: Address, to: Address, token_id: u32) {",
+          "        Self::ContractType::transfer_from(e, &spender, &from, &to, token_id);",
+          "    }"
+        ],
+        "dependencies": [
+          "access_control"
+        ],
+        "imports": [
+          "use stellar_contract_utils::pausable::{self as pausable, Pausable};",
+          "use stellar_macros::when_not_paused;"
+        ]
+      },
+      "upgradeable": {
+        "constructor_args": [],
+        "constructor_args_ownable": [],
+        "constructor_args_roles": [
+          "upgrader: Address"
+        ],
+        "constructor": [],
+        "constructor_ownable": [],
+        "constructor_roles": [
+          "        access_control::grant_role_no_auth(e, &admin, &upgrader, &Symbol::new(e, \"upgrader\"));"
+        ],
+        "implementation": [],
+        "utils": [
+          "impl UpgradeableInternal for <NAME> {",
+          "    fn _require_auth(e: &Env, _operator: &Address) {",
+          "        ownable::enforce_owner_auth(e);",
+          "    }",
+          "}"
+        ],
+        "utils_roles": [
+          "impl UpgradeableInternal for <NAME> {",
+          "    fn _require_auth(e: &Env, operator: &Address) {",
+          "        access_control::ensure_role(e, &Symbol::new(e, \"upgrader\"), operator);",
+          "        operator.require_auth();",
+          "    }",
+          "}"
+        ],
+        "extensions": [],
+        "settings_implementation": [],
+        "dependencies": [
+          "access_control"
+        ],
+        "imports": [
+          "use stellar_contract_utils::upgradeable::UpgradeableInternal;"
+        ]
+      },
+      "enumerable": {
+        "constructor_args": [],
+        "constructor_args_ownable": [],
+        "constructor_args_roles": [],
+        "constructor": [],
+        "constructor_ownable": [],
+        "constructor_roles": [],
+        "implementation": [],
+        "utils": [],
+        "extensions": [
+          "#[contractimpl(contracttrait)]",
+          "impl NonFungibleEnumerable for <NAME> {}"
+        ],
+        "settings_implementation": [],
+        "dependencies": [],
+        "imports": [
+          "use stellar_tokens::non_fungible::enumerable::{Enumerable, NonFungibleEnumerable};"
+        ]
+      },
+      "consecutive": {
+        "constructor_args": [],
+        "constructor_args_ownable": [],
+        "constructor_args_roles": [
+          "minter: Address"
+        ],
+        "constructor": [],
+        "constructor_ownable": [],
+        "constructor_roles": [
+          "        access_control::grant_role_no_auth(e, &admin, &minter, &Symbol::new(e, \"minter\"));"
+        ],
+        "implementation": [
+          "    #[<ROLE>]",
+          "    pub fn batch_mint(e: &Env, to: Address, amount: u32) -> u32 {",
+          "        Consecutive::batch_mint(e, &to, amount)",
+          "    }"
+        ],
+        "implementation_pausable": [
+          "    #[when_not_paused]",
+          "    #[<ROLE>]",
+          "    pub fn batch_mint(e: &Env, to: Address, amount: u32) -> u32 {",
+          "        Consecutive::batch_mint(e, &to, amount)",
+          "    }"
+        ],
+        "utils": [],
+        "extensions": [
+          "impl NonFungibleConsecutive for <NAME> {}"
+        ],
+        "settings_implementation": [],
+        "dependencies": [],
+        "imports": [
+          "use stellar_tokens::non_fungible::consecutive::{Consecutive, NonFungibleConsecutive};"
+        ]
+      }
+    },
+    "limitations": {
+      "allowlist": {
+        "imports": [
+          "use stellar_tokens::fungible::allowlist::{AllowList, FungibleAllowList};"
+        ],
+        "constructor_args_roles": [
+          "manager: Address"
+        ],
+        "constructor_roles": [
+          "        access_control::grant_role_no_auth(e, &admin, &manager, &Symbol::new(e, \"manager\"));"
+        ],
+        "extensions": [
+          "#[contractimpl]",
+          "impl FungibleAllowList for <NAME> {",
+          "    fn allowed(e: &Env, account: Address) -> bool {",
+          "        AllowList::allowed(e, &account)",
+          "    }",
+          " ",
+          "    #[<ROLE>]",
+          "    fn allow_user(e: &Env, user: Address, operator: Address) {",
+          "        AllowList::allow_user(e, &user);",
+          "    }",
+          " ",
+          "    #[<ROLE>]",
+          "    fn disallow_user(e: &Env, user: Address, operator: Address) {",
+          "        AllowList::disallow_user(e, &user);",
+          "    }",
+          "}"
+        ]
+      },
+      "blocklist": {
+        "imports": [
+          "use stellar_tokens::fungible::blocklist::{BlockList, FungibleBlockList};"
+        ],
+        "constructor_args_roles": [
+          "manager: Address"
+        ],
+        "constructor_roles": [
+          "        access_control::grant_role_no_auth(e, &admin, &manager, &Symbol::new(e, \"manager\"));"
+        ],
+        "extensions": [
+          "#[contractimpl]",
+          "impl FungibleBlockList for <NAME> {",
+          "    fn blocked(e: &Env, account: Address) -> bool {",
+          "        BlockList::blocked(e, &account)",
+          "    }",
+          " ",
+          "    #[<ROLE>]",
+          "    fn block_user(e: &Env, user: Address, operator: Address) {",
+          "        BlockList::block_user(e, &user);",
+          "    }",
+          " ",
+          "    #[<ROLE>]",
+          "    fn unblock_user(e: &Env, user: Address, operator: Address) {",
+          "        BlockList::unblock_user(e, &user);",
+          "    }",
+          "}"
+        ]
+      }
+    },
+    "access_control": {
+      "ownable": {
+        "constructor_args": [
+          "owner: Address"
+        ],
+        "constructor": [
+          "        ownable::set_owner(e, &owner);"
+        ],
+        "imports": [
+          "use stellar_access::ownable::{self as ownable, Ownable};",
+          "use stellar_macros::only_owner;"
+        ],
+        "utils": [
+          "#[contractimpl]",
+          "impl Ownable for <NAME> {",
+          "    fn owner(e: &Env) -> Address {",
+          "        ownable::owner(e)",
+          "    }",
+          " ",
+          "    #[only_owner]",
+          "    fn transfer_ownership(e: &Env, _caller: Address, new_owner: Address) {",
+          "        ownable::transfer_ownership(e, &new_owner);",
+          "    }",
+          " ",
+          "    #[only_owner]",
+          "    fn renounce_ownership(e: &Env, _caller: Address) {",
+          "        ownable::renounce_ownership(e);",
+          "    }",
+          "}"
+        ]
+      },
+      "roles": {
+        "constructor_args": [
+          "admin: Address"
+        ],
+        "constructor": [
+          "        access_control::set_admin(e, &admin);"
+        ],
+        "imports": [
+          "use stellar_access::access_control::{self, AccessControl};",
+          "use stellar_macros::only_role;"
+        ],
+        "utils": [
+          "#[contractimpl(contracttrait)]",
+          "impl AccessControl for <NAME> {}"
+        ]
+      }
+    }
+  }
+}
