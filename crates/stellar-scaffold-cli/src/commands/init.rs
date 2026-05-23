@@ -2,7 +2,7 @@ use clap::{Args, Parser};
 use degit::degit;
 use dialoguer::theme::ColorfulTheme;
 use dialoguer::{Confirm, Select};
-use std::fs::{copy, metadata, read_dir, remove_dir_all, remove_file, write};
+use std::fs::{copy, metadata, read_dir, read_to_string, remove_dir_all, remove_file, write};
 use std::path::{Path, PathBuf};
 use std::process::Command;
 use std::{env, io};
@@ -11,9 +11,11 @@ use super::{build, generate};
 use crate::commands::{PackageManager, PackageManagerSpec};
 use crate::extension::{ExtensionListStatus, list as list_extensions};
 use stellar_cli::{commands::global, print::Print};
+use toml_edit::{DocumentMut, Item, Table, value};
 
 pub const FRONTEND_TEMPLATE: &str = "theahaco/scaffold-stellar-frontend";
 const TUTORIAL_BRANCH: &str = "tutorial";
+const TEMPLATE_STELLAR_STRKEY_VERSION: &str = "0.0.15";
 const PNPM_WORKSPACE: &str = r#"packages:
   - "packages/*"
 "#;
@@ -123,6 +125,15 @@ impl Cmd {
 
         // Check extensions listed in environments.toml and offer to install any that are missing
         ensure_extensions_installed(&absolute_project_path, &printer, self.yes);
+
+        if let Err(e) = pin_workspace_stellar_strkey(
+            &absolute_project_path.join("Cargo.toml"),
+            TEMPLATE_STELLAR_STRKEY_VERSION,
+        ) {
+            printer.warnln(format!(
+                "Failed to pin stellar-strkey version in template: {e}"
+            ));
+        }
 
         // Copy .env.example to .env
         let example_path = absolute_project_path.join(".env.example");
@@ -499,6 +510,39 @@ fn ensure_extensions_installed(project_path: &Path, printer: &Print, yes: bool) 
     }
 }
 
+fn pin_workspace_stellar_strkey(cargo_toml_path: &Path, version: &str) -> Result<(), io::Error> {
+    let content = read_to_string(cargo_toml_path)?;
+    let mut document = content.parse::<DocumentMut>().map_err(|e| {
+        io::Error::new(
+            io::ErrorKind::InvalidData,
+            format!("invalid Cargo.toml at {}: {e}", cargo_toml_path.display()),
+        )
+    })?;
+
+    if document["workspace"].is_none() {
+        document["workspace"] = Item::Table(Table::new());
+    }
+    if document["workspace"]["dependencies"].is_none() {
+        document["workspace"]["dependencies"] = Item::Table(Table::new());
+    }
+
+    let dependencies = document["workspace"]["dependencies"]
+        .as_table_like_mut()
+        .ok_or_else(|| {
+            io::Error::new(
+                io::ErrorKind::InvalidData,
+                "workspace.dependencies is not a table",
+            )
+        })?;
+
+    if dependencies.get("stellar-strkey").and_then(Item::as_str) == Some(version) {
+        return Ok(());
+    }
+
+    dependencies.insert("stellar-strkey", value(version));
+    write(cargo_toml_path, document.to_string())
+}
+
 // Check if git is installed and exists in PATH
 fn git_exists() -> bool {
     Command::new("git").arg("--version").output().is_ok()
@@ -603,5 +647,53 @@ mod tests {
     #[test]
     fn is_semver_like_rejects_single_number() {
         assert!(!is_semver_like("10"));
+    }
+
+    #[test]
+    fn pin_workspace_stellar_strkey_adds_pin_when_missing() {
+        let temp_dir = tempfile::tempdir().expect("temp dir");
+        let cargo_toml_path = temp_dir.path().join("Cargo.toml");
+        write(
+            &cargo_toml_path,
+            r#"[workspace]
+[workspace.dependencies]
+soroban-sdk = "23.4.0"
+"#,
+        )
+        .expect("write fixture cargo");
+
+        pin_workspace_stellar_strkey(&cargo_toml_path, TEMPLATE_STELLAR_STRKEY_VERSION)
+            .expect("pin version");
+
+        let updated = read_to_string(&cargo_toml_path).expect("read updated cargo");
+        let document = updated.parse::<DocumentMut>().expect("parse updated cargo");
+        assert_eq!(
+            document["workspace"]["dependencies"]["stellar-strkey"].as_str(),
+            Some(TEMPLATE_STELLAR_STRKEY_VERSION)
+        );
+    }
+
+    #[test]
+    fn pin_workspace_stellar_strkey_updates_existing_pin() {
+        let temp_dir = tempfile::tempdir().expect("temp dir");
+        let cargo_toml_path = temp_dir.path().join("Cargo.toml");
+        write(
+            &cargo_toml_path,
+            r#"[workspace]
+[workspace.dependencies]
+stellar-strkey = "0.0.13"
+"#,
+        )
+        .expect("write fixture cargo");
+
+        pin_workspace_stellar_strkey(&cargo_toml_path, TEMPLATE_STELLAR_STRKEY_VERSION)
+            .expect("pin version");
+
+        let updated = read_to_string(&cargo_toml_path).expect("read updated cargo");
+        let document = updated.parse::<DocumentMut>().expect("parse updated cargo");
+        assert_eq!(
+            document["workspace"]["dependencies"]["stellar-strkey"].as_str(),
+            Some(TEMPLATE_STELLAR_STRKEY_VERSION)
+        );
     }
 }
