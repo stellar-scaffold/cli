@@ -15,7 +15,7 @@
 #
 # Usage: contracts/registry-tansu-manager/e2e-testnet.sh
 # Env vars:
-#   NETWORK         Stellar network alias (default: testnet; must be `stellar network add`-ed).
+#   NETWORK         Stellar network alias (default: testnet; must be in `stellar network ls`).
 #   RUN_ID          Suffix appended to ephemeral identities/aliases (default: epoch).
 #   PROPOSAL_ID     Proposal id to use (default: 1).
 #   HELLO_VERSION   Version published for hello (default: 0.1.0).
@@ -48,17 +48,10 @@ for w in "$HELLO_WASM" "$REGISTRY_WASM" "$MANAGER_WASM" "$STUB_WASM"; do
     fi
 done
 
-# Ensure the network alias exists locally. testnet is added if missing; any
-# other name must be pre-configured by the user.
+# Ensure the network alias exists locally. 
 if ! stellar network ls 2>/dev/null | grep -qx "$NETWORK"; then
-    if [ "$NETWORK" = "testnet" ]; then
-        stellar network add testnet \
-            --rpc-url https://soroban-testnet.stellar.org \
-            --network-passphrase "Test SDF Network ; September 2015"
-    else
-        echo "❌ stellar network '$NETWORK' is not configured; run \`stellar network add\` first" >&2
-        exit 1
-    fi
+    echo "❌ stellar network '$NETWORK' is not configured; run \`stellar network add\` first" >&2
+    exit 1
 fi
 
 ADMIN_ID="${ADMIN_ID:-e2e-admin-${RUN_ID}}"
