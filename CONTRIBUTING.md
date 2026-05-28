@@ -7,7 +7,7 @@ The following is a set of guidelines for contributions and may change over time.
 ## Getting started
 
 - Make sure you have a [GitHub account](https://github.com/signup/free).
-- If responding to an existing [GitHub issue](https://github.com/theahaco/scaffold-stellar/issues), comment on that issue to express your interest and intent to work on this issue.
+- If responding to an existing [GitHub issue](https://github.com/stellar-scaffold/cli/issues), comment on that issue to express your interest and intent to work on this issue.
 - If an issue does not exist for the work you'd like to contribute, create a GitHub issue.
   - Clearly describe the issue, including steps to reproduce if it is a bug.
 - Fork the repository on GitHub.
@@ -57,7 +57,7 @@ just test-integration
 
 ## Changes to the Frontend Template
 
-If you want to make a change to the project scaffold created by the `init` command, you can do so at [the frontend template repo](https://github.com/theahaco/scaffold-stellar-frontend). The `init` command accepts a `--tag` argument if you want to use a specific version of the template other than the latest `main` branch:
+If you want to make a change to the project scaffold created by the `init` command, you can do so at [the frontend template repo](https://github.com/stellar-scaffold/ui). The `init` command accepts a `--tag` argument if you want to use a specific version of the template other than the latest `main` branch:
 
 ```bash
 # specify a branch name

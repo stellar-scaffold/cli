@@ -3,17 +3,14 @@ resolver = "2"
 default-members = ["crates/*"]
 members = [
     "crates/*",
-    "contracts/registry",
-    "contracts/test/*",
     "crates/stellar-scaffold-test/fixtures/contracts/*",
 ]
 
 [workspace.package]
-repository = "https://github.com/theahaco/scaffold-stellar"
+repository = "https://github.com/stellar-scaffold/cli"
 
 [workspace.dependencies]
 stellar-scaffold-macro = { path = "crates/stellar-scaffold-macro" }
-stellar-registry = { path = "crates/stellar-registry" }
 stellar-scaffold-test = { path = "crates/stellar-scaffold-test" }
 stellar-scaffold-ext-types = { path = "crates/stellar-scaffold-ext-types", version = "0.0.2" }
 

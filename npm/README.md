@@ -1,6 +1,6 @@
 # stellar-scaffold-cli
 
-An npm installation for [loam](https://github.com/theahaco/scaffold-stellar).
+An npm installation for [stellar-scaffold-cli](https://github.com/stellar-scaffold/cli).
 
 ```bash
 npm i -g stellar-scaffold-cli

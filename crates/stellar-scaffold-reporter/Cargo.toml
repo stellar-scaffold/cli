@@ -1,13 +1,13 @@
 [package]
 name = "stellar-scaffold-reporter"
 description = "Scaffold Stellar plugin for logging development metrics"
-homepage = "https://github.com/theahaco/scaffold-stellar"
+homepage = "https://github.com/stellar-scaffold/cli"
 authors = ["Aha Labs <hello@theaha.co>"]
 license = "Apache-2.0"
 readme = "README.md"
 version = "0.1.0"
 edition = "2024"
-repository = "https://github.com/theahaco/scaffold-stellar/tree/main/crates/stellar-scaffold-reporter"
+repository = "https://github.com/stellar-scaffold/cli/tree/main/crates/stellar-scaffold-reporter"
 
 [[bin]]
 name = "stellar-scaffold-reporter"
