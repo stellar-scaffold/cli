@@ -9,7 +9,7 @@ on:
     branches: [main, release/**]
   pull_request:
     paths-ignore:
-      - "website/**"
+      - "docs/site/**"
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.head_ref || github.run_id }}
@@ -41,14 +41,12 @@ jobs:
       - run: just build
       - run: just build-cli-test-contracts
       - name: Create nextest archive
-        run: cargo nextest archive --archive-file nextest-archive.tar.zst --package stellar-scaffold-cli --package stellar-registry-cli --package stellar-scaffold-reporter --features integration-tests
+        run: cargo nextest archive --archive-file nextest-archive.tar.zst --package stellar-scaffold-cli --package stellar-scaffold-reporter --features integration-tests
       - name: Package runtime artifacts
         run: |
           tar -cf - \
             target/debug/stellar-scaffold \
-            target/debug/stellar-registry \
             target/debug/stellar-scaffold-reporter \
-            target/stellar/local/ \
             crates/stellar-scaffold-test/fixtures/soroban-init-boilerplate/target/stellar/local/ \
             | zstd -1 -o runtime-artifacts.tar.zst
       - name: Upload nextest archive
@@ -80,8 +78,6 @@ jobs:
             filter: "test-integration-scaffold-examples-1"
           - name: scaffold-cli (examples 15-27)
             filter: "test-integration-scaffold-examples-2"
-          - name: registry-cli
-            filter: "test-integration-registry"
           - name: reporter
             filter: "test-integration-reporter"
     env:
