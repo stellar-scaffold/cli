@@ -39,7 +39,7 @@ jobs:
       - uses: mozilla-actions/sccache-action@v0.0.10
       - name: Run cargo fmt
         run: cargo fmt --all -- --check
-      - uses: stellar/stellar-cli@v26.0.0
+      - uses: stellar/stellar-cli@v26.1.0
       - name: build since clippy needs contracts to be built
         run: just build
       - name: Run cargo clippy
