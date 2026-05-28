@@ -1,0 +1,22 @@
+[package]
+name = "tansu-stub"
+description = "Minimal stand-in for the Tansu DAO contract. Used by the e2e script for the registry-tansu-manager flow on testnet — it lets a caller plant a synthetic `Approved` proposal so `RegistryTansuManager::execute(proposal_id)` can be exercised without running Tansu's real voting cycle (collateral, members, 24h voting period)."
+version = "0.0.0"
+edition = "2021"
+publish = false
+
+[lib]
+crate-type = ["cdylib"]
+doctest = false
+
+[dependencies]
+soroban-sdk = { workspace = true }
+
+[package.metadata.stellar]
+cargo_inherit = true
+# Marks this crate as a contract-build dependency so `stellar scaffold build`
+# orders it before any package that lists it under `[dependencies]` (e.g.
+# `registry-tansu-manager`, which `import_contract_client!`s tansu_stub.wasm
+# at compile time). Without this, the topo sort can't see the edge and a
+# clean-checkout build (CI) fails because tansu_stub.wasm isn't there yet.
+contract = true

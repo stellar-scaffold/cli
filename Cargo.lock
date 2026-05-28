@@ -2103,6 +2103,13 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "2304e00983f87ffb38b55b444b5e3b60a884b5d30c0fca7d82fe33449bbe55ea"
 
 [[package]]
+name = "hello"
+version = "0.1.0"
+dependencies = [
+ "soroban-sdk 25.3.1",
+]
+
+[[package]]
 name = "hello_v1"
 version = "0.0.0"
 dependencies = [
@@ -3778,6 +3785,16 @@ dependencies = [
  "soroban-sdk-tools",
  "stellar-registry",
  "stellar-xdr 26.0.0",
+]
+
+[[package]]
+name = "registry-tansu-manager"
+version = "0.1.0"
+dependencies = [
+ "soroban-sdk 25.3.1",
+ "soroban-sdk-tools",
+ "stellar-registry",
+ "tansu-stub",
 ]
 
 [[package]]
@@ -5570,6 +5587,13 @@ dependencies = [
  "proc-macro2",
  "quote",
  "syn 2.0.117",
+]
+
+[[package]]
+name = "tansu-stub"
+version = "0.0.0"
+dependencies = [
+ "soroban-sdk 25.3.1",
 ]
 
 [[package]]

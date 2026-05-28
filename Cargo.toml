@@ -4,6 +4,8 @@ default-members = ["crates/*"]
 members = [
     "crates/*",
     "contracts/registry",
+    "contracts/registry-tansu-manager",
+    "contracts/hello",
     "contracts/test/*",
     "crates/stellar-scaffold-test/fixtures/contracts/*",
 ]
