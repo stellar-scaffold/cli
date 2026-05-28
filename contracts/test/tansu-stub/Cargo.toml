@@ -14,3 +14,9 @@ soroban-sdk = { workspace = true }
 
 [package.metadata.stellar]
 cargo_inherit = true
+# Marks this crate as a contract-build dependency so `stellar scaffold build`
+# orders it before any package that lists it under `[dependencies]` (e.g.
+# `registry-tansu-manager`, which `import_contract_client!`s tansu_stub.wasm
+# at compile time). Without this, the topo sort can't see the edge and a
+# clean-checkout build (CI) fails because tansu_stub.wasm isn't there yet.
+contract = true
