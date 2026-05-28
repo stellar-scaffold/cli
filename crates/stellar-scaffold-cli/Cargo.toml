@@ -62,7 +62,7 @@ heck = "0.5.0"
 hex = "0.4.3"
 shlex = "1.1.0"
 toml = { version = "0.9", features = ["parse", "preserve_order"] }
-rand = "0.8.5"
+rand = "0.9.2"
 notify = "8.2.0"
 stellar-strkey = { workspace = true }
 stellar-xdr = { workspace = true }
