@@ -1051,6 +1051,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "crate-git-revision"
+version = "0.0.9"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "54851b5b3f24621804b1cded2820975623c205e3055d2d44031cdb1237339ac8"
+dependencies = [
+ "serde",
+ "serde_derive",
+ "serde_json",
+]
+
+[[package]]
 name = "crc32fast"
 version = "1.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -4621,7 +4632,7 @@ dependencies = [
  "chrono",
  "clap",
  "clap_complete",
- "crate-git-revision",
+ "crate-git-revision 0.0.6",
  "csv",
  "directories",
  "dotenvy",
@@ -4699,7 +4710,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "bfc49a80a68fc1005847308e63b9fce39874de731940b1807b721d472de3ff01"
 dependencies = [
  "arbitrary",
- "crate-git-revision",
+ "crate-git-revision 0.0.6",
  "ethnum",
  "num-derive",
  "num-traits",
@@ -4717,7 +4728,7 @@ version = "26.1.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "08582c2c21bd3f7b737bcb76db9d4ca473f8349d65f8952a50eeed8823f44aef"
 dependencies = [
- "crate-git-revision",
+ "crate-git-revision 0.0.6",
  "ethnum",
  "num-derive",
  "num-traits",
@@ -4889,7 +4900,7 @@ checksum = "4502f2e018f238a4c5d3212d7d20ea6abcdc6e58babd63b642b693739db30fd1"
 dependencies = [
  "arbitrary",
  "bytes-lit",
- "crate-git-revision",
+ "crate-git-revision 0.0.6",
  "ctor",
  "derive_arbitrary",
  "ed25519-dalek",
@@ -4912,7 +4923,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "bdc156a0183eb584e57d45f63f3bd7023165980131d6eecc939fe5cda2490c63"
 dependencies = [
  "bytes-lit",
- "crate-git-revision",
+ "crate-git-revision 0.0.6",
  "rand 0.8.5",
  "rustc_version",
  "serde",
@@ -5237,7 +5248,7 @@ dependencies = [
  "assert_cmd",
  "assert_fs",
  "clap",
- "crate-git-revision",
+ "crate-git-revision 0.0.9",
  "dotenvy",
  "ed25519-dalek",
  "heck 0.5.0",
@@ -5292,7 +5303,7 @@ dependencies = [
  "cargo_metadata",
  "cargo_toml",
  "clap",
- "crate-git-revision",
+ "crate-git-revision 0.0.9",
  "degit-rs",
  "dialoguer",
  "dirs",
@@ -5391,7 +5402,7 @@ version = "0.0.13"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "ee1832fb50c651ad10f734aaf5d31ca5acdfb197a6ecda64d93fcdb8885af913"
 dependencies = [
- "crate-git-revision",
+ "crate-git-revision 0.0.6",
  "data-encoding",
 ]
 
@@ -5402,7 +5413,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "97e1a364048067bfcd24e6f1a93bba43eeb79c16b854596c841c3e8bab0bfa0c"
 dependencies = [
  "clap",
- "crate-git-revision",
+ "crate-git-revision 0.0.6",
  "data-encoding",
  "serde",
  "serde_json",
@@ -5416,7 +5427,7 @@ version = "0.0.16"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "084afcb0d458c3d5d5baa2d294b18f881e62cc258ef539d8fdf68be7dbe45520"
 dependencies = [
- "crate-git-revision",
+ "crate-git-revision 0.0.6",
  "data-encoding",
  "heapless",
 ]
@@ -5428,7 +5439,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "89d2848e1694b0c8db81fd812bfab5ea71ee28073e09ccc45620ef3cf7a75a9b"
 dependencies = [
  "cfg_eval",
- "crate-git-revision",
+ "crate-git-revision 0.0.6",
  "escape-bytes",
  "ethnum",
  "hex",
@@ -5447,7 +5458,7 @@ dependencies = [
  "arbitrary",
  "base64 0.22.1",
  "cfg_eval",
- "crate-git-revision",
+ "crate-git-revision 0.0.6",
  "escape-bytes",
  "ethnum",
  "hex",
@@ -5467,7 +5478,7 @@ dependencies = [
  "base64 0.22.1",
  "cfg_eval",
  "clap",
- "crate-git-revision",
+ "crate-git-revision 0.0.6",
  "escape-bytes",
  "ethnum",
  "hex",
