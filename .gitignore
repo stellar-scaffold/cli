@@ -6,3 +6,6 @@ test_snapshots/
 .vscode/
 .idea/
 .DS_Store
+
+# Per-run state from e2e-real-tansu-testnet.sh setup
+contracts/registry-tansu-manager/e2e-real-tansu-state-*.env
