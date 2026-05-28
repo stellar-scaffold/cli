@@ -2,8 +2,8 @@
 #![allow(clippy::too_many_arguments, clippy::needless_pass_by_value)]
 
 use soroban_sdk::{
-    contract, contractimpl, contracttype, vec, Address, Bytes, BytesN, Env, IntoVal, String,
-    Symbol, Val, Vec,
+    contract, contracterror, contractimpl, contracttype, panic_with_error, vec, Address, Bytes,
+    BytesN, Env, IntoVal, String, Symbol, Val, Vec,
 };
 
 // Tansu Proposal types — kept in lock-step with both `Consulting-Manao/tansu`
@@ -88,6 +88,22 @@ pub struct Proposal {
 #[contracttype]
 enum Key {
     Proposal(Bytes, u32),
+    /// Marker set when `execute(...)` runs for a (project_key, proposal_id).
+    /// On a second call we panic with [`Error::ProposalActive`] to mirror
+    /// Tansu's status guard.
+    Executed(Bytes, u32),
+}
+
+/// Subset of `Consulting-Manao/tansu`'s `ContractErrors` that this stub
+/// surfaces — keeps the same numeric codes so test harnesses can match by
+/// `Error(Contract, #N)` the same way they would against real Tansu.
+#[contracterror]
+#[derive(Copy, Clone, Debug, Eq, PartialEq, PartialOrd, Ord)]
+#[repr(u32)]
+pub enum Error {
+    /// The proposal has already been executed once (Tansu would say the
+    /// proposal isn't `Active` anymore).
+    ProposalActive = 402,
 }
 
 #[contract]
@@ -102,6 +118,46 @@ impl TansuStub {
             .persistent()
             .get(&Key::Proposal(project_key, proposal_id))
             .unwrap()
+    }
+
+    /// Stand-in for `Consulting-Manao/tansu`'s `execute`. Real Tansu tallies
+    /// votes, flips the proposal's status, then auto-invokes the
+    /// matching-branch outcome via `try_invoke_contract`. The stub skips the
+    /// tally (proposals are planted as `Approved` directly) but reproduces
+    /// the same auto-invocation + the `if proposal.status != Active` replay
+    /// guard, so callers like `RegistryTansuManager::trigger` can exercise
+    /// the full flow without needing live Tansu.
+    ///
+    /// `maintainer`, `tallies`, `seeds` are accepted for signature parity
+    /// with real Tansu's CLI shape; the stub ignores them.
+    pub fn execute(
+        env: &Env,
+        _maintainer: Address,
+        project_key: Bytes,
+        proposal_id: u32,
+        _tallies: Option<Vec<u128>>,
+        _seeds: Option<Vec<u128>>,
+    ) -> ProposalStatus {
+        let exec_key = Key::Executed(project_key.clone(), proposal_id);
+        if env.storage().persistent().has(&exec_key) {
+            panic_with_error!(env, Error::ProposalActive);
+        }
+
+        let proposal: Proposal = env
+            .storage()
+            .persistent()
+            .get(&Key::Proposal(project_key, proposal_id))
+            .unwrap();
+
+        // Auto-invoke the approved-branch outcome (index 0 in real Tansu).
+        if let Some(outcomes) = &proposal.outcome_contracts {
+            if let Some(oc) = outcomes.get(0) {
+                let _: Val = env.invoke_contract(&oc.address, &oc.execute_fn, oc.args.clone());
+            }
+        }
+
+        env.storage().persistent().set(&exec_key, &true);
+        proposal.status
     }
 
     /// Plant an arbitrary, fully-formed `Proposal`. Used by callers that need

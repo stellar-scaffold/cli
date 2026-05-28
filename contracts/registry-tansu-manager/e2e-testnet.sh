@@ -5,13 +5,18 @@
 # Flow:
 #   1. Deploy a fresh registry (no manager yet → author can self-publish).
 #   2. Author publishes hello.wasm to the registry.
-#   3. Deploy a tansu-stub (stand-in for the Tansu DAO).
+#   3. Deploy a tansu-stub (stand-in for the Tansu DAO; implements
+#      `get_proposal` + a Tansu-like `execute` that auto-invokes the outcome).
 #   4. Deploy the registry-tansu-manager, pointing at the stub + registry.
 #   5. Admin installs the manager on the registry.
 #   6. Plant an `Approved` deploy-proposal on the stub.
-#   7. Call manager.execute(proposal_id) — registry deploys hello via XCC.
+#   7. Call manager.trigger(proposal_id). The manager reads the proposal,
+#      pre-authorizes the outcome (registry.deploy) via
+#      `env.authorize_as_current_contract`, then calls stub.execute — which
+#      auto-invokes the outcome. The registry's manager.require_auth() is
+#      satisfied by the pre-authorization, so the deploy lands in one tx.
 #   8. Verify: invoke hello on the freshly deployed contract.
-#   9. Replay guard: second execute(proposal_id) returns AlreadyExecuted.
+#   9. Replay guard: second trigger(proposal_id) returns ProposalActive (#402).
 #
 # Usage: contracts/registry-tansu-manager/e2e-testnet.sh
 # Env vars:
@@ -142,13 +147,16 @@ stellar contract invoke --id "$TANSU_ID" \
     --contract_name "$CONTRACT_NAME" \
     --admin "$ADMIN_ADDR"
 
-# 7. Execute the proposal via the manager. No external signer is required —
-#    the registry's manager.require_auth() is satisfied by the manager
-#    contract's own outgoing-call auth.
-echo "==> Executing proposal via manager"
+# 7. Drive the proposal via manager.trigger. The manager reads the proposal
+#    from the stub, pre-authorizes the single outcome (registry.deploy) via
+#    `env.authorize_as_current_contract`, then calls the stub's
+#    `execute(...)`. The stub mimics real Tansu: auto-invokes the outcome via
+#    XCC; the registry's `manager.require_auth()` is satisfied by the
+#    pre-authorization, so the deploy lands in the same tx.
+echo "==> Driving proposal via manager.trigger"
 stellar contract invoke --id "$MANAGER_ID" \
     --source "$CALLER_ID" --network "$NETWORK" \
-    -- execute --proposal_id "$PROPOSAL_ID"
+    -- trigger --proposal_id "$PROPOSAL_ID"
 
 # 8. Verify the registry now resolves the deployed contract.
 echo "==> Resolving deployed contract via registry"
@@ -164,12 +172,13 @@ GREETING=$(stellar contract invoke --id "$DEPLOYED" \
     -- hello --to world)
 echo "    hello(world) = $GREETING"
 
-# 9. Replay guard.
-echo "==> Re-executing proposal — must fail with AlreadyExecuted"
+# 9. Replay guard — Tansu's own `if proposal.status != Active { panic }`
+#    (mirrored by the stub as `Error::ProposalActive = 402`).
+echo "==> Re-triggering proposal — must fail with ProposalActive"
 REPLAY_OUT=$(stellar contract invoke --id "$MANAGER_ID" \
     --source "$CALLER_ID" --network "$NETWORK" \
-    -- execute --proposal_id "$PROPOSAL_ID" 2>&1 || true)
-if grep -qE 'AlreadyExecuted|Error\(Contract, ?#5\)' <<<"$REPLAY_OUT"; then
+    -- trigger --proposal_id "$PROPOSAL_ID" 2>&1 || true)
+if grep -qE 'ProposalActive|Error\(Contract, ?#402\)' <<<"$REPLAY_OUT"; then
     echo "    ✓ replay rejected"
 else
     echo "    ❌ replay was NOT rejected" >&2
