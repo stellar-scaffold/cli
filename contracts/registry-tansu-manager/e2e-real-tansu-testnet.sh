@@ -171,17 +171,19 @@ phase_setup() {
     invoke --id "$REGISTRY_ID" --source "$MAINTAINER_ID" --send=yes \
         -- set_manager --new_manager "$MANAGER_ID" >/dev/null
 
-    # 7. Build the proposal. Outcome targets registry.publish_hash(hello) so a
-    #    successful proposal lands hello.wasm in the registry under the DAO's
-    #    authority.
+    # 7. Build the proposal. Outcome targets the manager's no-op `publish_hash`
+    #    proxy (same signature as the registry's). Tansu auto-invokes outcomes
+    #    inline; targeting the registry directly would fail at
+    #    `manager.require_auth` because Tansu isn't in that auth chain — this
+    #    manager is. The finalize phase then calls `manager.execute(proposal_id)`
+    #    which re-reads the same outcome and forwards `execute_fn + args` to
+    #    the registry with this contract's auth.
     NOW=$(date +%s)
     VOTING_ENDS_AT=$((NOW + 24*3600 + 600))   # 24h + 10min cushion
     PROPOSAL_TITLE="${PROPOSAL_TITLE:-Add hello@${HELLO_VERSION} to registry}"
-    # publish_hash(wasm_name: String, author: Address, wasm_hash: BytesN<32>, version: String)
-    # version is a plain String (not Option) — confirmed from registry.wasm interface.
     OUTCOME=$(cat <<EOF
 [{
-  "address": "$REGISTRY_ID",
+  "address": "$MANAGER_ID",
   "execute_fn": "publish_hash",
   "args": [
     {"string": "hello"},

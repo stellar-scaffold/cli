@@ -94,11 +94,11 @@ fn plant_proposal(
     tansu_stub::Client::new(env, tansu).set_proposal(project_key, &proposal);
 }
 
-fn one_outcome(env: &Env, registry: &Address, value: u32) -> Vec<OutcomeContract> {
+fn one_outcome(env: &Env, manager: &Address, value: u32) -> Vec<OutcomeContract> {
     vec![
         env,
         OutcomeContract {
-            address: registry.clone(),
+            address: manager.clone(),
             execute_fn: symbol_short!("man_only"),
             args: vec![env, value.into_val(env)],
         },
@@ -115,7 +115,7 @@ fn approved_proposal_forwards_to_registry() {
     let outcomes = vec![
         &s.env,
         OutcomeContract {
-            address: s.registry.clone(),
+            address: s.manager.clone(),
             execute_fn: Symbol::new(&s.env, "manager_only"),
             args: vec![&s.env, 42u32.into_val(&s.env)],
         },
@@ -201,12 +201,12 @@ fn proposal_with_multiple_outcomes_is_rejected() {
     let outcomes = vec![
         &s.env,
         OutcomeContract {
-            address: s.registry.clone(),
+            address: s.manager.clone(),
             execute_fn: Symbol::new(&s.env, "manager_only"),
             args: vec![&s.env, 1u32.into_val(&s.env)],
         },
         OutcomeContract {
-            address: s.registry.clone(),
+            address: s.manager.clone(),
             execute_fn: Symbol::new(&s.env, "manager_only"),
             args: vec![&s.env, 2u32.into_val(&s.env)],
         },
@@ -259,7 +259,7 @@ fn approved_proposal_cannot_be_replayed() {
     let outcomes = vec![
         &s.env,
         OutcomeContract {
-            address: s.registry.clone(),
+            address: s.manager.clone(),
             execute_fn: Symbol::new(&s.env, "manager_only"),
             args: vec![&s.env, 7u32.into_val(&s.env)],
         },
@@ -279,10 +279,12 @@ fn approved_proposal_cannot_be_replayed() {
 }
 
 #[test]
-fn proposal_targeting_manager_itself_is_rejected() {
-    // An attacker-crafted proposal whose outcome address is the manager
-    // contract (not the registry) must be rejected — otherwise the manager
-    // could be tricked into recursively re-entering itself.
+fn proposal_recursing_into_execute_is_rejected() {
+    // The new design *requires* outcome.address to be the manager itself (so
+    // Tansu's auto-invocation lands on a local no-op proxy instead of the
+    // registry). But the outcome.execute_fn must still NOT be `execute` — an
+    // attacker-crafted proposal could otherwise loop the manager back into
+    // itself. `execute` is rejected explicitly to break that.
     let s = setup();
     let outcomes = vec![
         &s.env,
