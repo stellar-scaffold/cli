@@ -1,0 +1,16 @@
+[package]
+name = "registry-stub"
+description = "Tiny registry-shaped contract used by registry-tansu-manager unit tests. Holds a `manager` address and exposes a `manager_only(value: u32) -> u32` function that requires the manager's auth — lets tests verify the manager-auth chain via soroban-sdk-tools' AuthClient builder."
+version = "0.0.0"
+edition = "2021"
+publish = false
+
+[lib]
+crate-type = ["cdylib"]
+doctest = false
+
+[dependencies]
+soroban-sdk = { workspace = true }
+
+[package.metadata.stellar]
+cargo_inherit = true

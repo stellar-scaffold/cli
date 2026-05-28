@@ -104,6 +104,15 @@ impl TansuStub {
             .unwrap()
     }
 
+    /// Plant an arbitrary, fully-formed `Proposal`. Used by callers that need
+    /// non-`Approved` states or unusual outcome shapes (e.g. unit tests that
+    /// exercise every rejection path in `RegistryTansuManager::execute`).
+    pub fn set_proposal(env: &Env, project_key: Bytes, proposal: Proposal) {
+        env.storage()
+            .persistent()
+            .set(&Key::Proposal(project_key, proposal.id), &proposal);
+    }
+
     /// Plant an `Approved` proposal whose single outcome is
     /// `registry.deploy(wasm_name, version, contract_name, admin, init, deployer)`.
     ///

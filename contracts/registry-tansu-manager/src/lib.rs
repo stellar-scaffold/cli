@@ -1,9 +1,6 @@
 #![no_std]
 
-use soroban_sdk::{
-    contract, contractimpl, contracttype, vec, Address, Bytes, BytesN, Env, IntoVal, String,
-    Symbol, Val, Vec,
-};
+use soroban_sdk::{self, contract, contractimpl, Address, Bytes, Env, Val};
 use soroban_sdk_tools::{contractstorage, InstanceItem, PersistentMap};
 
 #[soroban_sdk_tools::scerr]
@@ -20,83 +17,13 @@ pub enum Error {
     AlreadyExecuted,
 }
 
-// Tansu types mirrored from Consulting-Manao/tansu `contracts/tansu/src/types.rs`.
-// Field order, variant order, and `#[contracttype]` annotations must stay
-// identical to the upstream — Soroban encodes structs/enums by position, so
-// silent drift would surface as decode failures at runtime.
-
-#[contracttype]
-#[derive(Clone)]
-pub enum VoteChoice {
-    Approve,
-    Reject,
-    Abstain,
-}
-
-#[contracttype]
-#[derive(Clone)]
-pub struct PublicVote {
-    pub address: Address,
-    pub weight: u32,
-    pub vote_choice: VoteChoice,
-}
-
-#[contracttype]
-#[derive(Clone)]
-pub struct AnonymousVote {
-    pub address: Address,
-    pub weight: u32,
-    pub encrypted_seeds: Vec<String>,
-    pub encrypted_votes: Vec<String>,
-    pub commitments: Vec<BytesN<96>>,
-}
-
-#[contracttype]
-#[derive(Clone)]
-#[allow(clippy::large_enum_variant)]
-pub enum Vote {
-    PublicVote(PublicVote),
-    AnonymousVote(AnonymousVote),
-}
-
-#[contracttype]
-#[derive(Clone)]
-pub struct VoteData {
-    pub voting_ends_at: u64,
-    pub public_voting: bool,
-    pub token_contract: Option<Address>,
-    pub votes: Vec<Vote>,
-}
-
-#[contracttype]
-#[derive(Clone)]
-pub enum ProposalStatus {
-    Active,
-    Approved,
-    Rejected,
-    Cancelled,
-    Malicious,
-}
-
-#[contracttype]
-#[derive(Clone)]
-pub struct OutcomeContract {
-    pub address: Address,
-    pub execute_fn: Symbol,
-    pub args: Vec<Val>,
-}
-
-#[contracttype]
-#[derive(Clone)]
-pub struct Proposal {
-    pub id: u32,
-    pub title: String,
-    pub proposer: Address,
-    pub ipfs: String,
-    pub vote_data: VoteData,
-    pub status: ProposalStatus,
-    pub outcome_contracts: Option<Vec<OutcomeContract>>,
-}
+// Tansu proposal types + client come from the `tansu-stub` contract's wasm
+// (built by `stellar scaffold build` ahead of this crate via the Cargo edge in
+// `[dependencies]`). The stub is the single source of truth for these types,
+// hand-mirrored from upstream Tansu — see `contracts/test/tansu-stub/src/lib.rs`.
+// At runtime the manager points its `tansu` Address at *real* Tansu; the
+// wire-level encoding matches because the stub mirrors Tansu's spec.
+stellar_registry::import_contract_client!(tansu_stub);
 
 #[contractstorage(auto_shorten = true)]
 pub struct Storage {
@@ -150,6 +77,11 @@ impl RegistryTansuManager {
     /// so a wrong-project proposal cannot resolve. We do not re-verify
     /// `project_key` against any field of the returned proposal — Tansu's
     /// storage layout makes that lookup the only path.
+    ///
+    /// The forward call to the registry stays as untyped `env.invoke_contract`
+    /// rather than a typed client: an approved proposal can target *any*
+    /// registry method (whatever `execute_fn` + `args` the DAO passed), and a
+    /// typed client can't express that arbitrary forward.
     pub fn execute(env: &Env, proposal_id: u32) -> Result<Val, Error> {
         if Storage::has_executed(env, &proposal_id) {
             return Err(Error::AlreadyExecuted);
@@ -158,13 +90,10 @@ impl RegistryTansuManager {
         let project_key = Storage::get_project_key(env).unwrap();
         let registry = Storage::get_registry(env).unwrap();
 
-        let proposal: Proposal = env.invoke_contract(
-            &tansu,
-            &Symbol::new(env, "get_proposal"),
-            vec![env, project_key.into_val(env), proposal_id.into_val(env)],
-        );
+        let proposal =
+            tansu_stub::Client::new(env, &tansu).get_proposal(&project_key, &proposal_id);
 
-        if !matches!(proposal.status, ProposalStatus::Approved) {
+        if !matches!(proposal.status, tansu_stub::ProposalStatus::Approved) {
             return Err(Error::NotApproved);
         }
         let outcomes = proposal

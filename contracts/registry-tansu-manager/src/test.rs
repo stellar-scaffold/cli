@@ -3,69 +3,23 @@
 extern crate std;
 
 use soroban_sdk::{
-    contract, contractimpl, contracttype, symbol_short, testutils::Address as _, vec, Address,
-    Bytes, Env, IntoVal, String, Symbol, Vec,
+    self, symbol_short, testutils::Address as _, vec, Address, Bytes, Env, IntoVal, String, Symbol,
+    Vec,
 };
-use soroban_sdk_tools::auth::setup_mock_auth;
 
 use crate::{
-    Error, OutcomeContract, Proposal, ProposalStatus, RegistryTansuManager,
-    RegistryTansuManagerClient, VoteData,
+    tansu_stub::{self, OutcomeContract, Proposal, ProposalStatus, Vote, VoteData},
+    Error, RegistryTansuManager, RegistryTansuManagerClient,
 };
 
-// Stub Tansu contract: stores one Proposal under (project_key, id) and returns it on get_proposal.
-
-#[contracttype]
-enum TansuStubKey {
-    Proposal(Bytes, u32),
-}
-
-#[contract]
-pub struct TansuStub;
-
-#[contractimpl]
-impl TansuStub {
-    pub fn set_proposal(env: Env, project_key: Bytes, proposal: Proposal) {
-        env.storage()
-            .instance()
-            .set(&TansuStubKey::Proposal(project_key, proposal.id), &proposal);
-    }
-
-    pub fn get_proposal(env: Env, project_key: Bytes, proposal_id: u32) -> Proposal {
-        env.storage()
-            .instance()
-            .get(&TansuStubKey::Proposal(project_key, proposal_id))
-            .unwrap()
-    }
-}
-
-// Stub registry: requires manager auth on `manager_only`, records the value.
-
-#[contracttype]
-enum RegStubKey {
-    Manager,
-    Recorded,
-}
-
-#[contract]
-pub struct RegistryStub;
-
-#[contractimpl]
-impl RegistryStub {
-    pub fn __constructor(env: Env, manager: Address) {
-        env.storage().instance().set(&RegStubKey::Manager, &manager);
-    }
-
-    pub fn manager_only(env: Env, value: u32) -> u32 {
-        let manager: Address = env.storage().instance().get(&RegStubKey::Manager).unwrap();
-        manager.require_auth();
-        env.storage().instance().set(&RegStubKey::Recorded, &value);
-        value
-    }
-
-    pub fn recorded(env: Env) -> Option<u32> {
-        env.storage().instance().get(&RegStubKey::Recorded)
-    }
+// The `registry-stub` contract is wasm-imported via the soroban-sdk-tools macro
+// (not `import_contract_client!`) so we get the test-only `AuthClient` builder
+// alongside the regular `Client`. The AuthClient lets the
+// `registry_rejects_direct_caller` test below express "outsider tries to call
+// manager_only" with a single chained call instead of constructing MockAuth
+// scaffolding by hand.
+mod registry_stub {
+    soroban_sdk_tools::contractimport!(file = "../../target/stellar/local/registry_stub.wasm");
 }
 
 // ---------------------------------------------------------------------------
@@ -85,24 +39,16 @@ struct Setup {
 fn setup() -> Setup {
     let env = Env::default();
     let project_key = Bytes::from_slice(&env, &[7u8; 16]);
-    let tansu = env.register(TansuStub, ());
+    let tansu = env.register(tansu_stub::WASM, ());
 
-    // Pre-compute the manager address so the registry can be constructed with it
-    // as `manager`. (Registers a transient placeholder, then registers the real
-    // manager contract at a deterministic address derived from arg hash — simpler:
-    // register the manager first, then the registry with the manager address.)
+    // Register the manager with a dummy registry address; the real address is
+    // patched into instance storage below once the registry-stub is registered.
     let manager = env.register(
         RegistryTansuManager,
-        (
-            tansu.clone(),
-            project_key.clone(),
-            // dummy registry address; rewritten via instance storage below
-            Address::generate(&env),
-        ),
+        (tansu.clone(), project_key.clone(), Address::generate(&env)),
     );
-    let registry = env.register(RegistryStub, (manager.clone(),));
+    let registry = env.register(registry_stub::WASM, (manager.clone(),));
 
-    // Patch the manager's stored registry to the real RegistryStub address.
     env.as_contract(&manager, || {
         crate::Storage::set_registry(&env, &registry);
     });
@@ -124,7 +70,7 @@ fn empty_vote_data(env: &Env) -> VoteData {
         voting_ends_at: 0,
         public_voting: true,
         token_contract: None,
-        votes: Vec::new(env),
+        votes: Vec::<Vote>::new(env),
     }
 }
 
@@ -145,8 +91,7 @@ fn plant_proposal(
         status,
         outcome_contracts: outcomes,
     };
-    let client = TansuStubClient::new(env, tansu);
-    client.set_proposal(project_key, &proposal);
+    tansu_stub::Client::new(env, tansu).set_proposal(project_key, &proposal);
 }
 
 fn one_outcome(env: &Env, registry: &Address, value: u32) -> Vec<OutcomeContract> {
@@ -194,7 +139,7 @@ fn approved_proposal_forwards_to_registry() {
 
     assert_eq!(result, 42);
 
-    let reg = RegistryStubClient::new(&s.env, &s.registry);
+    let reg = registry_stub::Client::new(&s.env, &s.registry);
     assert_eq!(reg.recorded(), Some(42));
 }
 
@@ -305,8 +250,7 @@ fn proposal_targeting_wrong_address_is_rejected() {
 }
 
 // ---------------------------------------------------------------------------
-// Auth-flow guard: the registry's manager-only function must reject calls
-// that come from somewhere other than the manager contract.
+// Replay guard
 // ---------------------------------------------------------------------------
 
 #[test]
@@ -361,14 +305,22 @@ fn proposal_targeting_manager_itself_is_rejected() {
     assert_eq!(err, Error::OutcomeTargetMismatch);
 }
 
+// ---------------------------------------------------------------------------
+// Auth-flow guard: the registry's manager-only function must reject calls
+// that come from somewhere other than the manager contract.
+// ---------------------------------------------------------------------------
+
 #[test]
 #[should_panic] // require_auth on the manager address fails for an outside caller
 fn registry_rejects_direct_caller() {
     let s = setup();
     let outsider = Address::generate(&s.env);
 
-    // Authorize the outsider (not the manager contract) and call directly.
-    setup_mock_auth(&s.env, &s.registry, "manager_only", (99u32,), &[&outsider]);
-    let reg = RegistryStubClient::new(&s.env, &s.registry);
-    reg.manager_only(&99u32);
+    // Authorize the outsider (not the manager) and call manager_only directly.
+    // AuthClient chains the mock-auth setup onto the call in one builder,
+    // replacing the prior hand-built `setup_mock_auth(...)` + client.invoke().
+    registry_stub::AuthClient::new(&s.env, &s.registry)
+        .manager_only(&99u32)
+        .authorize(&outsider)
+        .invoke();
 }
