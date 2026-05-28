@@ -16,9 +16,13 @@
 #            calls manager.execute (forwards to registry.publish_hash),
 #            verifies the published wasm hash on the registry.
 #
-# Live Tansu (testnet): CBXKUSLQPVF35FYURR5C42BPYA5UOVDXX2ELKIM2CAJMCI6HXG2BHGZA
-# Collateral token (testnet XLM via native SAC): CDLZFC3SYJYDZT7K67VZ75HPJVIEUVNIXF47ZG2FB2RMQQVU2HHGCYSC
-# Proposal collateral: ~11 XLM (PROPOSAL_COLLATERAL + VOTE_COLLATERAL, badge-based).
+# Live Tansu (testnet):
+#   CBXKUSLQPVF35FYURR5C42BPYA5UOVDXX2ELKIM2CAJMCI6HXG2BHGZA
+#   https://stellar.expert/explorer/testnet/contract/CBXKUSLQPVF35FYURR5C42BPYA5UOVDXX2ELKIM2CAJMCI6HXG2BHGZA
+# Collateral token (testnet XLM via native SAC):
+#   CDLZFC3SYJYDZT7K67VZ75HPJVIEUVNIXF47ZG2FB2RMQQVU2HHGCYSC
+# Proposal collateral: 7 XLM (PROPOSAL_COLLATERAL); voting also takes 2 XLM
+# per voter (VOTE_COLLATERAL). Both refunded on Tansu.execute.
 
 set -euo pipefail
 
