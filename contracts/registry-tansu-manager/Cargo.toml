@@ -24,7 +24,6 @@ tansu-stub = { path = "../test/tansu-stub" }
 [dev-dependencies]
 soroban-sdk = { workspace = true, features = ["testutils"] }
 soroban-sdk-tools = { version = "0.1.2", features = ["testutils"] }
-registry-stub = { path = "../test/registry-stub" }
 
 [package.metadata.stellar]
 cargo_inherit = true

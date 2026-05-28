@@ -171,19 +171,30 @@ phase_setup() {
     invoke --id "$REGISTRY_ID" --source "$MAINTAINER_ID" --send=yes \
         -- set_manager --new_manager "$MANAGER_ID" >/dev/null
 
-    # 7. Build the proposal. Outcome targets the manager's no-op `publish_hash`
-    #    proxy (same signature as the registry's). Tansu auto-invokes outcomes
-    #    inline; targeting the registry directly would fail at
-    #    `manager.require_auth` because Tansu isn't in that auth chain — this
-    #    manager is. The finalize phase then calls `manager.execute(proposal_id)`
-    #    which re-reads the same outcome and forwards `execute_fn + args` to
-    #    the registry with this contract's auth.
+    # 6b. Hand Tansu maintainership over to the manager. After this, when the
+    #     finalize phase calls `manager.trigger(proposal_id)`, the manager is
+    #     the direct caller of Tansu.execute, so Tansu's internal
+    #     `maintainer.require_auth` is satisfied by contract-implicit auth
+    #     (no auth entry needed, no non-root recording issue).
+    echo "==> Tansu.update_config — replace maintainers with [$MANAGER_ID]"
+    invoke --id "$TANSU_ID" --source "$MAINTAINER_ID" --send=yes \
+        -- update_config \
+        --maintainer "$MAINTAINER_ADDR" \
+        --key "$PROJECT_KEY" \
+        --maintainers "[\"$MANAGER_ID\"]" \
+        --url "https://example.invalid/${PROJECT_NAME}" \
+        --ipfs "QmExampleIpfs0000000000000000000000000000000000" >/dev/null
+
+    # 7. Build the proposal. Outcome targets registry.publish_hash directly —
+    #    the manager pre-authorizes this specific call via
+    #    `authorize_as_current_contract` inside `trigger` so the registry's
+    #    `manager.require_auth` is satisfied.
     NOW=$(date +%s)
     VOTING_ENDS_AT=$((NOW + 24*3600 + 600))   # 24h + 10min cushion
     PROPOSAL_TITLE="${PROPOSAL_TITLE:-Add hello@${HELLO_VERSION} to registry}"
     OUTCOME=$(cat <<EOF
 [{
-  "address": "$MANAGER_ID",
+  "address": "$REGISTRY_ID",
   "execute_fn": "publish_hash",
   "args": [
     {"string": "hello"},
@@ -285,26 +296,17 @@ phase_finalize() {
         exit 1
     fi
 
-    # 1. Tansu.execute moves the proposal from Active to Approved if votes pass.
-    echo "==> Tansu.execute (Active -> Approved)"
-    STATUS_RAW=$(invoke --id "$TANSU_ID" --source "$MAINTAINER_ID" --send=yes \
-        -- execute \
-        --maintainer "$MAINTAINER_ADDR" \
-        --project_key "$PROJECT_KEY" \
-        --proposal_id "$PROPOSAL_ID")
-    STATUS="${STATUS_RAW//\"/}"
-    echo "    status: $STATUS"
-    if [[ "$STATUS" != "Approved" ]]; then
-        echo "❌ proposal did not pass — Tansu returned: $STATUS" >&2; exit 1
-    fi
-
-    # 2. Manager.execute reads the now-Approved proposal from Tansu via
-    #    get_proposal, then forwards the outcome (registry.publish_hash) via XCC.
-    echo "==> manager.execute -> registry.publish_hash via XCC"
+    # 1. manager.trigger drives Tansu.execute + the publish in one tx. The
+    #    manager (set as Tansu maintainer in setup step 6b) is the direct
+    #    caller of Tansu.execute, satisfying Tansu's
+    #    `maintainer.require_auth`. The manager pre-authorizes the registry
+    #    publish via `authorize_as_current_contract`, satisfying the
+    #    registry's `manager.require_auth`. Single tx.
+    echo "==> manager.trigger -> Tansu.execute -> registry.publish_hash (single tx)"
     invoke --id "$MANAGER_ID" --source "$MAINTAINER_ID" --send=yes \
-        -- execute --proposal_id "$PROPOSAL_ID" >/dev/null
+        -- trigger --proposal_id "$PROPOSAL_ID" >/dev/null
 
-    # 3. Verify the registry now has hello@version pointing at our uploaded hash.
+    # 2. Verify the registry now has hello@version pointing at our uploaded hash.
     echo "==> Verifying registry has hello@$HELLO_VERSION -> $HELLO_HASH"
     PUBLISHED_HASH_RAW=$(invoke --id "$REGISTRY_ID" --source "$MAINTAINER_ID" \
         -- fetch_hash --wasm_name hello --version "\"$HELLO_VERSION\"")
@@ -316,12 +318,12 @@ phase_finalize() {
         exit 1
     fi
 
-    # 4. Replay guard.
-    echo "==> Replay check — second manager.execute must fail with AlreadyExecuted"
+    # 3. Replay guard — Tansu's own ProposalActive check.
+    echo "==> Replay check — second manager.trigger must fail (ProposalActive)"
     REPLAY_OUT=$(invoke --id "$MANAGER_ID" --source "$MAINTAINER_ID" --send=yes \
-        -- execute --proposal_id "$PROPOSAL_ID" 2>&1 || true)
-    if grep -qE 'AlreadyExecuted|Error\(Contract, ?#5\)' <<<"$REPLAY_OUT"; then
-        echo "    ✓ replay rejected"
+        -- trigger --proposal_id "$PROPOSAL_ID" 2>&1 || true)
+    if grep -qE 'ProposalActive|Error\(Contract, ?#402\)' <<<"$REPLAY_OUT"; then
+        echo "    ✓ replay rejected by Tansu"
     else
         echo "    ❌ replay was NOT rejected" >&2
         echo "$REPLAY_OUT" >&2
@@ -335,7 +337,7 @@ phase_finalize() {
    project:  $PROJECT_NAME ($PROJECT_KEY)
    registry: $REGISTRY_ID
    manager:  $MANAGER_ID
-   proposal: #$PROPOSAL_ID -> $STATUS
+   proposal: #$PROPOSAL_ID -> Approved (via manager.trigger)
    hello:    $HELLO_HASH @ $HELLO_VERSION
 EOF
 }

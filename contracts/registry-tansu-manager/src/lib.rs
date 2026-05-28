@@ -1,40 +1,42 @@
 #![no_std]
+// Tansu-stub-generated client + types include multi-arg fns (e.g.
+// `set_deploy_proposal`), which trip `too_many_arguments`. Allow on the lib
+// since the lint fires inside the macro expansion of `import_contract_client!`.
+#![allow(clippy::too_many_arguments)]
 
-use soroban_sdk::{self, contract, contractimpl, Address, Bytes, BytesN, Env, String, Symbol, Val};
-use soroban_sdk_tools::{contractstorage, InstanceItem, PersistentMap};
+use soroban_sdk::{
+    self,
+    auth::{ContractContext, InvokerContractAuthEntry, SubContractInvocation},
+    contract, contractimpl, vec, Address, Bytes, Env, IntoVal, Symbol, Val, Vec,
+};
+use soroban_sdk_tools::{contractstorage, InstanceItem};
 
 #[soroban_sdk_tools::scerr]
 pub enum Error {
-    /// Proposal exists but is not in the `Approved` state.
-    NotApproved,
-    /// Proposal has no outcome contracts attached.
+    /// Proposal has no outcomes attached.
     NoOutcomeContracts,
-    /// Proposal has more than one outcome contract.
+    /// Proposal has more than one outcome — this manager authorizes exactly
+    /// one sub-call per proposal.
     MultipleOutcomes,
-    /// Proposal's outcome targets an address other than the configured registry.
-    OutcomeTargetMismatch,
-    /// Proposal has already been executed by this manager.
-    AlreadyExecuted,
 }
 
-// Tansu proposal types + client come from the `tansu-stub` contract's wasm
-// (built by `stellar scaffold build` ahead of this crate via the Cargo edge in
-// `[dependencies]`). The stub is the single source of truth for these types,
-// hand-mirrored from upstream Tansu — see `contracts/test/tansu-stub/src/lib.rs`.
-// At runtime the manager points its `tansu` Address at *real* Tansu; the
-// wire-level encoding matches because the stub mirrors Tansu's spec.
+// Proposal/status types are derived from the tansu-stub contract's wasm spec.
+// At runtime this manager points at *real* Tansu; the stub matches Tansu's
+// wire format so the generated `get_proposal` client decodes a live proposal
+// correctly.
 stellar_registry::import_contract_client!(tansu_stub);
 
 #[contractstorage(auto_shorten = true)]
 pub struct Storage {
-    /// Tansu DAO contract this manager queries proposals from.
+    /// Tansu DAO contract whose proposals this manager drives.
     tansu: InstanceItem<Address>,
-    /// Tansu workspace key this manager represents.
+    /// Tansu workspace key this manager represents. All Tansu lookups are
+    /// keyed by this — a wrong-project caller can't piggyback.
     project_key: InstanceItem<Bytes>,
-    /// Registry contract this manager forwards approved outcomes to.
+    /// Registry this manager is the manager of. Recorded for inspection;
+    /// `trigger` doesn't read it directly because it uses whatever outcome
+    /// the (project_key-gated) proposal carries.
     registry: InstanceItem<Address>,
-    /// Proposal IDs that have already been executed (replay guard).
-    executed: PersistentMap<u32, bool>,
 }
 
 #[contract]
@@ -60,45 +62,43 @@ impl RegistryTansuManager {
         Storage::get_registry(env).unwrap()
     }
 
-    /// Execute a passed Tansu proposal by forwarding its outcome to the registry.
+    /// Drive a Tansu proposal through to outcome execution in one transaction.
     ///
-    /// The proposal must be in `Approved` state and carry exactly one
-    /// `OutcomeContract`. The outcome's `address` must be this contract — i.e.
-    /// the proposal points at one of the no-op proxies on this manager (e.g.
-    /// [`publish_hash`]). Tansu's `execute` auto-invokes outcomes inline via
-    /// `env.try_invoke_contract`, so an outcome targeting the registry
-    /// directly would fail at the registry's `manager.require_auth()` (Tansu
-    /// isn't in that chain — this manager is) and revert the whole Tansu tx.
-    /// Routing through a no-op proxy here lets Tansu's auto-invocation succeed,
-    /// the proposal flip to `Approved`, and then an external caller invokes
-    /// `manager.execute(proposal_id)` to do the real registry forward with
-    /// this contract's auth.
+    /// Flow:
     ///
-    /// The forward itself is untyped — `oc.execute_fn` and `oc.args` are
-    /// passed through to the registry as-is. Any registry method we want to
-    /// gate behind a proposal just needs a matching no-op proxy added to this
-    /// contract; `execute` is not hardcoded to a specific method.
+    /// 1. Read the proposal from this manager's configured Tansu under this
+    ///    manager's configured `project_key`. Wrong-project callers can't
+    ///    construct a working invocation — `get_proposal` is keyed by
+    ///    `(project_key, proposal_id)` Tansu-side, so any mismatched proposal
+    ///    decodes to whatever lives at that key in *our* DAO or panics.
+    /// 2. Take the single approved-branch outcome (`outcome_contracts[0]`):
+    ///    its `address`, `execute_fn`, and `args`.
+    /// 3. Pre-authorize **this contract's auth** for exactly that one
+    ///    sub-call via `env.authorize_as_current_contract(...)`. Nothing
+    ///    else gets authorized. The auth entry is scoped to one specific
+    ///    `(contract, fn, args)` triple.
+    /// 4. Call `Tansu.execute(maintainer, project_key, proposal_id, _, _)`.
+    ///    Tansu tallies the votes, sets the proposal to its terminal status,
+    ///    and (on `Approved`) auto-invokes the outcome. When that outcome
+    ///    reaches `manager.require_auth()`, the host matches it against the
+    ///    pre-authorization from step 3 and lets the call run.
     ///
-    /// `execute` is rejected as a forward target to prevent recursive
-    /// re-entry through a maliciously crafted outcome.
+    /// For this to work the manager must be the Tansu project's maintainer
+    /// (set up at deploy time via `Tansu::register(..., maintainers=[manager])`
+    /// or `update_config`). That way the manager is the direct caller of
+    /// `Tansu::execute`, so Tansu's internal `maintainer.require_auth()` is
+    /// satisfied by contract-implicit auth — no auth entry needed for the
+    /// maintainer requirement, no non-root recording issue.
     ///
-    /// Replay-protected: a successful `execute` marks the proposal as
-    /// executed; later calls with the same `proposal_id` return
-    /// `AlreadyExecuted`.
-    pub fn execute(env: &Env, proposal_id: u32) -> Result<Val, Error> {
-        if Storage::has_executed(env, &proposal_id) {
-            return Err(Error::AlreadyExecuted);
-        }
+    /// Tansu's own `if proposal.status != Active` guard inside `execute`
+    /// prevents the same proposal being triggered twice — no separate
+    /// replay guard needed here.
+    pub fn trigger(env: &Env, proposal_id: u32) -> Result<(), Error> {
         let tansu = Storage::get_tansu(env).unwrap();
         let project_key = Storage::get_project_key(env).unwrap();
-        let registry = Storage::get_registry(env).unwrap();
 
         let proposal =
             tansu_stub::Client::new(env, &tansu).get_proposal(&project_key, &proposal_id);
-
-        if !matches!(proposal.status, tansu_stub::ProposalStatus::Approved) {
-            return Err(Error::NotApproved);
-        }
         let outcomes = proposal
             .outcome_contracts
             .ok_or(Error::NoOutcomeContracts)?;
@@ -106,45 +106,36 @@ impl RegistryTansuManager {
             return Err(Error::MultipleOutcomes);
         }
         let oc = outcomes.get(0).unwrap();
-        if oc.address != env.current_contract_address() {
-            return Err(Error::OutcomeTargetMismatch);
-        }
-        if oc.execute_fn == Symbol::new(env, "execute") {
-            // Don't let a crafted outcome recurse back into us.
-            return Err(Error::OutcomeTargetMismatch);
-        }
 
-        Storage::set_executed(env, &proposal_id, &true);
-        let result: Val = env.invoke_contract(&registry, &oc.execute_fn, oc.args);
-        Ok(result)
+        env.authorize_as_current_contract(vec![
+            env,
+            InvokerContractAuthEntry::Contract(SubContractInvocation {
+                context: ContractContext {
+                    contract: oc.address.clone(),
+                    fn_name: oc.execute_fn.clone(),
+                    args: oc.args.clone(),
+                },
+                sub_invocations: Vec::new(env),
+            }),
+        ]);
+
+        // Tansu.execute(maintainer, project_key, proposal_id, tallies, seeds).
+        // maintainer = self — must match the project's `maintainers` list in
+        // Tansu (configured at registration / update_config time).
+        let _: Val = env.invoke_contract(
+            &tansu,
+            &Symbol::new(env, "execute"),
+            vec![
+                env,
+                env.current_contract_address().into_val(env),
+                project_key.into_val(env),
+                proposal_id.into_val(env),
+                None::<Vec<u128>>.into_val(env),
+                None::<Vec<u128>>.into_val(env),
+            ],
+        );
+        Ok(())
     }
-
-    // -----------------------------------------------------------------------
-    // No-op proxy methods.
-    //
-    // Each one mirrors the signature of a registry method we want to gate
-    // behind a Tansu proposal. The proposal's outcome targets one of these by
-    // name + args; Tansu's auto-invocation lands here (does nothing); then
-    // `execute(proposal_id)` re-reads the same outcome and forwards
-    // `execute_fn + args` to the registry with this contract's auth chain.
-    //
-    // Adding support for another gated registry method = add another no-op
-    // proxy below with the matching signature. `execute` itself is unchanged.
-    // -----------------------------------------------------------------------
-
-    /// No-op proxy for `Registry::publish_hash`.
-    pub fn publish_hash(
-        _env: &Env,
-        _wasm_name: String,
-        _author: Address,
-        _wasm_hash: BytesN<32>,
-        _version: String,
-    ) {
-    }
-
-    /// No-op proxy used by unit tests that exercise the forward path against
-    /// the `registry-stub` fixture's `manager_only(value: u32)` method.
-    pub fn manager_only(_env: &Env, _value: u32) {}
 }
 
 #[cfg(test)]

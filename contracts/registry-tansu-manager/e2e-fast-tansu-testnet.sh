@@ -7,27 +7,25 @@
 # Custom Tansu (testnet): CDK7JBIIP6E75HOYLGRGWAHQLT6JUNUXQ7GNOYS3NAP26GISUXJ26UON
 #   https://stellar.expert/explorer/testnet/contract/CDK7JBIIP6E75HOYLGRGWAHQLT6JUNUXQ7GNOYS3NAP26GISUXJ26UON
 #
-# Flow (single phase):
+# Flow (single phase, single `manager.trigger` tx for the publish):
 #   1.  Register a fresh Tansu project with min_voting_period=$MIN_VOTING_PERIOD seconds
 #   2.  Add maintainer + voter as Tansu members
 #   3.  Upload hello.wasm, deploy registry, deploy manager, set_manager
-#   4.  Create proposal whose outcome targets `manager.publish_hash(...)` (a
-#       no-op proxy on the manager, same signature as the registry's). Tansu's
-#       auto-invocation in `contract_dao.rs::execute` lands on this no-op
-#       instead of the registry — pointing the outcome at the registry
-#       directly would fail at the registry's `manager.require_auth` (Tansu
-#       isn't in that auth chain) and `try_invoke_contract` would propagate
-#       the failure, reverting the whole Tansu tx.
+#   4.  Create proposal whose outcome is `registry.publish_hash(...)`
+#       targeting the registry directly.
 #   5.  Vote Approve from the second account
 #   6.  Sleep until past voting_ends_at + execute_delay
-#   7.  Tansu.execute (Active -> Approved). The no-op proxy succeeds; the
-#       proposal status persists.
-#   8.  manager.execute(proposal_id) — re-reads the now-Approved proposal,
-#       checks the outcome targets one of its proxies (and isn't a recursive
-#       `execute` re-entry), then forwards `oc.execute_fn + oc.args` to the
-#       registry with this contract's auth satisfying manager.require_auth.
-#   9.  Assert registry.fetch_hash returns the wasm hash we uploaded
-#  10.  Replay guard via second manager.execute
+#   7.  Call `manager.trigger(proposal_id, maintainer)`. The manager reads the
+#       proposal under its configured `(project_key, proposal_id)`, takes the
+#       single approved-branch outcome, and pre-authorizes that exact
+#       sub-call via `env.authorize_as_current_contract`. It then calls
+#       `Tansu.execute(maintainer, project_key, proposal_id, _, _)` which
+#       tallies votes, flips the proposal to Approved, and auto-invokes the
+#       outcome — the pre-authorization satisfies the registry's
+#       `manager.require_auth()` so publish_hash runs in the same tx.
+#   8.  Assert registry.fetch_hash returns the wasm hash we uploaded
+#   9.  Replay guard via second manager.trigger (Tansu rejects ProposalActive
+#       on the already-executed proposal, which trigger propagates)
 #
 # Env (all optional):
 #   NETWORK              Stellar network alias (default: testnet)
@@ -157,18 +155,30 @@ echo "==> Installing manager contract on registry"
 invoke --id "$REGISTRY_ID" --source "$MAINTAINER_ID" --send=yes \
     -- set_manager --new_manager "$MANAGER_ID" >/dev/null
 
-# 5. Create proposal whose outcome targets registry.publish_hash(hello).
+# 4b. Hand Tansu maintainership over to the manager. After this, the manager
+#     is the sole project maintainer — so when `trigger` calls Tansu.execute,
+#     Tansu's `maintainer.require_auth` is satisfied by contract-implicit
+#     auth (manager is the direct caller) and the recorder doesn't need to
+#     synthesize a non-root auth entry.
+echo "==> Tansu.update_config — replace maintainers with [$MANAGER_ID]"
+invoke --id "$TANSU_ID" --source "$MAINTAINER_ID" --send=yes \
+    -- update_config \
+    --maintainer "$MAINTAINER_ADDR" \
+    --key "$PROJECT_KEY" \
+    --maintainers "[\"$MANAGER_ID\"]" \
+    --url "https://example.invalid/${PROJECT_NAME}" \
+    --ipfs "QmExampleIpfs0000000000000000000000000000000000" >/dev/null
+
+# 5. Create proposal whose outcome targets registry.publish_hash directly.
+#    The manager pre-authorizes this specific outcome via
+#    `authorize_as_current_contract` inside `trigger`, then drives
+#    Tansu.execute itself — single tx, no non-root auth gymnastics.
 NOW=$(date +%s)
-VOTING_ENDS_AT=$((NOW + MIN_VOTING_PERIOD + 15))   # +15s buffer for tx propagation
+VOTING_ENDS_AT=$((NOW + MIN_VOTING_PERIOD + 15))
 echo "==> Creating proposal (voting_ends_at=$VOTING_ENDS_AT, in ~$((VOTING_ENDS_AT-NOW))s)"
-# Outcome targets the manager's no-op `publish_hash` proxy (same signature as
-# the registry's). Tansu's auto-invocation lands there harmlessly so the
-# proposal can flip to Approved; manager.execute(proposal_id) then re-reads
-# the same outcome and forwards `publish_hash + args` to the registry with
-# this contract's auth.
 OUTCOME=$(cat <<EOF
 [{
-  "address": "$MANAGER_ID",
+  "address": "$REGISTRY_ID",
   "execute_fn": "publish_hash",
   "args": [
     {"string": "hello"},
@@ -213,26 +223,12 @@ while (( $(date +%s) < WAIT_UNTIL )); do
 done
 echo ""
 
-# 8. Tansu.execute moves the proposal from Active to Approved.
-echo "==> Tansu.execute (Active -> Approved)"
-STATUS_RAW=$(invoke --id "$TANSU_ID" --source "$MAINTAINER_ID" --send=yes \
-    -- execute \
-    --maintainer "$MAINTAINER_ADDR" \
-    --project_key "$PROJECT_KEY" \
-    --proposal_id "$PROPOSAL_ID")
-STATUS="${STATUS_RAW//\"/}"
-echo "    status:             $STATUS"
-[[ "$STATUS" == "Approved" ]] || { echo "❌ proposal didn't pass: $STATUS" >&2; exit 1; }
-
-# 9. manager.execute -> registry.publish_hash via XCC. Manager re-reads the
-#    Approved proposal from Tansu, verifies the outcome targets one of its
-#    no-op proxies (not `execute` itself), and forwards execute_fn + args to
-#    the registry.
-echo "==> manager.execute -> registry.publish_hash"
+# 8. manager.trigger drives Tansu.execute + the publish in one tx.
+echo "==> manager.trigger -> Tansu.execute -> registry.publish_hash (single tx)"
 invoke --id "$MANAGER_ID" --source "$MAINTAINER_ID" --send=yes \
-    -- execute --proposal_id "$PROPOSAL_ID" >/dev/null
+    -- trigger --proposal_id "$PROPOSAL_ID" >/dev/null
 
-# 10. Verify the publish landed.
+# 9. Verify the publish landed.
 echo "==> Verifying registry has hello@$HELLO_VERSION -> $HELLO_HASH"
 PUBLISHED_HASH_RAW=$(invoke --id "$REGISTRY_ID" --source "$MAINTAINER_ID" \
     -- fetch_hash --wasm_name hello --version "\"$HELLO_VERSION\"")
@@ -244,12 +240,14 @@ else
     exit 1
 fi
 
-# 11. Replay guard.
-echo "==> Replay check — second manager.execute must fail with AlreadyExecuted"
+# 10. Replay guard — second manager.trigger calls into Tansu.execute again,
+#     which panics with ProposalActive (#402) because the proposal is no
+#     longer Active.
+echo "==> Replay check — second manager.trigger must fail (ProposalActive)"
 REPLAY_OUT=$(invoke --id "$MANAGER_ID" --source "$MAINTAINER_ID" --send=yes \
-    -- execute --proposal_id "$PROPOSAL_ID" 2>&1 || true)
-if grep -qE 'AlreadyExecuted|Error\(Contract, ?#5\)' <<<"$REPLAY_OUT"; then
-    echo "    ✓ replay rejected"
+    -- trigger --proposal_id "$PROPOSAL_ID" 2>&1 || true)
+if grep -qE 'ProposalActive|Error\(Contract, ?#402\)' <<<"$REPLAY_OUT"; then
+    echo "    ✓ replay rejected by Tansu"
 else
     echo "    ❌ replay was NOT rejected" >&2
     echo "$REPLAY_OUT" >&2
@@ -264,6 +262,6 @@ cat <<EOF
    period:   ${MIN_VOTING_PERIOD}s
    registry: $REGISTRY_ID
    manager:  $MANAGER_ID
-   proposal: #$PROPOSAL_ID -> $STATUS
+   proposal: #$PROPOSAL_ID -> Approved (via manager.trigger)
    hello:    $HELLO_HASH @ $HELLO_VERSION
 EOF
