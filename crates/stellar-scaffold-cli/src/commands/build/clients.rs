@@ -4,6 +4,7 @@ use crate::arg_parsing;
 use crate::arg_parsing::ArgParser;
 use crate::commands::build::clients::Error::UpgradeArgsError;
 use crate::commands::build::env_toml::{self, Environment};
+use crate::commands::build::scaffold_yml::ScaffoldConfig;
 use crate::commands::{PackageManager, PackageManagerSpec};
 use crate::extension::{self, ResolvedExtension};
 use indexmap::IndexMap;
@@ -166,6 +167,7 @@ pub struct Builder {
     pkg_manager: PackageManager,
     extensions: Vec<ResolvedExtension>,
     compile_ctx: Option<CompileContext>,
+    scaffold_config: ScaffoldConfig,
 }
 
 impl Builder {
@@ -181,6 +183,7 @@ impl Builder {
         pkg_manager: PackageManager,
         extensions: Vec<ResolvedExtension>,
         compile_ctx: Option<CompileContext>,
+        scaffold_config: ScaffoldConfig,
     ) -> Self {
         Self {
             printer: Print::new(global_args.quiet),
@@ -194,6 +197,7 @@ impl Builder {
             pkg_manager,
             extensions,
             compile_ctx,
+            scaffold_config,
         }
     }
 
@@ -361,7 +365,10 @@ export default new Client.Client({{
 }});
 "
         );
-        let path = self.workspace_root.join(format!("src/contracts/{name}.ts"));
+        let path = self
+            .workspace_root
+            .join(&self.scaffold_config.clients_dir)
+            .join(format!("{name}.ts"));
         std::fs::write(path, template)?;
         Ok(())
     }
@@ -377,8 +384,12 @@ export default new Client.Client({{
         let network = &self.network;
         let printer = self.printer();
         let workspace_root = &self.workspace_root;
-        let final_output_dir = workspace_root.join(format!("packages/{name}"));
-        let src_template_path = workspace_root.join(format!("src/contracts/{name}.ts"));
+        let final_output_dir = workspace_root
+            .join(&self.scaffold_config.bindings_dir)
+            .join(name);
+        let src_template_path = workspace_root
+            .join(&self.scaffold_config.clients_dir)
+            .join(format!("{name}.ts"));
 
         extension::run_hook(
             &self.extensions,
@@ -402,7 +413,10 @@ export default new Client.Client({{
         // require everything held across an await to be Send.
         let codegen_failure: Option<String> = async {
             if rebuild {
-                let temp_dir = workspace_root.join(format!("target/packages/{name}"));
+                let temp_dir = workspace_root
+                    .join("target")
+                    .join(&self.scaffold_config.bindings_dir)
+                    .join(name);
                 let temp_dir_display = temp_dir.display();
                 let config_dir = self.get_config_dir()?;
 
@@ -789,7 +803,8 @@ export default new Client.Client({{
             let needs_rebuild = deploy_kind != DeployKind::Unchanged
                 || !self
                     .workspace_root
-                    .join(format!("packages/{name}"))
+                    .join(&self.scaffold_config.bindings_dir)
+                    .join(name)
                     .exists();
             (contract_id, Some(new_hash), needs_rebuild)
         };
@@ -1095,6 +1110,8 @@ impl Args {
                 version: None,
             });
 
+        let scaffold_config = ScaffoldConfig::get(workspace_root);
+
         let builder = Builder::new(
             global_args,
             network,
@@ -1106,6 +1123,7 @@ impl Args {
             pkg_manager_spec.kind,
             self.extensions.clone(),
             self.compile_ctx.clone(),
+            scaffold_config,
         );
         Ok(builder)
     }

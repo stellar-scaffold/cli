@@ -217,6 +217,63 @@ fn set_package_manager_field(json: &str, value: &str) -> Option<String> {
     }
 }
 
+#[derive(thiserror::Error, Debug)]
+pub enum EngineConstraintError {
+    #[error(
+        "This project requires stellar-scaffold {required}, but the installed version is {installed}. \
+         Update with: cargo install stellar-scaffold-cli"
+    )]
+    ConstraintNotSatisfied { required: String, installed: String },
+    #[error("Invalid engines.stellar-scaffold constraint '{constraint}': {source}")]
+    InvalidConstraint {
+        constraint: String,
+        source: semver::Error,
+    },
+}
+
+/// Read `engines.stellar-scaffold` from `package.json` and verify the running
+/// CLI version satisfies it. Returns `Ok(())` if the file or field is absent.
+pub fn check_engine_constraint(workspace_root: &Path) -> Result<(), EngineConstraintError> {
+    #[derive(serde::Deserialize)]
+    struct Engines {
+        #[serde(rename = "stellar-scaffold")]
+        stellar_scaffold: Option<String>,
+    }
+    #[derive(serde::Deserialize)]
+    struct Pkg {
+        engines: Option<Engines>,
+    }
+
+    let Ok(contents) = read_to_string(workspace_root.join("package.json")) else {
+        return Ok(());
+    };
+    let Ok(pkg) = serde_json::from_str::<Pkg>(&contents) else {
+        return Ok(());
+    };
+    let Some(constraint_str) = pkg.engines.and_then(|e| e.stellar_scaffold) else {
+        return Ok(());
+    };
+
+    let req = semver::VersionReq::parse(&constraint_str).map_err(|e| {
+        EngineConstraintError::InvalidConstraint {
+            constraint: constraint_str.clone(),
+            source: e,
+        }
+    })?;
+
+    let installed =
+        semver::Version::parse(version::pkg()).expect("CARGO_PKG_VERSION is always valid semver");
+
+    if !req.matches(&installed) {
+        return Err(EngineConstraintError::ConstraintNotSatisfied {
+            required: constraint_str,
+            installed: installed.to_string(),
+        });
+    }
+
+    Ok(())
+}
+
 #[derive(Debug, Clone, PartialEq, clap::ValueEnum)]
 pub enum PackageManager {
     Npm,
@@ -376,6 +433,72 @@ mod tests {
         let result = set_package_manager_field(json, "bun@1.0.0").unwrap();
         assert!(result.contains(r#""scripts""#));
         assert!(result.contains(r#""packageManager": "bun@1.0.0""#));
+    }
+
+    mod engine_constraint {
+        use super::*;
+
+        fn write_package_json(dir: &std::path::Path, contents: &str) {
+            std::fs::write(dir.join("package.json"), contents).unwrap();
+        }
+
+        #[test]
+        fn ok_when_no_package_json() {
+            let dir = tempfile::tempdir().unwrap();
+            assert!(check_engine_constraint(dir.path()).is_ok());
+        }
+
+        #[test]
+        fn ok_when_no_engines_field() {
+            let dir = tempfile::tempdir().unwrap();
+            write_package_json(dir.path(), r#"{"name": "my-app"}"#);
+            assert!(check_engine_constraint(dir.path()).is_ok());
+        }
+
+        #[test]
+        fn ok_when_no_stellar_scaffold_engine() {
+            let dir = tempfile::tempdir().unwrap();
+            write_package_json(dir.path(), r#"{"engines": {"node": ">=18"}}"#);
+            assert!(check_engine_constraint(dir.path()).is_ok());
+        }
+
+        #[test]
+        fn ok_when_constraint_satisfied() {
+            let dir = tempfile::tempdir().unwrap();
+            // Current CLI version (from CARGO_PKG_VERSION) is 0.0.24, so >=0.0.1 passes.
+            write_package_json(
+                dir.path(),
+                r#"{"engines": {"stellar-scaffold": ">=0.0.1"}}"#,
+            );
+            assert!(check_engine_constraint(dir.path()).is_ok());
+        }
+
+        #[test]
+        fn err_when_constraint_not_satisfied() {
+            let dir = tempfile::tempdir().unwrap();
+            // Require a version far ahead of the current CLI.
+            write_package_json(
+                dir.path(),
+                r#"{"engines": {"stellar-scaffold": ">=999.0.0"}}"#,
+            );
+            assert!(matches!(
+                check_engine_constraint(dir.path()),
+                Err(EngineConstraintError::ConstraintNotSatisfied { .. })
+            ));
+        }
+
+        #[test]
+        fn err_on_invalid_constraint() {
+            let dir = tempfile::tempdir().unwrap();
+            write_package_json(
+                dir.path(),
+                r#"{"engines": {"stellar-scaffold": "not-a-version"}}"#,
+            );
+            assert!(matches!(
+                check_engine_constraint(dir.path()),
+                Err(EngineConstraintError::InvalidConstraint { .. })
+            ));
+        }
     }
 
     mod parameterized {

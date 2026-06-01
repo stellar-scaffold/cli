@@ -1,5 +1,6 @@
 use crate::commands::build::clients::ScaffoldEnv;
 use crate::commands::build::env_toml::{self, Account, Environment};
+use crate::commands::build::scaffold_yml::ScaffoldConfig;
 use cargo_metadata::Metadata;
 use clap::Parser;
 use std::{
@@ -59,10 +60,11 @@ impl Cmd {
         Self::clean_target_stellar(&cargo_meta, &printer)?;
 
         let workspace_root: PathBuf = cargo_meta.workspace_root.into();
+        let scaffold_config = ScaffoldConfig::get(&workspace_root);
 
-        Self::clean_packages(&workspace_root, &printer)?;
+        Self::clean_packages(&workspace_root, &scaffold_config, &printer)?;
 
-        Self::clean_src_contracts(&workspace_root, &printer)?;
+        Self::clean_src_contracts(&workspace_root, &scaffold_config, &printer)?;
 
         Self::clean_contract_aliases(&workspace_root, &printer)?;
 
@@ -84,9 +86,19 @@ impl Cmd {
         Ok(())
     }
 
-    fn clean_packages(workspace_root: &Path, printer: &Print) -> Result<(), Error> {
-        let packages_path: PathBuf = workspace_root.join("packages");
-        let git_tracked_packages_entries = Self::git_tracked_entries(workspace_root, "packages");
+    fn clean_packages(
+        workspace_root: &Path,
+        scaffold_config: &ScaffoldConfig,
+        printer: &Print,
+    ) -> Result<(), Error> {
+        let packages_path: PathBuf = workspace_root.join(&scaffold_config.bindings_dir);
+        let bindings_dir_str = scaffold_config
+            .bindings_dir
+            .to_str()
+            .unwrap_or("packages")
+            .to_string();
+        let git_tracked_packages_entries =
+            Self::git_tracked_entries(workspace_root, &bindings_dir_str);
         Self::clean_dir(
             workspace_root,
             &packages_path,
@@ -95,10 +107,19 @@ impl Cmd {
         )
     }
 
-    fn clean_src_contracts(workspace_root: &Path, printer: &Print) -> Result<(), Error> {
-        let src_contracts_path = workspace_root.join("src").join("contracts");
+    fn clean_src_contracts(
+        workspace_root: &Path,
+        scaffold_config: &ScaffoldConfig,
+        printer: &Print,
+    ) -> Result<(), Error> {
+        let src_contracts_path = workspace_root.join(&scaffold_config.clients_dir);
+        let clients_dir_str = scaffold_config
+            .clients_dir
+            .to_str()
+            .unwrap_or("src/contracts")
+            .to_string();
         let git_tracked_src_contract_entries =
-            Self::git_tracked_entries(workspace_root, "src/contracts");
+            Self::git_tracked_entries(workspace_root, &clients_dir_str);
         Self::clean_dir(
             workspace_root,
             &src_contracts_path,

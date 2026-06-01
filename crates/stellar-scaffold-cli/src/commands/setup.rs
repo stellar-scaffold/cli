@@ -6,7 +6,10 @@ use std::path::{Path, PathBuf};
 use std::process::Command;
 use std::{env, io};
 
-use super::{PackageManager, PackageManagerSpec, build};
+use super::build::env_toml;
+use super::{
+    EngineConstraintError, PackageManager, PackageManagerSpec, build, check_engine_constraint,
+};
 use crate::extension::{ExtensionListStatus, list as list_extensions};
 use stellar_cli::{commands::global, print::Print};
 
@@ -40,6 +43,10 @@ pub enum Error {
     IoError(#[from] io::Error),
     #[error(transparent)]
     BuildError(Box<build::Error>),
+    #[error(transparent)]
+    SchemaVersion(#[from] build::scaffold_yml::Error),
+    #[error(transparent)]
+    EngineConstraint(#[from] EngineConstraintError),
 }
 
 impl Cmd {
@@ -56,6 +63,9 @@ impl Cmd {
             }
         });
 
+        build::scaffold_yml::check_version(&absolute_project_path)?;
+        check_engine_constraint(&absolute_project_path)?;
+
         let env_path = absolute_project_path.join(".env");
         if !env_path.exists() {
             let example_path = absolute_project_path.join(".env.example");
@@ -64,6 +74,16 @@ impl Cmd {
             {
                 printer.warnln(format!("Failed to copy .env.example: {e}"));
             }
+        }
+
+        if let Ok(Some(dev_env)) = env_toml::Environment::get(
+            &absolute_project_path,
+            &build::clients::ScaffoldEnv::Development,
+        ) && dev_env.network.run_locally
+            && Command::new("docker").arg("--version").output().is_err()
+        {
+            printer.warnln("Docker not found. Install it from https://docs.docker.com/get-docker/");
+            printer.warnln("Docker is required to run a local Stellar network (run-locally = true in environments.toml).");
         }
 
         ensure_extensions_installed(&absolute_project_path, &printer, self.yes);
@@ -119,9 +139,10 @@ impl Cmd {
         let pm_command = pkg_manager.kind.command();
         run_install(pm_command, &absolute_project_path, &printer);
 
-        printer.infoln("Compiling contracts...");
+        printer.infoln("Compiling contracts and generating client packages...");
         let mut build_command = build::Command::parse_from(["build"]);
         build_command.build.manifest_path = Some(absolute_project_path.join("Cargo.toml"));
+        build_command.build_clients = true;
         let mut build_args = global_args.clone();
         if !(global_args.verbose && global_args.very_verbose) {
             build_args.quiet = true;
