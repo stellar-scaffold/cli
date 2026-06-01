@@ -29,7 +29,7 @@ pub enum Error {
 /// ```yaml
 /// config:
 ///   contracts_dir: contracts
-///   bindings_dir: packages
+///   bindings_dir: bindings
 ///   clients_dir: src/contracts
 /// ```
 #[derive(Debug, Clone, serde::Deserialize)]
@@ -37,7 +37,9 @@ pub enum Error {
 pub struct ScaffoldConfig {
     /// Directory containing Rust/Soroban contract source (default: `"contracts"`).
     pub contracts_dir: std::path::PathBuf,
-    /// Directory where generated TypeScript npm packages are written (default: `"packages"`).
+    /// Directory where generated Contract Bindings (TypeScript npm packages) are
+    /// written (default: `"bindings"`). CLI-owned; kept separate from authored
+    /// workspace packages so generated output is never overwritten or GC'd by hand.
     pub bindings_dir: std::path::PathBuf,
     /// Directory where per-contract TypeScript client stub files are written (default: `"src/contracts"`).
     pub clients_dir: std::path::PathBuf,
@@ -47,7 +49,7 @@ impl Default for ScaffoldConfig {
     fn default() -> Self {
         Self {
             contracts_dir: "contracts".into(),
-            bindings_dir: "packages".into(),
+            bindings_dir: "bindings".into(),
             clients_dir: "src/contracts".into(),
         }
     }
@@ -109,7 +111,7 @@ mod tests {
         let dir = tempfile::TempDir::new().unwrap();
         let config = ScaffoldConfig::get(dir.path());
         assert_eq!(config.contracts_dir, PathBuf::from("contracts"));
-        assert_eq!(config.bindings_dir, PathBuf::from("packages"));
+        assert_eq!(config.bindings_dir, PathBuf::from("bindings"));
         assert_eq!(config.clients_dir, PathBuf::from("src/contracts"));
     }
 
@@ -137,7 +139,7 @@ mod tests {
         .unwrap();
         let config = ScaffoldConfig::get(dir.path());
         assert_eq!(config.contracts_dir, PathBuf::from("contracts"));
-        assert_eq!(config.bindings_dir, PathBuf::from("packages"));
+        assert_eq!(config.bindings_dir, PathBuf::from("bindings"));
         assert_eq!(config.clients_dir, PathBuf::from("src/contracts"));
     }
 
