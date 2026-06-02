@@ -392,16 +392,17 @@ crate-type = ["cdylib"]
     }
 
     #[test]
-    fn test_clean_packages() {
+    fn test_clean_bindings() {
         let global_args = global::Args::default();
         let temp_dir = TempDir::new().unwrap();
         let manifest_path = create_test_workspace(temp_dir.path());
 
-        let packages_path = temp_dir.path().join("packages");
-        let test_package_path = packages_path.join("test_contract_package");
+        // Default bindings_dir is `bindings/` (ADR 0007).
+        let bindings_path = temp_dir.path().join("bindings");
+        let test_package_path = bindings_path.join("test_contract_package");
         std::fs::create_dir_all(&test_package_path).unwrap();
 
-        let gitkeep_path = packages_path.join(".gitkeep");
+        let gitkeep_path = bindings_path.join(".gitkeep");
         fs::write(&gitkeep_path, "").unwrap();
 
         let cmd = Cmd {
@@ -412,11 +413,11 @@ crate-type = ["cdylib"]
 
         assert!(
             !test_package_path.exists(),
-            "packages/test_contract_package/ should be removed"
+            "bindings/test_contract_package/ should be removed"
         );
         assert!(
             gitkeep_path.exists(),
-            "packages/.gitkeep should be preserved"
+            "bindings/.gitkeep should be preserved"
         );
     }
 

@@ -10,7 +10,7 @@ use std::path::{Path, PathBuf};
 use stellar_cli::commands::global::Args;
 use toml_edit::{DocumentMut, Item, Table, value};
 
-use crate::{arg_parsing, commands::build, commands::init::FRONTEND_TEMPLATE};
+use crate::{arg_parsing, commands::build, commands::init::DEFAULT_UI_REPO};
 use stellar_cli::print::Print;
 
 /// A command to upgrade an existing Soroban workspace to a scaffold project
@@ -127,7 +127,9 @@ impl Cmd {
             .to_str()
             .ok_or(Error::InvalidWorkspacePathEncoding)?;
 
-        degit(FRONTEND_TEMPLATE, temp_str);
+        // TODO: upgrade now pulls the whole UI monorepo, not a single frontend.
+        // Needs monorepo-aware rework (pick a framework, copy only that template).
+        degit(DEFAULT_UI_REPO, temp_str);
 
         if metadata(temp_path).is_err() || read_dir(temp_path)?.next().is_none() {
             return Err(Error::DegitError(format!(

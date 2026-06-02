@@ -2,9 +2,9 @@ use clap::Parser;
 use dialoguer::theme::ColorfulTheme;
 use dialoguer::{Confirm, Select};
 use std::fs::copy;
-use std::path::{Path, PathBuf};
+use std::io;
+use std::path::Path;
 use std::process::Command;
-use std::{env, io};
 
 use super::build::env_toml;
 use super::{
@@ -12,30 +12,6 @@ use super::{
 };
 use crate::extension::{ExtensionListStatus, list as list_extensions};
 use stellar_cli::{commands::global, print::Print};
-
-const PNPM_WORKSPACE: &str = r#"packages:
-  - "packages/*"
-"#;
-const DENO_CONFIG: &str = r#"{
-  "nodeModulesDir": "auto"
-}
-"#;
-
-/// A command to set up an existing project (idempotent)
-#[derive(Parser, Debug, Clone)]
-pub struct Cmd {
-    /// Path to the project root
-    #[arg(default_value = ".")]
-    pub project_path: PathBuf,
-
-    /// Specify package manager, omitting will prompt interactively
-    #[arg(short = 'p', long)]
-    pub package_manager: Option<PackageManager>,
-
-    /// Accept all defaults and skip interactive prompts
-    #[arg(short = 'y', long)]
-    pub yes: bool,
-}
 
 #[derive(thiserror::Error, Debug)]
 pub enum Error {
@@ -49,117 +25,84 @@ pub enum Error {
     EngineConstraint(#[from] EngineConstraintError),
 }
 
-impl Cmd {
-    pub async fn run(&self, global_args: &global::Args) -> Result<PackageManager, Error> {
-        let printer = Print::new(global_args.quiet);
+/// The `prepare` step of `init`: the network/tooling tail run after the
+/// project's files are in place. Package-manager *selection* and *file writes*
+/// happen earlier (in `init` and `instantiate`); this takes the already-chosen
+/// manager and does environment setup, dependency install, contract build, and
+/// git init. Per ADR 0008, this is the folded-in successor to the old `setup`
+/// subcommand.
+pub async fn prepare(
+    project_path: &Path,
+    pkg_manager: &PackageManagerSpec,
+    global_args: &global::Args,
+    yes: bool,
+) -> Result<(), Error> {
+    let printer = Print::new(global_args.quiet);
 
-        let absolute_project_path = self.project_path.canonicalize().unwrap_or_else(|_| {
-            if self.project_path.is_absolute() {
-                self.project_path.clone()
-            } else {
-                env::current_dir()
-                    .unwrap_or_default()
-                    .join(&self.project_path)
-            }
-        });
+    build::scaffold_yml::check_version(project_path)?;
+    check_engine_constraint(project_path)?;
 
-        build::scaffold_yml::check_version(&absolute_project_path)?;
-        check_engine_constraint(&absolute_project_path)?;
-
-        let env_path = absolute_project_path.join(".env");
-        if !env_path.exists() {
-            let example_path = absolute_project_path.join(".env.example");
-            if example_path.exists()
-                && let Err(e) = copy(&example_path, &env_path)
-            {
-                printer.warnln(format!("Failed to copy .env.example: {e}"));
-            }
-        }
-
-        if let Ok(Some(dev_env)) = env_toml::Environment::get(
-            &absolute_project_path,
-            &build::clients::ScaffoldEnv::Development,
-        ) && dev_env.network.run_locally
-            && Command::new("docker").arg("--version").output().is_err()
+    let env_path = project_path.join(".env");
+    if !env_path.exists() {
+        let example_path = project_path.join(".env.example");
+        if example_path.exists()
+            && let Err(e) = copy(&example_path, &env_path)
         {
-            printer.warnln("Docker not found. Install it from https://docs.docker.com/get-docker/");
-            printer.warnln("Docker is required to run a local Stellar network (run-locally = true in environments.toml).");
+            printer.warnln(format!("Failed to copy .env.example: {e}"));
         }
+    }
 
-        ensure_extensions_installed(&absolute_project_path, &printer, self.yes);
+    if let Ok(Some(dev_env)) =
+        env_toml::Environment::get(project_path, &build::clients::ScaffoldEnv::Development)
+        && dev_env.network.run_locally
+        && Command::new("docker").arg("--version").output().is_err()
+    {
+        printer.warnln("Docker not found. Install it from https://docs.docker.com/get-docker/");
+        printer.warnln("Docker is required to run a local Stellar network (run-locally = true in environments.toml).");
+    }
 
-        let Some(pkg_manager) = (match &self.package_manager {
-            Some(kind) => {
-                let version = pkg_manager_version(kind.command());
-                Some(PackageManagerSpec {
-                    kind: kind.clone(),
-                    version,
-                })
-            }
-            None => select_pkg_manager(&printer, self.yes),
-        }) else {
-            printer.warnln("Package manager selection cancelled.");
-            return Ok(PackageManager::Npm);
-        };
+    ensure_extensions_installed(project_path, &printer, yes);
 
-        match pkg_manager.kind {
-            PackageManager::Pnpm => {
-                if let Err(e) = std::fs::write(
-                    absolute_project_path.join("pnpm-workspace.yaml"),
-                    PNPM_WORKSPACE,
-                ) {
-                    printer.warnln(format!("Failed to create pnpm-workspace.yaml: {e}"));
-                }
-            }
-            PackageManager::Deno => {
-                if let Err(e) = std::fs::write(absolute_project_path.join("deno.json"), DENO_CONFIG)
-                {
-                    printer.warnln(format!("Failed to create deno.json: {e}"));
-                }
-            }
-            _ => {}
+    let pm_command = pkg_manager.kind.command();
+    run_install(pm_command, project_path, &printer);
+
+    printer.infoln("Compiling contracts and generating client packages...");
+    let mut build_command = build::Command::parse_from(["build"]);
+    build_command.build.manifest_path = Some(project_path.join("Cargo.toml"));
+    build_command.build_clients = true;
+    let mut build_args = global_args.clone();
+    if !(global_args.verbose && global_args.very_verbose) {
+        build_args.quiet = true;
+    }
+    if let Err(e) = build_command.run(&build_args).await.map_err(Box::new) {
+        printer.warnln(format!("Failed to compile contracts: {e}"));
+    }
+
+    if git_exists() {
+        git_init(project_path);
+        if git_has_changes(project_path) {
+            git_add(project_path, &["-A"]);
+            git_commit(project_path, "initial commit");
         }
+    }
 
-        if pkg_manager.kind != PackageManager::Npm {
-            let lock = absolute_project_path.join("package-lock.json");
-            if lock.exists()
-                && let Err(e) = std::fs::remove_file(&lock)
-            {
-                printer.warnln(format!("Failed to remove package-lock.json: {e}"));
-            }
-        }
+    Ok(())
+}
 
-        if pkg_manager
-            .write_to_package_json(&absolute_project_path)
-            .is_err()
-        {
-            printer.warnln("Failed to write the selected package manager to package.json");
-        }
-
-        let pm_command = pkg_manager.kind.command();
-        run_install(pm_command, &absolute_project_path, &printer);
-
-        printer.infoln("Compiling contracts and generating client packages...");
-        let mut build_command = build::Command::parse_from(["build"]);
-        build_command.build.manifest_path = Some(absolute_project_path.join("Cargo.toml"));
-        build_command.build_clients = true;
-        let mut build_args = global_args.clone();
-        if !(global_args.verbose && global_args.very_verbose) {
-            build_args.quiet = true;
-        }
-        if let Err(e) = build_command.run(&build_args).await.map_err(Box::new) {
-            printer.warnln(format!("Failed to compile contracts: {e}"));
-        }
-
-        if git_exists() {
-            git_init(&absolute_project_path);
-            if git_has_changes(&absolute_project_path) {
-                git_add(&absolute_project_path, &["-A"]);
-                git_commit(&absolute_project_path, "initial commit");
-            }
-        }
-
-        Ok(pkg_manager.kind)
+/// Resolve a package-manager choice: honor an explicit `-p`, else prompt
+/// (or pick the default when `yes`). Returns `None` only if the interactive
+/// prompt is cancelled.
+pub(crate) fn resolve_pkg_manager(
+    requested: Option<&PackageManager>,
+    printer: &Print,
+    yes: bool,
+) -> Option<PackageManagerSpec> {
+    match requested {
+        Some(kind) => Some(PackageManagerSpec {
+            kind: kind.clone(),
+            version: pkg_manager_version(kind.command()),
+        }),
+        None => select_pkg_manager(printer, yes),
     }
 }
 

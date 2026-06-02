@@ -54,9 +54,6 @@ impl Root {
     pub async fn run(&mut self) -> Result<(), Error> {
         match &mut self.cmd {
             Cmd::Init(init_info) => init_info.run(&self.global_args).await?,
-            Cmd::Setup(setup_info) => {
-                setup_info.run(&self.global_args).await?;
-            }
             Cmd::Version(version_info) => version_info.run(),
             Cmd::Build(build_info) => build_info.run(&self.global_args).await?,
             Cmd::Generate(generate) => match &mut generate.cmd {
@@ -86,8 +83,6 @@ impl FromStr for Root {
 pub enum Cmd {
     /// Initialize the project
     Init(init::Cmd),
-    /// Set up an existing project (copy .env, install extensions, build contracts, git init)
-    Setup(setup::Cmd),
     /// Version of the scaffold-stellar-cli
     Version(version::Cmd),
 
@@ -118,8 +113,6 @@ pub enum Error {
     // TODO: stop using Debug for displaying errors
     #[error(transparent)]
     Init(#[from] init::Error),
-    #[error(transparent)]
-    Setup(#[from] setup::Error),
     #[error(transparent)]
     BuildContracts(#[from] build::Error),
     #[error(transparent)]
