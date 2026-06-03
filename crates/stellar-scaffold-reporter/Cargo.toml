@@ -20,7 +20,7 @@ serde_json = "1"
 clap = { version = "4", features = ["derive"] }
 
 [dev-dependencies]
-assert_cmd = "2.2.1"
+assert_cmd = "2.2.2"
 stellar-scaffold-test = { path = "../stellar-scaffold-test" }
 
 [features]
