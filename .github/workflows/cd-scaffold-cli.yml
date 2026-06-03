@@ -28,7 +28,7 @@ defaults:
 jobs:
   upload-assets:
     name: ${{ matrix.target }}
-    if: github.repository_owner == 'theahaco'
+    if: github.repository_owner == 'stellar-scaffold'
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false

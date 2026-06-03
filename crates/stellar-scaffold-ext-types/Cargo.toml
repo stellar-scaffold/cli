@@ -4,7 +4,7 @@ version = "0.0.2"
 edition = "2024"
 description = "Shared types for stellar-scaffold extension hooks"
 license = "Apache-2.0"
-repository = "https://github.com/theahaco/scaffold-stellar/tree/main/crates/stellar-scaffold-ext-types"
+repository = "https://github.com/stellar-scaffold/cli/tree/main/crates/stellar-scaffold-ext-types"
 
 [lib]
 crate-type = ["rlib"]

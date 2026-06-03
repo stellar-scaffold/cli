@@ -1,7 +1,7 @@
 # Scaffold Stellar
 
 [![Apache 2.0 licensed](https://img.shields.io/badge/license-apache%202.0-blue.svg)](LICENSE)
-[![Ask DeepWiki](https://deepwiki.com/badge.svg)](https://deepwiki.com/AhaLabs/scaffold-stellar)
+[![Ask DeepWiki](https://deepwiki.com/badge.svg)](https://deepwiki.com/stellar-scaffold/cli)
 
 **Scaffold Stellar** is a developer toolkit for building decentralized applications (dApps) and smart contracts on the [**Stellar** blockchain](https://stellar.org).
 
@@ -119,7 +119,7 @@ my-project/
 
 This template provides a ready-to-use frontend application with example smart contracts and their TypeScript clients. You can use these as reference while building your own contracts and UI. The frontend is set up with `Vite`, `React`, and includes basic components for interacting with the contracts.
 
-See the [CLI Documentation](https://github.com/theahaco/scaffold-stellar/blob/main/docs/cli.md) for detailed command information and the [Environments Guide](https://github.com/theahaco/scaffold-stellar/blob/main/docs/environments.md) for configuration details.
+See the [CLI Documentation](https://scaffoldstellar.com/docs/cli) for detailed command information and the [Environments Guide](https://scaffoldstellar.com/docs/environments) for configuration details.
 
 ---
 
@@ -231,11 +231,9 @@ Your repo contains the following key folders:
 |Folder	| Purpose |
 |-------|---------|
 |`.cargo/`, `.config/`	| Rust and build settings|
-|`contracts/` |	Example smart contracts|
-|`crates/`|	Internal Rust libraries and helpers|
-|`docs/`|	Documentation files|
-|`npm/`|	Shared frontend packages|
-|`deploy_registry.sh`|	Helper script to deploy the registry|
+|`crates/`|	The `stellar-scaffold` CLI and its supporting Rust libraries|
+|`docs/site/`|	Documentation site (Docusaurus) published to scaffoldstellar.com|
+|`npm/`|	npm wrapper that installs the prebuilt CLI binary|
 |`justfile` |	Commands you can run with just|
 
 ---
@@ -256,11 +254,11 @@ Your repo contains the following key folders:
 ## Contributing
 We love contributions! If you're new, check these out:
 
-[Contributing Guide](https://github.com/theahaco/scaffold-stellar/blob/main/CONTRIBUTING.md)
+[Contributing Guide](https://github.com/stellar-scaffold/cli/blob/main/CONTRIBUTING.md)
 
 ## License
 
-#### This project is licensed under the Apache-2.0 License — see the [LICENSE](https://github.com/scaffold-stellar/blob/main/LICENSE) file for details.
+#### This project is licensed under the Apache-2.0 License — see the [LICENSE](https://github.com/stellar-scaffold/cli/blob/main/LICENSE) file for details.
 ---
 
 ## Need Help?

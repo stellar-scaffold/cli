@@ -12,7 +12,7 @@ use crate::commands::{PackageManager, PackageManagerSpec};
 use crate::extension::{ExtensionListStatus, list as list_extensions};
 use stellar_cli::{commands::global, print::Print};
 
-pub const FRONTEND_TEMPLATE: &str = "theahaco/scaffold-stellar-frontend";
+pub const FRONTEND_TEMPLATE: &str = "stellar-scaffold/ui";
 const TUTORIAL_BRANCH: &str = "tutorial";
 const PNPM_WORKSPACE: &str = r#"packages:
   - "packages/*"

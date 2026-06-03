@@ -11,9 +11,6 @@ path:
 scaffold +args:
     @cargo run --bin stellar-scaffold --quiet -- {{ args }}
 
-registry +args:
-    @cargo run --bin stellar-registry --quiet -- {{ args }}
-
 reporter +args:
     @cargo run --bin stellar-scaffold-reporter --quiet -- {{ args }}
 
@@ -29,11 +26,10 @@ stellar +args:
 build_contract p:
     stellar contract build --profile contracts --package {{ p }}
 
-# build contracts
+# Build the CLI and the fixture test contracts
 build:
-    just stellar-scaffold build --profile contracts
-    cargo build $CI_BUILD --package stellar-registry-cli
-    stellar contract optimize --wasm ./target/stellar/local/registry.wasm --wasm-out ./target/stellar/local/registry.wasm
+    cargo build $CI_BUILD --package stellar-scaffold-cli
+    just build-cli-test-contracts
 
 # Setup the project to use a pinned version of the CLI
 setup:
@@ -59,10 +55,6 @@ _test-integration package filter ci="false":
 _test-scaffold filter ci="false":
     just _test-integration stellar-scaffold-cli '{{ filter }}' {{ ci }}
 
-[private]
-_test-scaffold-ci filter:
-    jsut _test-scaffold {{ filter }}  --binaries-metadata target/nextest/binaries-metadata.json --cargo-metadata target/nextest/cargo-metadata.json --target-dir-remap target --workspace-remap .
-
 # Run scaffold-cli accounts & contracts integration tests
 test-integration-scaffold-build-clients ci="false":
     just _test-scaffold 'test(build_clients)' {{ ci }}
@@ -81,18 +73,9 @@ test-integration-scaffold-examples-2 ci="false":
     just _test-scaffold 'test(examples::) and test(/case_15/)' {{ ci }}
     just _test-scaffold 'test(examples::) and (test(/case_1[6-9]/) or test(/case_2/))' {{ ci }}
 
-# Run registry-cli integration tests
-test-integration-registry ci="false":
-    just _test-integration stellar-registry-cli 'test(/./)' {{ ci }}
-
 # Run reporter integration tests
 test-integration-reporter ci="false":
     just _test-integration stellar-scaffold-reporter 'test(/./)' {{ ci }}
-
-create: build
-    rm -rf .soroban
-    -stellar keys generate default --fund
-    # just stellar contract deploy --wasm ./target/stellar/local/example_status_message.wasm --alias core --source-account default
 
 clippy *args:
     cargo clippy --all {{ args }} \
@@ -100,7 +83,3 @@ clippy *args:
 
 clippy-test:
     just clippy --tests --all-features
-
-# update deterministic contract IDs after changes to `contracts/registry/.salt`
-update-registry-tests:
-    UPDATE_EXPECT=1 cargo test --package stellar-registry-build registry::generate_id
