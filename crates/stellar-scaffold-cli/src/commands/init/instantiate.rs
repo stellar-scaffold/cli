@@ -16,9 +16,10 @@ pub const TEMPLATES_DIR: &str = "templates";
 /// The directory selected template is promoted to
 pub const APP_DIR: &str = "app";
 
-/// The declared workspaces for instantiated project, handled differently
-/// depending on the selected package manager
-const INSTANTIATED_WORKSPACES: &[&str] = &["app", "bindings/*", "core"];
+/// The declared workspaces for the instantiated project. `e2e/` is kept (its
+/// self-adapting config targets the single `app/` post-init); `templates/*` is
+/// gone, replaced by `app`.
+const INSTANTIATED_WORKSPACES: &[&str] = &["app", "bindings/*", "core", "e2e"];
 
 const DENO_CONFIG: &str = "{\n  \"nodeModulesDir\": \"auto\"\n}\n";
 
@@ -101,6 +102,26 @@ pub fn instantiate(root: &Path, framework: &str) -> Result<(), Error> {
     fs::remove_dir_all(&templates)?;
 
     rewrite_root_workspaces(root)?;
+    prune_e2e_snapshots(root)?;
+    Ok(())
+}
+
+/// Remove the committed visual-snapshot baselines from the kept `e2e/` suite.
+/// They are per-framework (e.g. `home-react-darwin.png`); after init only the
+/// single `app/` remains, so the user regenerates their own on first run.
+fn prune_e2e_snapshots(root: &Path) -> Result<(), Error> {
+    let tests = root.join("e2e").join("tests");
+    if !tests.is_dir() {
+        return Ok(());
+    }
+    for entry in fs::read_dir(&tests)? {
+        let entry = entry?;
+        if entry.file_type()?.is_dir()
+            && entry.file_name().to_string_lossy().ends_with("-snapshots")
+        {
+            fs::remove_dir_all(entry.path())?;
+        }
+    }
     Ok(())
 }
 
@@ -183,6 +204,16 @@ mod tests {
             "{\"name\":\"@stellar-scaffold/ui-core\"}",
         );
         write(&root.join("contracts/.gitkeep"), "");
+        // e2e is kept post-init; its per-framework snapshot baselines are not.
+        write(&root.join("e2e/tests/smoke.spec.ts"), "// smoke");
+        write(
+            &root.join("e2e/tests/visual.spec.ts-snapshots/home-react-darwin.png"),
+            "png",
+        );
+        write(
+            &root.join("e2e/tests/visual.spec.ts-snapshots/home-svelte-darwin.png"),
+            "png",
+        );
         dir
     }
 
@@ -245,7 +276,23 @@ mod tests {
             serde_json::from_str(&fs::read_to_string(root.join("package.json")).unwrap()).unwrap();
         assert_eq!(
             pkg["workspaces"],
-            serde_json::json!(["app", "bindings/*", "core"])
+            serde_json::json!(["app", "bindings/*", "core", "e2e"])
+        );
+    }
+
+    #[test]
+    fn instantiate_prunes_e2e_snapshots_but_keeps_specs() {
+        let dir = fixture();
+        let root = dir.path();
+        instantiate(root, "react").unwrap();
+
+        assert!(
+            !root.join("e2e/tests/visual.spec.ts-snapshots").exists(),
+            "stale per-framework snapshots removed"
+        );
+        assert!(
+            root.join("e2e/tests/smoke.spec.ts").exists(),
+            "e2e specs kept"
         );
     }
 

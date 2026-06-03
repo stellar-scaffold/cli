@@ -4,13 +4,15 @@ use clap::Parser;
 use degit::degit;
 use indexmap::IndexMap;
 use std::fs;
-use std::fs::{create_dir_all, metadata, read_dir, write};
+use std::fs::{metadata, read_dir, write};
 use std::io;
 use std::path::{Path, PathBuf};
 use stellar_cli::commands::global::Args;
 use toml_edit::{DocumentMut, Item, Table, value};
 
-use crate::{arg_parsing, commands::build, commands::init::DEFAULT_UI_REPO};
+use crate::{
+    arg_parsing, commands::build, commands::init::DEFAULT_UI_REPO, commands::init::instantiate,
+};
 use stellar_cli::print::Print;
 
 /// A command to upgrade an existing Soroban workspace to a scaffold project
@@ -22,6 +24,9 @@ pub struct Cmd {
     /// Skip the prompt to fill in constructor arguments
     #[arg(long)]
     pub skip_prompt: bool,
+    /// Framework for the frontend (e.g. `react`). Omit to choose interactively.
+    #[arg(long)]
+    pub template: Option<String>,
 }
 
 /// Errors that can occur during upgrade
@@ -57,6 +62,10 @@ pub enum Error {
     SorobanSpecTools(#[from] soroban_spec_tools::contract::Error),
     #[error(transparent)]
     CopyError(#[from] fs_extra::error::Error),
+    #[error(transparent)]
+    Instantiate(#[from] instantiate::Error),
+    #[error("Framework selection cancelled")]
+    Cancelled,
 }
 
 impl Cmd {
@@ -88,6 +97,13 @@ impl Cmd {
 
         printer.infoln("Downloading frontend template...");
         Self::clone_frontend_template(temp_path)?;
+
+        // Collapse the UI monorepo to a single chosen framework before copying:
+        // `instantiate` promotes `templates/<fw>` to `app/`, drops the rest, and
+        // rewrites the root workspaces.
+        let framework = self.select_framework(temp_path)?;
+        printer.infoln(format!("Using {framework} template..."));
+        instantiate::instantiate(temp_path, &framework)?;
 
         printer.infoln("Copying frontend files...");
         self.copy_frontend_files(temp_path)?;
@@ -122,13 +138,30 @@ impl Cmd {
         Ok(())
     }
 
+    /// Resolve the framework: explicit `--template`, the only one available, or
+    /// an interactive pick (falls back to the first when `--skip-prompt`).
+    fn select_framework(&self, temp_path: &Path) -> Result<String, Error> {
+        if let Some(template) = &self.template {
+            return Ok(template.clone());
+        }
+        let available = instantiate::enumerate_templates(temp_path)?;
+        if self.skip_prompt || available.len() <= 1 {
+            return available.into_iter().next().ok_or(Error::Cancelled);
+        }
+        let index = dialoguer::Select::with_theme(&dialoguer::theme::ColorfulTheme::default())
+            .with_prompt("Pick a framework")
+            .items(&available)
+            .default(0)
+            .interact()
+            .map_err(|_| Error::Cancelled)?;
+        available.into_iter().nth(index).ok_or(Error::Cancelled)
+    }
+
     fn clone_frontend_template(temp_path: &Path) -> Result<(), Error> {
         let temp_str = temp_path
             .to_str()
             .ok_or(Error::InvalidWorkspacePathEncoding)?;
 
-        // TODO: upgrade now pulls the whole UI monorepo, not a single frontend.
-        // Needs monorepo-aware rework (pick a framework, copy only that template).
         degit(DEFAULT_UI_REPO, temp_str);
 
         if metadata(temp_path).is_err() || read_dir(temp_path)?.next().is_none() {
@@ -175,12 +208,6 @@ impl Cmd {
 
                 fs_extra::file::copy(&src, &dest, &copy_options)?;
             }
-        }
-
-        // Create packages directory if it doesn't exist
-        let packages_dir = self.workspace_path.join("packages");
-        if !packages_dir.exists() {
-            create_dir_all(&packages_dir)?;
         }
 
         Ok(())

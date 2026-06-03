@@ -296,7 +296,9 @@ impl Cmd {
         }
     }
 
-    // cleans the given directory while preserving git tracked files, as well as some common template files: utils.js and .gitkeep
+    // cleans the given directory while preserving git-tracked files and .gitkeep
+    // (everything else in a generated dir like bindings/ or core/clients/ is
+    // regenerable). Authored clients are kept by virtue of being git-tracked.
     fn clean_dir(
         workspace_root: &Path,
         dir_to_clean: &Path,
@@ -315,11 +317,9 @@ impl Cmd {
                     continue;
                 }
 
-                // Preserve common template files regardless of git status
+                // Preserve .gitkeep regardless of git status
                 let filename = path.file_name().and_then(|n| n.to_str());
-                if let Some(name) = filename
-                    && (name == "util.ts" || name == ".gitkeep")
-                {
+                if filename == Some(".gitkeep") {
                     continue;
                 }
 
@@ -422,19 +422,20 @@ crate-type = ["cdylib"]
     }
 
     #[test]
-    fn test_clean_src_contracts() {
+    fn test_clean_clients() {
         let global_args = global::Args::default();
         let temp_dir = TempDir::new().unwrap();
         let manifest_path = create_test_workspace(temp_dir.path());
 
-        let src_contracts_path = temp_dir.path().join("src").join("contracts");
-        std::fs::create_dir_all(&src_contracts_path).unwrap();
+        // Default clients_dir is `core/clients` (ADR 0009).
+        let clients_path = temp_dir.path().join("core").join("clients");
+        std::fs::create_dir_all(&clients_path).unwrap();
 
-        let test_contract_path = src_contracts_path.join("test_contract_client.js");
+        let test_contract_path = clients_path.join("test_contract_client.js");
         fs::write(&test_contract_path, "").unwrap();
 
-        let util_path = src_contracts_path.join("util.ts");
-        fs::write(&util_path, "").unwrap();
+        let gitkeep_path = clients_path.join(".gitkeep");
+        fs::write(&gitkeep_path, "").unwrap();
 
         let cmd = Cmd {
             manifest_path: Some(manifest_path),
@@ -444,11 +445,11 @@ crate-type = ["cdylib"]
 
         assert!(
             !test_contract_path.exists(),
-            "src/contracts/test_contract_client.js should be removed"
+            "core/clients/test_contract_client.js (generated) should be removed"
         );
         assert!(
-            util_path.exists(),
-            "src/contracts/util.js should be preserved"
+            gitkeep_path.exists(),
+            "core/clients/.gitkeep should be preserved"
         );
     }
 }
