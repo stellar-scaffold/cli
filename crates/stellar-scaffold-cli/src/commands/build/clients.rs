@@ -355,7 +355,7 @@ impl Builder {
         let network_passphrase = &network.network_passphrase;
         let template = format!(
             r"import * as Client from '{name}';
-import {{ rpcUrl }} from './util';
+import {{ rpcUrl }} from '@stellar-scaffold/ui-core';
 
 export default new Client.Client({{
   networkPassphrase: '{network_passphrase}',

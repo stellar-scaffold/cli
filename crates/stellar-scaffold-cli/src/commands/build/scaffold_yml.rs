@@ -30,7 +30,7 @@ pub enum Error {
 /// config:
 ///   contracts_dir: contracts
 ///   bindings_dir: bindings
-///   clients_dir: src/contracts
+///   clients_dir: core/clients
 /// ```
 #[derive(Debug, Clone, serde::Deserialize)]
 #[serde(default)]
@@ -41,7 +41,9 @@ pub struct ScaffoldConfig {
     /// written (default: `"bindings"`). CLI-owned; kept separate from authored
     /// workspace packages so generated output is never overwritten or GC'd by hand.
     pub bindings_dir: std::path::PathBuf,
-    /// Directory where per-contract TypeScript client stub files are written (default: `"src/contracts"`).
+    /// Directory where the shared per-contract Contract Clients are generated
+    /// (default: `"core/clients"`). One set shared by every template; imported
+    /// by app code. See ADR 0009.
     pub clients_dir: std::path::PathBuf,
 }
 
@@ -50,7 +52,7 @@ impl Default for ScaffoldConfig {
         Self {
             contracts_dir: "contracts".into(),
             bindings_dir: "bindings".into(),
-            clients_dir: "src/contracts".into(),
+            clients_dir: "core/clients".into(),
         }
     }
 }
@@ -112,7 +114,7 @@ mod tests {
         let config = ScaffoldConfig::get(dir.path());
         assert_eq!(config.contracts_dir, PathBuf::from("contracts"));
         assert_eq!(config.bindings_dir, PathBuf::from("bindings"));
-        assert_eq!(config.clients_dir, PathBuf::from("src/contracts"));
+        assert_eq!(config.clients_dir, PathBuf::from("core/clients"));
     }
 
     #[test]
@@ -140,7 +142,7 @@ mod tests {
         let config = ScaffoldConfig::get(dir.path());
         assert_eq!(config.contracts_dir, PathBuf::from("contracts"));
         assert_eq!(config.bindings_dir, PathBuf::from("bindings"));
-        assert_eq!(config.clients_dir, PathBuf::from("src/contracts"));
+        assert_eq!(config.clients_dir, PathBuf::from("core/clients"));
     }
 
     #[test]
@@ -198,6 +200,6 @@ mod tests {
         let config = ScaffoldConfig::get(dir.path());
         assert_eq!(config.contracts_dir, PathBuf::from("contracts"));
         assert_eq!(config.bindings_dir, PathBuf::from("my_packages"));
-        assert_eq!(config.clients_dir, PathBuf::from("src/contracts"));
+        assert_eq!(config.clients_dir, PathBuf::from("core/clients"));
     }
 }
