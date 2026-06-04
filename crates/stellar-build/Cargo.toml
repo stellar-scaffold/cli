@@ -4,7 +4,7 @@ version = "0.0.6"
 edition = "2024"
 description = "A library for gathering Contracts"
 license = "Apache-2.0"
-repository = "https://github.com/theahaco/scaffold-stellar/tree/main/crates/stellar-build"
+repository = "https://github.com/stellar-scaffold/cli/tree/main/crates/stellar-build"
 
 
 [lib]

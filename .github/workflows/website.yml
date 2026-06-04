@@ -7,7 +7,7 @@ on:
   workflow_dispatch:
   pull_request:
     paths:
-      - 'website/**'
+      - 'docs/site/**'
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.head_ref || github.run_id }}
@@ -16,7 +16,7 @@ concurrency:
 defaults:
   run:
     shell: bash
-    working-directory: ./website
+    working-directory: ./docs/site
 
 jobs:
   website-docs:
@@ -29,7 +29,7 @@ jobs:
         with:
           node-version: 24
           cache: 'npm'
-          cache-dependency-path: './website/package-lock.json'
+          cache-dependency-path: './docs/site/package-lock.json'
 
       - name: Install dependencies
         run: npm ci

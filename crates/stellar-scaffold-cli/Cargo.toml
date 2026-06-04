@@ -1,14 +1,14 @@
 [package]
 name = "stellar-scaffold-cli"
 description = "Stellar CLI plugin for building smart contracts with frontend support"
-homepage = "https://github.com/theahaco/scaffold-stellar"
+homepage = "https://github.com/stellar-scaffold/cli"
 authors = ["Aha Labs <hello@theaha.co>"]
 license = "Apache-2.0"
 readme = "README.md"
 version = "0.0.24"
 edition = "2024"
 autobins = false
-repository = "https://github.com/theahaco/scaffold-stellar/tree/main/crates/stellar-scaffold-cli"
+repository = "https://github.com/stellar-scaffold/cli/tree/main/crates/stellar-scaffold-cli"
 
 [[bin]]
 name = "stellar-scaffold"

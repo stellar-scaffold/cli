@@ -4,7 +4,7 @@ version = "0.8.14"
 edition = "2024"
 description = "Macros needed by stellar-scaffold"
 license = "Apache-2.0"
-repository = "https://github.com/theahaco/scaffold-stellar/tree/main/crates/stellar-scaffold-macro"
+repository = "https://github.com/stellar-scaffold/cli/tree/main/crates/stellar-scaffold-macro"
 
 [lib]
 proc-macro = true

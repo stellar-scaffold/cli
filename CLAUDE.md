@@ -4,35 +4,33 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-Scaffold Stellar is a developer toolkit for building dApps and smart contracts on the Stellar blockchain. It provides two Stellar CLI plugins:
-- **stellar-scaffold** (`crates/stellar-scaffold-cli`) - Project scaffolding, building, and frontend generation
-- **stellar-registry** (`crates/stellar-registry-cli`) - Publishing and deploying contracts via an on-chain registry
+This repo is the **stellar-scaffold** CLI — a Stellar CLI plugin (`stellar scaffold`) for scaffolding dApps and smart contracts, plus its supporting Rust libraries. It is one of several repos split out of the original `scaffold-stellar` monorepo.
+
+Related repos:
+- `stellar-scaffold/ui` — frontend template fetched by `stellar scaffold init`
+- `stellar-registry/cli` — the `stellar registry` CLI (consumes `stellar-build` and `stellar-scaffold-macro` published from this repo)
+- `stellar-registry/contracts` — on-chain registry contracts
 
 ## Common Commands
 
 ```bash
-# Setup development environment (installs stellar-cli v26.0.0)
+# Install the pinned stellar-cli (v26.0.0) into ./target/bin and set up git hooks
 just setup
 
-# Build contracts and optimize registry wasm
-just build
+# Build / check / test
+cargo build --workspace
+cargo check --workspace --all-targets
+cargo test --workspace
 
-# Run unit tests (builds first)
-just test
+# Run the CLI during development (stellar scaffold ...)
+cargo run -p stellar-scaffold-cli -- <args>
 
-# Run integration tests (requires local Stellar RPC via Docker)
-just test-integration
-
-# Format check
+# Format and lint
 cargo fmt --all -- --check
-
-# Lint across entire workspace (matches CI)
-just clippy
-
-# Run CLI directly during development
-just scaffold <args>    # runs stellar-scaffold
-just registry <args>    # runs stellar-registry
+cargo clippy --all-targets
 ```
+
+Note: the `justfile` still carries some recipes from the monorepo (e.g. `just build` references the registry wasm). Prefer the `cargo` commands above until the justfile is trimmed to this repo.
 
 ## Code Quality Checklist
 
@@ -43,53 +41,45 @@ After making changes to Rust code, always run in order:
 
 Clippy and warning flags are configured in `.cargo/config.toml` `rustflags` and apply automatically to every `cargo` invocation — no extra flags needed. `just clippy` runs across the whole workspace with additional allow-list overrides and matches CI.
 
+
 ## Architecture
 
 ### Crate Structure
 
 | Crate | Purpose |
 |-------|---------|
-| `stellar-scaffold-cli` | Main Scaffold CLI: init, build, generate, watch commands |
-| `stellar-registry-cli` | Main Registry CLI: publish, deploy, download, upgrade commands |
-| `stellar-build` | Contract building logic and dependency resolution |
-| `stellar-scaffold-ext-types` | Rust types for Scaffold CLI extensions |
-| `stellar-registry-build` | Registry interaction and contract deployment logic |
-| `stellar-registry` | Shared registry types and utilities |
-| `stellar-scaffold-macro` | Procedural macros |
-| `stellar-scaffold-reporter` | Reference extension for Scaffold CLI reporting useful build metrics |
-| `stellar-scaffold-test` | Test utilities and fixture contracts |
+| `stellar-scaffold-cli` | The `stellar scaffold` CLI: `init`, `upgrade`, `build`, `generate`, `watch` |
+| `stellar-build` | Contract building logic and dependency resolution (published to crates.io; also used by `stellar-registry/cli`) |
+| `stellar-scaffold-macro` | Procedural macros (published to crates.io; also used by `stellar-registry/cli`) |
+| `stellar-scaffold-ext-types` | Shared extension-hook types (serde) |
+| `stellar-scaffold-test` | Test harness, fixtures, and integration utilities (`publish = false`; consumed via git by `stellar-registry/cli` tests) |
+| `stellar-scaffold-reporter` | Built-in build-pipeline extension that logs compile/deploy metrics |
 
-### Key Contracts
+### Other directories
 
-- `contracts/registry` - The on-chain Registry contract (manages wasm publication and contract deployment)
-- `contracts/test/*` - Test contracts for integration testing
-- `crates/stellar-scaffold-test/fixtures/` - Fixture contracts for CLI testing
+- `npm/` — npm wrapper that installs the prebuilt CLI binary
+- `docs/site/` — Docusaurus documentation site (published to scaffoldstellar.com)
+- `crates/stellar-scaffold-test/fixtures/` — fixture contracts and a boilerplate project for CLI integration tests
 
 ### CLI Command Flow
 
-**stellar-scaffold commands:** init → setup → build → generate → watch
-- `init` - Clones a template repo via degit (`--template user/repo`, defaults to official frontend template), then runs `setup`
-- `setup` - Idempotent project setup: copies `.env.example` → `.env`, checks extensions, selects package manager, installs deps, compiles contracts, git init
-- `build` - Builds contracts and generates TypeScript clients based on `environments.toml`
-- `generate contract` - Adds new contract to existing project
-- `watch` - Monitors and rebuilds on changes
-
-**stellar-registry commands:** publish → deploy → create-alias
-- `publish` - Uploads wasm to registry with semantic versioning
-- `deploy` - Instantiates a published wasm as a named contract
-- `create-alias` - Creates local stellar contract alias from registry
+`init` → `build` → `generate` → `watch`
+- `init` — scaffolds a new project; fetches the frontend template from `stellar-scaffold/ui` via degit
+- `upgrade` — converts an existing Soroban workspace into a full scaffold project
+- `build` — builds contracts and generates TypeScript clients based on `environments.toml`
+- `generate contract` — adds a new contract to an existing project
+- `watch` — rebuilds on changes
 
 ## Testing
 
-- Unit tests run without external dependencies: `cargo t` (aliased to `cargo nextest run` — requires `cargo-nextest`)
-- Integration tests require local Stellar RPC running via Docker (stellar/quickstart image)
-- Feature flag `integration-tests` enables RPC-dependent tests
-- Test fixtures in `crates/stellar-scaffold-test/fixtures/`
+- Unit tests run without external dependencies.
+- Integration tests require a local Stellar RPC (Docker `stellar/quickstart`) and the `integration-tests` feature flag.
+- Fixtures live in `crates/stellar-scaffold-test/fixtures/`.
 
 ## Build Profile
 
-Contracts use a custom `[profile.contracts]` with aggressive optimization:
-- `opt-level = "z"` (size optimization)
-- `lto = true`
-- `strip = "symbols"`
-- Build with: `stellar contract build --profile contracts`
+The fixture contracts use a custom `[profile.contracts]` with aggressive size optimization (`opt-level = "z"`, `lto = true`, `strip = "symbols"`). Build with `stellar contract build --profile contracts`.
+
+## Cross-repo dependencies
+
+`stellar-build` and `stellar-scaffold-macro` are published to crates.io and consumed by `stellar-registry/cli`. When bumping their public APIs, publish a new version so the registry repo can pick it up.
