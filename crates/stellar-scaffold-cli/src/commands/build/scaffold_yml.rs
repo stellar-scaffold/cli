@@ -43,7 +43,7 @@ pub struct ScaffoldConfig {
     pub bindings_dir: std::path::PathBuf,
     /// Directory where the shared per-contract Contract Clients are generated
     /// (default: `"core/clients"`). One set shared by every template; imported
-    /// by app code. See ADR 0009.
+    /// by app code.
     pub clients_dir: std::path::PathBuf,
 }
 

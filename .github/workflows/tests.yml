@@ -120,5 +120,18 @@ jobs:
           mkdir -p /tmp/nextest-run
           cargo nextest run --archive-file nextest-archive.tar.zst --extract-to /tmp/nextest-run --workspace-remap . --no-run
           cp -a /tmp/nextest-run/target/* target/
+      # If this PR's branch name also exists on the UI monorepo, point the
+      # degit-based tests at that branch so coordinated cross-repo changes can
+      # go green before merging.
+      - name: Resolve UI repo ref
+        run: |
+          REF="${{ github.head_ref }}"
+          if [ -n "$REF" ] && git ls-remote --exit-code --heads \
+              https://github.com/stellar-scaffold/ui "$REF" >/dev/null 2>&1; then
+            echo "STELLAR_SCAFFOLD_UI_REPO=stellar-scaffold/ui#$REF" >> "$GITHUB_ENV"
+            echo "Pinned UI monorepo -> $REF"
+          else
+            echo "Using default UI monorepo (main)"
+          fi
       - name: Run tests
         run: just ${{ matrix.filter }} true

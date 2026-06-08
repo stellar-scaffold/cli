@@ -397,7 +397,7 @@ crate-type = ["cdylib"]
         let temp_dir = TempDir::new().unwrap();
         let manifest_path = create_test_workspace(temp_dir.path());
 
-        // Default bindings_dir is `bindings/` (ADR 0007).
+        // Default bindings_dir is `bindings/`
         let bindings_path = temp_dir.path().join("bindings");
         let test_package_path = bindings_path.join("test_contract_package");
         std::fs::create_dir_all(&test_package_path).unwrap();
@@ -427,7 +427,7 @@ crate-type = ["cdylib"]
         let temp_dir = TempDir::new().unwrap();
         let manifest_path = create_test_workspace(temp_dir.path());
 
-        // Default clients_dir is `core/clients` (ADR 0009).
+        // Default clients_dir is `core/clients`
         let clients_path = temp_dir.path().join("core").join("clients");
         std::fs::create_dir_all(&clients_path).unwrap();
 

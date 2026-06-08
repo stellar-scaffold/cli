@@ -29,8 +29,7 @@ pub enum Error {
 /// project's files are in place. Package-manager *selection* and *file writes*
 /// happen earlier (in `init` and `instantiate`); this takes the already-chosen
 /// manager and does environment setup, dependency install, contract build, and
-/// git init. Per ADR 0008, this is the folded-in successor to the old `setup`
-/// subcommand.
+/// git init.
 pub async fn prepare(
     project_path: &Path,
     pkg_manager: &PackageManagerSpec,

@@ -13,8 +13,22 @@ use stellar_cli::{commands::global, print::Print};
 
 pub mod instantiate;
 
-/// The official UI monorepo (Template Monorepo) degit'd by default. See ADR 0007.
+/// The official UI monorepo (Template Monorepo) degit'd by default.
 pub const DEFAULT_UI_REPO: &str = "stellar-scaffold/ui";
+
+/// Env var that overrides the UI monorepo degit target (repo plus optional
+/// `#ref`). Points `init`/`upgrade` at an unreleased UI branch — chiefly used by
+/// CI when landing coordinated cross-repo changes.
+pub const UI_REPO_ENV: &str = "STELLAR_SCAFFOLD_UI_REPO";
+
+/// Resolve the UI monorepo degit target, honoring [`UI_REPO_ENV`] when set and
+/// non-empty, otherwise falling back to [`DEFAULT_UI_REPO`].
+pub fn ui_repo() -> String {
+    env::var(UI_REPO_ENV)
+        .ok()
+        .filter(|s| !s.trim().is_empty())
+        .unwrap_or_else(|| DEFAULT_UI_REPO.to_string())
+}
 
 /// A command to initialize a new project
 #[derive(Parser, Debug, Clone)]
@@ -100,7 +114,7 @@ impl Cmd {
         };
 
         let repo = match &source {
-            Source::Official(_) => DEFAULT_UI_REPO.to_string(),
+            Source::Official(_) => ui_repo(),
             Source::Community(repo) => repo.clone(),
         };
 
