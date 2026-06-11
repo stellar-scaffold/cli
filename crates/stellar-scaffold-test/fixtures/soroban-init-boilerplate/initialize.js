@@ -69,7 +69,7 @@ function deploy_all() {
 
 function bind(contract) {
   const filenameNoExt = filenameNoExtension(contract);
-  exe(`${soroban} contract bindings typescript --contract-id $(cat ${contract}) --output-dir ${dirname}/packages/${filenameNoExt} --overwrite`);
+  exe(`${soroban} contract bindings typescript --contract-id $(cat ${contract}) --output-dir ${dirname}/bindings/${filenameNoExt} --overwrite`);
 }
 
 function bind_all() {
@@ -86,7 +86,7 @@ function bind_all() {
 
 function importContract(contract) {
   const filenameNoExt = filenameNoExtension(contract);
-  const outputDir = `${dirname}/src/contracts/`;
+  const outputDir = `${dirname}/core/clients/`;
   mkdirSync(outputDir, { recursive: true });
 
   const importContent =

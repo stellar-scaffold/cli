@@ -33,11 +33,6 @@ pnpm-debug.log*
 # macOS-specific files
 .DS_Store
 
-# generated contract clients
-packages/*
-# if you have other workspace packages, add them here
-!packages/.gitkeep
-
-# generated contract client imports
-src/contracts/*
-!src/contracts/util.ts
+# generated contract bindings + clients (Binding packages and flattened index.ts)
+app-lib/clients/*
+!app-lib/clients/.gitkeep

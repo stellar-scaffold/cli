@@ -19,7 +19,7 @@ pub const APP_DIR: &str = "app";
 /// The declared workspaces for the instantiated project. `e2e/` is kept (its
 /// self-adapting config targets the single `app/` post-init); `templates/*` is
 /// gone, replaced by `app`.
-const INSTANTIATED_WORKSPACES: &[&str] = &["app", "bindings/*", "core", "e2e"];
+const INSTANTIATED_WORKSPACES: &[&str] = &["app", "app-lib", "app-lib/clients/*", "e2e"];
 
 const DENO_CONFIG: &str = "{\n  \"nodeModulesDir\": \"auto\"\n}\n";
 
@@ -195,13 +195,13 @@ mod tests {
         let root = dir.path();
         write(
             &root.join("package.json"),
-            "{\n  \"name\": \"ui\",\n  \"workspaces\": [\"templates/*\", \"bindings/*\", \"core\"]\n}\n",
+            "{\n  \"name\": \"ui\",\n  \"workspaces\": [\"templates/*\", \"app-lib\", \"app-lib/clients/*\"]\n}\n",
         );
         write(&root.join("templates/react/index.html"), "<react/>");
         write(&root.join("templates/svelte/index.html"), "<svelte/>");
         write(
-            &root.join("core/package.json"),
-            "{\"name\":\"@stellar-scaffold/ui-core\"}",
+            &root.join("app-lib/package.json"),
+            "{\"name\":\"@stellar-scaffold/app-lib\"}",
         );
         write(&root.join("contracts/.gitkeep"), "");
         // e2e is kept post-init; its per-framework snapshot baselines are not.
@@ -263,7 +263,10 @@ mod tests {
             "<react/>"
         );
         assert!(!root.join("templates").exists(), "templates/ removed");
-        assert!(root.join("core/package.json").exists(), "core/ untouched");
+        assert!(
+            root.join("app-lib/package.json").exists(),
+            "app-lib/ untouched"
+        );
     }
 
     #[test]
@@ -276,7 +279,7 @@ mod tests {
             serde_json::from_str(&fs::read_to_string(root.join("package.json")).unwrap()).unwrap();
         assert_eq!(
             pkg["workspaces"],
-            serde_json::json!(["app", "bindings/*", "core", "e2e"])
+            serde_json::json!(["app", "app-lib", "app-lib/clients/*", "e2e"])
         );
     }
 
@@ -326,8 +329,8 @@ mod tests {
 
         let yaml = fs::read_to_string(root.join("pnpm-workspace.yaml")).unwrap();
         assert!(yaml.contains("- \"app\""));
-        assert!(yaml.contains("- \"bindings/*\""));
-        assert!(yaml.contains("- \"core\""));
+        assert!(yaml.contains("- \"app-lib\""));
+        assert!(yaml.contains("- \"app-lib/clients/*\""));
 
         let pkg = fs::read_to_string(root.join("package.json")).unwrap();
         assert!(pkg.contains("\"packageManager\": \"pnpm@1.2.3\""));

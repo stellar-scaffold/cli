@@ -29,21 +29,19 @@ pub enum Error {
 /// ```yaml
 /// config:
 ///   contracts_dir: contracts
-///   bindings_dir: bindings
-///   clients_dir: core/clients
+///   clients_dir: app-lib/clients
 /// ```
 #[derive(Debug, Clone, serde::Deserialize)]
 #[serde(default)]
 pub struct ScaffoldConfig {
     /// Directory containing Rust/Soroban contract source (default: `"contracts"`).
     pub contracts_dir: std::path::PathBuf,
-    /// Directory where generated Contract Bindings (TypeScript npm packages) are
-    /// written (default: `"bindings"`). CLI-owned; kept separate from authored
-    /// workspace packages so generated output is never overwritten or GC'd by hand.
-    pub bindings_dir: std::path::PathBuf,
-    /// Directory where the shared per-contract Contract Clients are generated
-    /// (default: `"core/clients"`). One set shared by every template; imported
-    /// by app code.
+    /// Directory for the generated TypeScript contract layer the app imports
+    /// (default: `"app-lib/clients"`). Holds both the generated Contract Binding
+    /// npm packages (one per contract, in `clients_dir/<name>/`) and the single
+    /// flattened Contract Clients `index.ts` (`clients_dir/index.ts`), imported
+    /// by app code as `@stellar-scaffold/app-lib/clients`. CLI-owned. (The
+    /// former separate `bindings_dir` was folded into this one directory.)
     pub clients_dir: std::path::PathBuf,
 }
 
@@ -51,8 +49,7 @@ impl Default for ScaffoldConfig {
     fn default() -> Self {
         Self {
             contracts_dir: "contracts".into(),
-            bindings_dir: "bindings".into(),
-            clients_dir: "core/clients".into(),
+            clients_dir: "app-lib/clients".into(),
         }
     }
 }
@@ -113,8 +110,7 @@ mod tests {
         let dir = tempfile::TempDir::new().unwrap();
         let config = ScaffoldConfig::get(dir.path());
         assert_eq!(config.contracts_dir, PathBuf::from("contracts"));
-        assert_eq!(config.bindings_dir, PathBuf::from("bindings"));
-        assert_eq!(config.clients_dir, PathBuf::from("core/clients"));
+        assert_eq!(config.clients_dir, PathBuf::from("app-lib/clients"));
     }
 
     #[test]
@@ -122,12 +118,11 @@ mod tests {
         let dir = tempfile::TempDir::new().unwrap();
         std::fs::write(
             dir.path().join(CONFIG_FILE),
-            "config:\n  contracts_dir: my_contracts\n  bindings_dir: my_packages\n  clients_dir: frontend/contracts\n",
+            "config:\n  contracts_dir: my_contracts\n  clients_dir: frontend/contracts\n",
         )
         .unwrap();
         let config = ScaffoldConfig::get(dir.path());
         assert_eq!(config.contracts_dir, PathBuf::from("my_contracts"));
-        assert_eq!(config.bindings_dir, PathBuf::from("my_packages"));
         assert_eq!(config.clients_dir, PathBuf::from("frontend/contracts"));
     }
 
@@ -141,8 +136,7 @@ mod tests {
         .unwrap();
         let config = ScaffoldConfig::get(dir.path());
         assert_eq!(config.contracts_dir, PathBuf::from("contracts"));
-        assert_eq!(config.bindings_dir, PathBuf::from("bindings"));
-        assert_eq!(config.clients_dir, PathBuf::from("core/clients"));
+        assert_eq!(config.clients_dir, PathBuf::from("app-lib/clients"));
     }
 
     #[test]
@@ -194,12 +188,11 @@ mod tests {
         let dir = tempfile::TempDir::new().unwrap();
         std::fs::write(
             dir.path().join(CONFIG_FILE),
-            "config:\n  bindings_dir: my_packages\n",
+            "config:\n  clients_dir: my_clients\n",
         )
         .unwrap();
         let config = ScaffoldConfig::get(dir.path());
         assert_eq!(config.contracts_dir, PathBuf::from("contracts"));
-        assert_eq!(config.bindings_dir, PathBuf::from("my_packages"));
-        assert_eq!(config.clients_dir, PathBuf::from("core/clients"));
+        assert_eq!(config.clients_dir, PathBuf::from("my_clients"));
     }
 }

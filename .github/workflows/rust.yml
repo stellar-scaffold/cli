@@ -46,5 +46,18 @@ jobs:
         run: just clippy
       - name: Run cargo clippy on tests
         run: just clippy-test
+      # `init_copies_frontend_template` degits the UI monorepo. If this PR's
+      # branch name also exists there, pin to it so coordinated cross-repo
+      # changes can go green before merging.
+      - name: Resolve UI repo ref
+        run: |
+          REF="${{ github.head_ref }}"
+          if [ -n "$REF" ] && git ls-remote --exit-code --heads \
+              https://github.com/stellar-scaffold/ui "$REF" >/dev/null 2>&1; then
+            echo "STELLAR_SCAFFOLD_UI_REPO=stellar-scaffold/ui#$REF" >> "$GITHUB_ENV"
+            echo "Pinned UI monorepo -> $REF"
+          else
+            echo "Using default UI monorepo (main)"
+          fi
       - name: Unit Tests
         run: just test

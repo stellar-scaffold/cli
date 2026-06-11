@@ -122,9 +122,15 @@ impl Cmd {
         acquire(&repo, &absolute_project_path).await?;
 
         // Gather the package-manager choice up front (both paths need it).
-        let pkg_manager =
-            setup::resolve_pkg_manager(self.package_manager.as_ref(), &printer, self.yes)
-                .ok_or(Error::NoPackageManager)?;
+        // `--template` signals non-interactive intent (the framework is already
+        // chosen), so default the package manager to npm rather than prompting;
+        // `init` is only fully interactive when no template is given.
+        let pkg_manager = setup::resolve_pkg_manager(
+            self.package_manager.as_ref(),
+            &printer,
+            self.yes || self.template.is_some(),
+        )
+        .ok_or(Error::NoPackageManager)?;
 
         // instantiate: official templates promote one framework + apply pkg-mgr fs.
         match &source {
