@@ -62,6 +62,8 @@ heck = "0.5.0"
 hex = "0.4.3"
 shlex = "1.1.0"
 toml = { version = "0.9", features = ["parse", "preserve_order"] }
+serde_yaml = "0.9"
+semver = { version = "1", features = ["serde"] }
 rand = "0.8.5"
 notify = "8.2.0"
 stellar-strkey = { workspace = true }

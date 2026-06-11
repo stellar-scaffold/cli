@@ -4,6 +4,7 @@ use crate::arg_parsing;
 use crate::arg_parsing::ArgParser;
 use crate::commands::build::clients::Error::UpgradeArgsError;
 use crate::commands::build::env_toml::{self, Environment};
+use crate::commands::build::scaffold_yml::ScaffoldConfig;
 use crate::commands::{PackageManager, PackageManagerSpec};
 use crate::extension::{self, ResolvedExtension};
 use indexmap::IndexMap;
@@ -13,7 +14,10 @@ use shlex::split;
 use std::hash::Hash;
 use std::path::Path;
 use std::process::Command;
-use std::{fmt::Debug, path::PathBuf};
+use std::{
+    fmt::{Debug, Write as _},
+    path::PathBuf,
+};
 use stellar_cli::{
     CommandParser, commands as cli,
     commands::contract::info::shared::{
@@ -166,6 +170,7 @@ pub struct Builder {
     pkg_manager: PackageManager,
     extensions: Vec<ResolvedExtension>,
     compile_ctx: Option<CompileContext>,
+    scaffold_config: ScaffoldConfig,
 }
 
 impl Builder {
@@ -181,6 +186,7 @@ impl Builder {
         pkg_manager: PackageManager,
         extensions: Vec<ResolvedExtension>,
         compile_ctx: Option<CompileContext>,
+        scaffold_config: ScaffoldConfig,
     ) -> Self {
         Self {
             printer: Print::new(global_args.quiet),
@@ -194,6 +200,7 @@ impl Builder {
             pkg_manager,
             extensions,
             compile_ctx,
+            scaffold_config,
         }
     }
 
@@ -337,32 +344,78 @@ impl Builder {
         config_dir.save_contract_id(passphrase, contract_id, name)
     }
 
-    fn create_contract_template(
-        &self,
-        name: &str,
-        contract_id: &str,
-        network: &network::Network,
-    ) -> Result<(), Error> {
-        let allow_http = if self.stellar_scaffold_env().testing_or_development() {
-            "\n  allowHttp: true,"
-        } else {
-            ""
-        };
-        let network_passphrase = &network.network_passphrase;
-        let template = format!(
-            r"import * as Client from '{name}';
-import {{ rpcUrl }} from './util';
+    /// Resolve the on-chain contract id baked into a Client: a pinned `id` from
+    /// the environment config takes precedence, otherwise the saved alias for the
+    /// current network.
+    fn resolve_contract_id(&self, name: &str) -> Result<Option<String>, Error> {
+        if let Some(contracts) = self.env.contracts.as_ref()
+            && let Some(contract) = contracts.get(name)
+            && let Some(id) = &contract.id
+        {
+            return Ok(Some(id.clone()));
+        }
+        Ok(self
+            .get_contract_alias(name, &self.network)?
+            .map(|c| c.to_string()))
+    }
 
-export default new Client.Client({{
-  networkPassphrase: '{network_passphrase}',
-  contractId: '{contract_id}',
-  rpcUrl,{allow_http}
-  publicKey: undefined,
-}});
-"
+    /// Regenerate the single flattened Clients file `clients_dir/index.ts` from
+    /// every Binding package currently present in `clients_dir`. Each Client is
+    /// exported as a camelCase const built from one shared `options` object;
+    /// only `contractId` is baked per contract. `allowHttp` and the
+    /// network passphrase/rpcUrl are resolved at runtime from the app's `network`
+    /// reader rather than baked. Idempotent — safe to call after every build,
+    /// including incremental `watch` rebuilds of a single contract.
+    fn regenerate_clients_index(&self) -> Result<(), Error> {
+        let clients_dir = self.workspace_root.join(&self.scaffold_config.clients_dir);
+        if !clients_dir.exists() {
+            return Ok(());
+        }
+
+        // A Binding package is a subdirectory of clients_dir holding a package.json.
+        let present: Vec<String> = std::fs::read_dir(&clients_dir)?
+            .filter_map(Result::ok)
+            .filter(|entry| entry.path().join("package.json").is_file())
+            .filter_map(|entry| entry.file_name().into_string().ok())
+            .collect();
+        let names = Self::maintain_user_ordering(&present, self.env.contracts.as_ref());
+
+        let mut imports = String::new();
+        let mut exports = String::new();
+        for name in &names {
+            // Honor `<contract>.client = false` (per-contract, per-environment):
+            // never export a Client for a contract whose client generation is
+            // disabled in this environment, even if a stale Binding package from
+            // a previous build/environment is still on disk.
+            if let Some(contracts) = self.env.contracts.as_ref()
+                && let Some(contract) = contracts.get(name.as_str())
+                && !contract.client
+            {
+                continue;
+            }
+            let Some(contract_id) = self.resolve_contract_id(name)? else {
+                continue;
+            };
+            let pascal = to_pascal_case(name);
+            let camel = to_camel_case(name);
+            // Writing to a String is infallible.
+            let _ = writeln!(imports, "import {{ Client as {pascal} }} from \"{name}\"");
+            let _ = write!(
+                exports,
+                "\nexport const {camel} = new {pascal}({{\n\t...options,\n\tcontractId: \"{contract_id}\",\n}})\n"
+            );
+        }
+
+        let contents = format!(
+            "// AUTO-GENERATED by `stellar scaffold` — do not edit.\n\
+             // Regenerated on every build/redeploy from your deployed contracts.\n\
+             // To customize a client, import it into your own code under app/ instead.\n\n\
+             import {{ network }} from \"@stellar-scaffold/app-lib\"\n{imports}\n\
+             const {{ passphrase: networkPassphrase, rpcUrl, id }} = network\n\n\
+             const options = {{\n\tnetworkPassphrase,\n\trpcUrl,\n\tallowHttp: id === \"local\",\n\tpublicKey: undefined,\n}}\n{exports}"
         );
-        let path = self.workspace_root.join(format!("src/contracts/{name}.ts"));
-        std::fs::write(path, template)?;
+
+        std::fs::write(clients_dir.join("index.ts"), contents)?;
         Ok(())
     }
 
@@ -377,8 +430,14 @@ export default new Client.Client({{
         let network = &self.network;
         let printer = self.printer();
         let workspace_root = &self.workspace_root;
-        let final_output_dir = workspace_root.join(format!("packages/{name}"));
-        let src_template_path = workspace_root.join(format!("src/contracts/{name}.ts"));
+        let final_output_dir = workspace_root
+            .join(&self.scaffold_config.clients_dir)
+            .join(name);
+        // The generated Client now lives in the shared flattened index, not a
+        // per-contract file; hooks see the index path as the codegen target.
+        let src_template_path = workspace_root
+            .join(&self.scaffold_config.clients_dir)
+            .join("index.ts");
 
         extension::run_hook(
             &self.extensions,
@@ -402,7 +461,10 @@ export default new Client.Client({{
         // require everything held across an await to be Send.
         let codegen_failure: Option<String> = async {
             if rebuild {
-                let temp_dir = workspace_root.join(format!("target/packages/{name}"));
+                let temp_dir = workspace_root
+                    .join("target")
+                    .join(&self.scaffold_config.clients_dir)
+                    .join(name);
                 let temp_dir_display = temp_dir.display();
                 let config_dir = self.get_config_dir()?;
 
@@ -488,8 +550,6 @@ export default new Client.Client({{
                         ));
                     }
                 }
-
-                self.create_contract_template(name, contract_id, network)?;
             }
             Ok::<(), Error>(())
         }
@@ -789,7 +849,8 @@ export default new Client.Client({{
             let needs_rebuild = deploy_kind != DeployKind::Unchanged
                 || !self
                     .workspace_root
-                    .join(format!("packages/{name}"))
+                    .join(&self.scaffold_config.clients_dir)
+                    .join(name)
                     .exists();
             (contract_id, Some(new_hash), needs_rebuild)
         };
@@ -1095,6 +1156,8 @@ impl Args {
                 version: None,
             });
 
+        let scaffold_config = ScaffoldConfig::get(workspace_root);
+
         let builder = Builder::new(
             global_args,
             network,
@@ -1106,6 +1169,7 @@ impl Args {
             pkg_manager_spec.kind,
             self.extensions.clone(),
             self.compile_ctx.clone(),
+            scaffold_config,
         );
         Ok(builder)
     }
@@ -1122,8 +1186,36 @@ impl Args {
         };
         builder.handle_accounts().await?;
         builder.handle_contracts(package_names).await?;
+        // Regenerate the flattened Clients index from whatever Bindings are now
+        // present, so it reflects the full set of contracts (and honors
+        // per-contract `client = false`) after every build, including watch.
+        builder.regenerate_clients_index()?;
         Ok(())
     }
+}
+
+/// `snake_case` contract/package name → `PascalCase`, used as the imported
+/// binding `Client` alias (e.g. `guess_the_number` → `GuessTheNumber`).
+fn to_pascal_case(name: &str) -> String {
+    name.split('_')
+        .filter(|segment| !segment.is_empty())
+        .map(|segment| {
+            let mut chars = segment.chars();
+            chars.next().map_or_else(String::new, |first| {
+                first.to_uppercase().collect::<String>() + chars.as_str()
+            })
+        })
+        .collect()
+}
+
+/// `snake_case` contract/package name → `camelCase`, used as the exported
+/// Client const name (e.g. `guess_the_number` → `guessTheNumber`).
+fn to_camel_case(name: &str) -> String {
+    let pascal = to_pascal_case(name);
+    let mut chars = pascal.chars();
+    chars.next().map_or_else(String::new, |first| {
+        first.to_lowercase().collect::<String>() + chars.as_str()
+    })
 }
 
 fn to_network(

@@ -338,12 +338,9 @@ async fn watch_and_vite_integration_test() {
 
             let client = reqwest::Client::new();
 
-            // Try to request the actual JavaScript modules that would cause import errors
-            let js_module_paths = [
-                "/src/contracts/fungible_token_interface_example.ts",
-                "/src/contracts/nft_enumerable_example.ts",
-                "/src/contracts/stellar_hello_world_contract.ts",
-            ];
+            // Request the generated flattened Clients module that would surface
+            // import errors (all Clients are now exported from this one file).
+            let js_module_paths = ["/app-lib/clients/index.ts"];
 
             for module_path in js_module_paths {
                 let _ = client
@@ -401,7 +398,7 @@ mod test;
             let mut new_vite_errors = Vec::new();
 
             let client = reqwest::Client::new();
-            let hello_world_client_path = "/src/contracts/stellar_hello_world_contract.ts";
+            let hello_world_client_path = "/app-lib/clients/index.ts";
 
             // Monitor for 60 seconds for the rebuild process
             let rebuild_timeout = tokio::time::Duration::from_secs(60);

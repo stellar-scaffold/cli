@@ -43,6 +43,10 @@ pub enum Error {
     DockerStart,
     #[error(transparent)]
     Manifest(#[from] cargo_metadata::Error),
+    #[error(transparent)]
+    SchemaVersion(#[from] build::scaffold_yml::Error),
+    #[error(transparent)]
+    EngineConstraint(#[from] super::EngineConstraintError),
 }
 
 fn canonicalize_path(path: &Path) -> PathBuf {
@@ -141,6 +145,9 @@ impl Cmd {
         let rebuild_state = Arc::new(Mutex::new(false));
         let metadata = &self.build_cmd.metadata()?;
         let workspace_root = metadata.workspace_root.as_std_path();
+
+        build::scaffold_yml::check_version(workspace_root)?;
+        super::check_engine_constraint(workspace_root)?;
 
         let scaffold_env = self
             .build_cmd

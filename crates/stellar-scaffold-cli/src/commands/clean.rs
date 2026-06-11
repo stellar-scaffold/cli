@@ -1,5 +1,6 @@
 use crate::commands::build::clients::ScaffoldEnv;
 use crate::commands::build::env_toml::{self, Account, Environment};
+use crate::commands::build::scaffold_yml::ScaffoldConfig;
 use cargo_metadata::Metadata;
 use clap::Parser;
 use std::{
@@ -30,8 +31,8 @@ pub enum Error {
 
 // cleans up scaffold artifacts
 // - target/stellar ✅
-// - packages/* (but not checked-into-git files like .gitkeep) ✅
-// - src/contracts/* (but not checked-into-git files like util.ts) ✅
+// - clients_dir/* — Binding packages + flattened Clients index.ts (but not
+//   checked-into-git files like .gitkeep) ✅
 // - contract aliases (for local and test) ✅
 // - identity aliases (for local and test) ✅
 
@@ -59,10 +60,9 @@ impl Cmd {
         Self::clean_target_stellar(&cargo_meta, &printer)?;
 
         let workspace_root: PathBuf = cargo_meta.workspace_root.into();
+        let scaffold_config = ScaffoldConfig::get(&workspace_root);
 
-        Self::clean_packages(&workspace_root, &printer)?;
-
-        Self::clean_src_contracts(&workspace_root, &printer)?;
+        Self::clean_clients(&workspace_root, &scaffold_config, &printer)?;
 
         Self::clean_contract_aliases(&workspace_root, &printer)?;
 
@@ -84,27 +84,22 @@ impl Cmd {
         Ok(())
     }
 
-    fn clean_packages(workspace_root: &Path, printer: &Print) -> Result<(), Error> {
-        let packages_path: PathBuf = workspace_root.join("packages");
-        let git_tracked_packages_entries = Self::git_tracked_entries(workspace_root, "packages");
-        Self::clean_dir(
-            workspace_root,
-            &packages_path,
-            &git_tracked_packages_entries,
-            printer,
-        )
-    }
-
-    fn clean_src_contracts(workspace_root: &Path, printer: &Print) -> Result<(), Error> {
-        let src_contracts_path = workspace_root.join("src").join("contracts");
-        let git_tracked_src_contract_entries =
-            Self::git_tracked_entries(workspace_root, "src/contracts");
-        Self::clean_dir(
-            workspace_root,
-            &src_contracts_path,
-            &git_tracked_src_contract_entries,
-            printer,
-        )
+    /// Clean the generated contract layer (`clients_dir`): both the Binding
+    /// packages and the flattened Clients `index.ts` live here. Git-tracked
+    /// entries and `.gitkeep` are preserved.
+    fn clean_clients(
+        workspace_root: &Path,
+        scaffold_config: &ScaffoldConfig,
+        printer: &Print,
+    ) -> Result<(), Error> {
+        let clients_path = workspace_root.join(&scaffold_config.clients_dir);
+        let clients_dir_str = scaffold_config
+            .clients_dir
+            .to_str()
+            .unwrap_or("app-lib/clients")
+            .to_string();
+        let git_tracked_entries = Self::git_tracked_entries(workspace_root, &clients_dir_str);
+        Self::clean_dir(workspace_root, &clients_path, &git_tracked_entries, printer)
     }
 
     fn clean_contract_aliases(workspace_root: &Path, printer: &Print) -> Result<(), Error> {
@@ -275,7 +270,9 @@ impl Cmd {
         }
     }
 
-    // cleans the given directory while preserving git tracked files, as well as some common template files: utils.js and .gitkeep
+    // cleans the given directory while preserving git-tracked files and .gitkeep
+    // (everything else in the generated clients_dir like app-lib/clients/ is
+    // regenerable). Authored files are kept by virtue of being git-tracked.
     fn clean_dir(
         workspace_root: &Path,
         dir_to_clean: &Path,
@@ -294,11 +291,9 @@ impl Cmd {
                     continue;
                 }
 
-                // Preserve common template files regardless of git status
+                // Preserve .gitkeep regardless of git status
                 let filename = path.file_name().and_then(|n| n.to_str());
-                if let Some(name) = filename
-                    && (name == "util.ts" || name == ".gitkeep")
-                {
+                if filename == Some(".gitkeep") {
                     continue;
                 }
 
@@ -371,16 +366,17 @@ crate-type = ["cdylib"]
     }
 
     #[test]
-    fn test_clean_packages() {
+    fn test_clean_binding_packages() {
         let global_args = global::Args::default();
         let temp_dir = TempDir::new().unwrap();
         let manifest_path = create_test_workspace(temp_dir.path());
 
-        let packages_path = temp_dir.path().join("packages");
-        let test_package_path = packages_path.join("test_contract_package");
+        // Default clients_dir is `app-lib/clients` — Binding packages live here.
+        let clients_path = temp_dir.path().join("app-lib").join("clients");
+        let test_package_path = clients_path.join("test_contract_package");
         std::fs::create_dir_all(&test_package_path).unwrap();
 
-        let gitkeep_path = packages_path.join(".gitkeep");
+        let gitkeep_path = clients_path.join(".gitkeep");
         fs::write(&gitkeep_path, "").unwrap();
 
         let cmd = Cmd {
@@ -391,28 +387,29 @@ crate-type = ["cdylib"]
 
         assert!(
             !test_package_path.exists(),
-            "packages/test_contract_package/ should be removed"
+            "app-lib/clients/test_contract_package/ should be removed"
         );
         assert!(
             gitkeep_path.exists(),
-            "packages/.gitkeep should be preserved"
+            "app-lib/clients/.gitkeep should be preserved"
         );
     }
 
     #[test]
-    fn test_clean_src_contracts() {
+    fn test_clean_clients_index() {
         let global_args = global::Args::default();
         let temp_dir = TempDir::new().unwrap();
         let manifest_path = create_test_workspace(temp_dir.path());
 
-        let src_contracts_path = temp_dir.path().join("src").join("contracts");
-        std::fs::create_dir_all(&src_contracts_path).unwrap();
+        // Default clients_dir is `app-lib/clients` — the flattened index.ts lives here.
+        let clients_path = temp_dir.path().join("app-lib").join("clients");
+        std::fs::create_dir_all(&clients_path).unwrap();
 
-        let test_contract_path = src_contracts_path.join("test_contract_client.js");
-        fs::write(&test_contract_path, "").unwrap();
+        let index_path = clients_path.join("index.ts");
+        fs::write(&index_path, "").unwrap();
 
-        let util_path = src_contracts_path.join("util.ts");
-        fs::write(&util_path, "").unwrap();
+        let gitkeep_path = clients_path.join(".gitkeep");
+        fs::write(&gitkeep_path, "").unwrap();
 
         let cmd = Cmd {
             manifest_path: Some(manifest_path),
@@ -421,12 +418,12 @@ crate-type = ["cdylib"]
         assert!(cmd.run(&global_args).is_ok());
 
         assert!(
-            !test_contract_path.exists(),
-            "src/contracts/test_contract_client.js should be removed"
+            !index_path.exists(),
+            "app-lib/clients/index.ts (generated) should be removed"
         );
         assert!(
-            util_path.exists(),
-            "src/contracts/util.js should be preserved"
+            gitkeep_path.exists(),
+            "app-lib/clients/.gitkeep should be preserved"
         );
     }
 }

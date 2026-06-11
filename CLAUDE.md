@@ -32,6 +32,16 @@ cargo clippy --all-targets
 
 Note: the `justfile` still carries some recipes from the monorepo (e.g. `just build` references the registry wasm). Prefer the `cargo` commands above until the justfile is trimmed to this repo.
 
+## Code Quality Checklist
+
+After making changes to Rust code, always run in order:
+1. `cargo build -p <crate>` — confirm it compiles
+2. `cargo test -p <crate>` — confirm tests pass (`cargo t` is aliased to `cargo nextest run`)
+3. `cargo clippy -p <crate>` — fix any lint errors before considering work done
+
+Clippy and warning flags are configured in `.cargo/config.toml` `rustflags` and apply automatically to every `cargo` invocation — no extra flags needed. `just clippy` runs across the whole workspace with additional allow-list overrides and matches CI.
+
+
 ## Architecture
 
 ### Crate Structure
@@ -54,7 +64,7 @@ Note: the `justfile` still carries some recipes from the monorepo (e.g. `just bu
 ### CLI Command Flow
 
 `init` → `build` → `generate` → `watch`
-- `init` — scaffolds a new project; fetches the frontend template from `stellar-scaffold/ui` via degit (`FRONTEND_TEMPLATE` in `src/commands/init.rs`)
+- `init` — scaffolds a new project; fetches the frontend template from `stellar-scaffold/ui` via degit
 - `upgrade` — converts an existing Soroban workspace into a full scaffold project
 - `build` — builds contracts and generates TypeScript clients based on `environments.toml`
 - `generate contract` — adds a new contract to an existing project

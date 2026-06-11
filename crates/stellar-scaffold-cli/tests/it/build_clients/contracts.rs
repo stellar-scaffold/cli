@@ -1,5 +1,33 @@
 use stellar_scaffold_test::{AssertExt, TestEnv, rpc_url};
 
+/// `snake_case` contract name -> `camelCase` Client const, matching the CLI's
+/// `regenerate_clients_index` (e.g. `soroban_hello_world_contract` ->
+/// `sorobanHelloWorldContract`).
+fn to_camel_case(name: &str) -> String {
+    let mut out = String::new();
+    let mut upper = false;
+    for (i, ch) in name.chars().enumerate() {
+        if ch == '_' {
+            upper = true;
+        } else if upper && i != 0 {
+            out.extend(ch.to_uppercase());
+            upper = false;
+        } else {
+            out.push(ch);
+        }
+    }
+    out
+}
+
+/// True if the generated flattened `app-lib/clients/index.ts` exports a Client
+/// const for `name` (replaces the old per-contract file existence check).
+fn index_exports_client(env: &TestEnv, name: &str) -> bool {
+    let path = env.cwd.join("app-lib/clients/index.ts");
+    std::fs::read_to_string(path)
+        .map(|content| content.contains(&format!("export const {} = ", to_camel_case(name))))
+        .unwrap_or(false)
+}
+
 #[test]
 fn contracts_built() {
     let contracts = [
@@ -42,11 +70,11 @@ soroban_token_contract.client = false
             assert!(stderr.contains(&format!("Successfully generated client for: {c}")));
 
             // check that contracts are actually deployed, bound, and imported
-            assert!(env.cwd.join(format!("packages/{c}")).exists());
-            assert!(env.cwd.join(format!("src/contracts/{c}.ts")).exists());
+            assert!(env.cwd.join(format!("app-lib/clients/{c}")).exists());
+            assert!(index_exports_client(env, c));
 
             // check dist/index.js and dist/index.d.ts exist after npm run build
-            let dist_dir = env.cwd.join(format!("packages/{c}/dist"));
+            let dist_dir = env.cwd.join(format!("app-lib/clients/{c}/dist"));
             assert!(
                 dist_dir.join("index.js").exists(),
                 "index.js missing for {c}"
@@ -92,8 +120,8 @@ soroban_token_contract.client = false
             assert!(stderr.contains(&format!("Successfully generated client for: {c}")));
 
             // check that contracts are actually deployed, bound, and imported
-            assert!(env.cwd.join(format!("packages/{c}")).exists());
-            assert!(env.cwd.join(format!("src/contracts/{c}.ts")).exists());
+            assert!(env.cwd.join(format!("app-lib/clients/{c}")).exists());
+            assert!(index_exports_client(env, c));
         }
     });
 }
@@ -188,10 +216,8 @@ soroban_token_contract.client = false
             message.contains("Successfully generated client for: soroban_hello_world_contract")
         );
 
-        // Extract the contract ID from the generated TypeScript client file.
-        let ts_file = env
-            .cwd
-            .join("src/contracts/soroban_hello_world_contract.ts");
+        // Extract the contract ID from the generated flattened Clients index.
+        let ts_file = env.cwd.join("app-lib/clients/index.ts");
         let ts_content = std::fs::read_to_string(&ts_file).expect("TS client file not found");
         let Some(contract_id) = extract_contract_id_from_ts(&ts_content) else {
             panic!("Could not find contract ID in generated TS file");
@@ -248,15 +274,15 @@ soroban_token_contract.client = false
     });
 }
 
-/// Extracts the contract ID from the `contractId: '...'` line in a generated
-/// TypeScript client file produced by `create_contract_template`.
+/// Extracts the first contract ID from a `contractId: "..."` line in the
+/// generated flattened Clients `index.ts` (`regenerate_clients_index`).
 fn extract_contract_id_from_ts(content: &str) -> Option<String> {
     content
         .lines()
         .find(|l| l.contains("contractId:"))
         .and_then(|l| {
-            let start = l.find('\'')? + 1;
-            let end = l.rfind('\'')?;
+            let start = l.find('"')? + 1;
+            let end = l.rfind('"')?;
             (start < end).then(|| l[start..end].to_string())
         })
 }
@@ -328,14 +354,10 @@ soroban_token_contract.client = false
     // Check that the contract files are created in the new directory
     assert!(
         env.cwd
-            .join("packages/soroban_hello_world_contract")
+            .join("app-lib/clients/soroban_hello_world_contract")
             .exists()
     );
-    assert!(
-        env.cwd
-            .join("src/contracts/soroban_hello_world_contract.ts")
-            .exists()
-    );
+    assert!(index_exports_client(&env, "soroban_hello_world_contract"));
 }
 
 #[test]
@@ -381,17 +403,15 @@ soroban_token_contract.client = false
         // Check that contract client files are still generated
         assert!(
             env.cwd
-                .join("packages/soroban_hello_world_contract")
+                .join("app-lib/clients/soroban_hello_world_contract")
                 .exists()
         );
-        assert!(
-            env.cwd
-                .join("src/contracts/soroban_hello_world_contract.ts")
-                .exists()
-        );
+        assert!(index_exports_client(env, "soroban_hello_world_contract"));
 
         // Check dist/index.js and dist/index.d.ts exist after npm run build
-        let dist_dir = env.cwd.join("packages/soroban_hello_world_contract/dist");
+        let dist_dir = env
+            .cwd
+            .join("app-lib/clients/soroban_hello_world_contract/dist");
         assert!(
             dist_dir.join("index.js").exists(),
             "index.js missing for soroban_hello_world_contract"
@@ -474,37 +494,29 @@ STELLAR_ACCOUNT=bob --symbol ABND --decimal 7 --name abundance --admin bb
         // Check that successful contracts are still deployed
         assert!(
             env.cwd
-                .join("packages/soroban_hello_world_contract")
-                .exists()
-        );
-        assert!(env.cwd.join("packages/soroban_increment_contract").exists());
-        assert!(
-            env.cwd
-                .join("packages/soroban_custom_types_contract")
+                .join("app-lib/clients/soroban_hello_world_contract")
                 .exists()
         );
         assert!(
             env.cwd
-                .join("src/contracts/soroban_hello_world_contract.ts")
+                .join("app-lib/clients/soroban_increment_contract")
                 .exists()
         );
         assert!(
             env.cwd
-                .join("src/contracts/soroban_increment_contract.ts")
+                .join("app-lib/clients/soroban_custom_types_contract")
                 .exists()
         );
-        assert!(
-            env.cwd
-                .join("src/contracts/soroban_custom_types_contract.ts")
-                .exists()
-        );
+        assert!(index_exports_client(env, "soroban_hello_world_contract"));
+        assert!(index_exports_client(env, "soroban_increment_contract"));
+        assert!(index_exports_client(env, "soroban_custom_types_contract"));
 
         // Failed contract should not have generated client files
-        assert!(!env.cwd.join("packages/soroban_token_contract").exists());
         assert!(
             !env.cwd
-                .join("src/contracts/soroban_token_contract.ts")
+                .join("app-lib/clients/soroban_token_contract")
                 .exists()
         );
+        assert!(!index_exports_client(env, "soroban_token_contract"));
     });
 }
