@@ -24,8 +24,8 @@ soroban_token_contract.client = false
 
         let cmd = env.scaffold("clean").assert().success().stderr_as_str();
         assert!(cmd.contains("Starting workspace cleanup"));
-        assert!(cmd.contains("Removed packages/soroban_hello_world_contract"));
-        assert!(cmd.contains("src/contracts/soroban_hello_world_contract.ts"));
+        assert!(cmd.contains("Removed app-lib/clients/soroban_hello_world_contract"));
+        assert!(cmd.contains("Removed app-lib/clients/index.ts"));
         assert!(cmd.contains("Removed contract alias: soroban_hello_world_contract"));
         assert!(cmd.contains("Removed account: alice"));
     })

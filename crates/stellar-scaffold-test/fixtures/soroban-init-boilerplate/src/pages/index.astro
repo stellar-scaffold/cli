@@ -1,7 +1,7 @@
 ---
 import Layout from "../layouts/Layout.astro";
 import Card from "../components/Card.astro";
-import helloWorld from "../contracts/hello_world";
+import helloWorld from "../../core/clients/hello_world";
 const { result } = await helloWorld.hello({ to: "you" });
 const greeting = result.join(" ");
 ---

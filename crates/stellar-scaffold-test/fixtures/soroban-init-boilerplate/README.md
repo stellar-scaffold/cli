@@ -41,7 +41,7 @@ If you look in [package.json](./package.json), you'll see that the `start` & `de
 
 1. Deploys to a local network (_needs to be running with `docker run` or `soroban network start`_)
 2. Saves contract IDs to `.soroban/contract-ids`
-3. Generates TS bindings for each into the `packages` folder, which is set up as an [npm workspace](https://docs.npmjs.com/cli/v10/configuring-npm/package-json#workspaces)
-4. Create a file in `src/contracts` that imports the contract client and initializes it for the `local` network.
+3. Generates TS bindings for each into the `bindings` folder, which is set up as an [npm workspace](https://docs.npmjs.com/cli/v10/configuring-npm/package-json#workspaces)
+4. Create a file in `core/clients` that imports the contract client and initializes it for the `local` network.
 
 You're now ready to import these initialized contract clients in your [Astro templates](https://docs.astro.build/en/core-concepts/astro-syntax/) or your [React, Svelte, Vue, Alpine, Lit, and whatever else JS files](https://docs.astro.build/en/core-concepts/framework-components/#official-ui-framework-integrations). You can see an example of this in [index.astro](./src/pages/index.astro).

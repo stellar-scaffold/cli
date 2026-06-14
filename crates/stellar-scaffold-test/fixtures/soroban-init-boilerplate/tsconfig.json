@@ -1,6 +1,6 @@
 {
   "files": [],
-  "exclude": ["packages"],
+  "exclude": ["bindings"],
   "references": [
     { "path": "./tsconfig.app.json" },
     { "path": "./tsconfig.node.json" }

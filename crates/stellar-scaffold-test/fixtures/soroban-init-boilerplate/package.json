@@ -15,7 +15,7 @@
     "lint": "eslint ."
   },
   "workspaces": [
-    "packages/*"
+    "app-lib/clients/*"
   ],
   "dependencies": {
     "@stellar/design-system": "^3.1.1",

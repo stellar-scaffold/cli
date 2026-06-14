@@ -17,6 +17,7 @@ use stellar_scaffold_ext_types::{CompileContext, HookName};
 pub mod clients;
 pub mod docker;
 pub mod env_toml;
+pub mod scaffold_yml;
 
 /// Build a contract from source
 ///

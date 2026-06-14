@@ -65,12 +65,16 @@ fn init_copies_frontend_template() {
         std::fs::remove_dir_all(&project_path).unwrap();
     }
     assert!(!project_path.exists());
+    // `--template react` keeps this non-interactive: the framework is chosen and
+    // the package manager defaults to npm, so no prompts in CI.
     env.scaffold("init")
-        .args([project_path.to_str().unwrap()])
+        .args([project_path.to_str().unwrap(), "--template", "react"])
         .assert()
         .success();
-    // Verify frontend template files exist
+    // The monorepo is instantiated to a single `app/`; verify the promoted
+    // template and the rewritten workspace root.
     assert!(project_path.join("package.json").exists());
-    assert!(project_path.join("src").exists());
-    assert!(project_path.join("tsconfig.json").exists());
+    assert!(project_path.join("app").exists());
+    assert!(project_path.join("app/src").exists());
+    assert!(project_path.join("app/tsconfig.json").exists());
 }

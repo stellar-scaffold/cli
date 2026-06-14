@@ -57,14 +57,25 @@ just test-integration
 
 ## Changes to the Frontend Template
 
-If you want to make a change to the project scaffold created by the `init` command, you can do so at [the frontend template repo](https://github.com/stellar-scaffold/ui). The `init` command accepts a `--tag` argument if you want to use a specific version of the template other than the latest `main` branch:
+If you want to make a change to the project scaffold created by the `init` command, you can do so at the [UI monorepo](https://github.com/stellar-scaffold/ui). Make sure you follow the CONTRIBUTING.md documentation there
+too. The `init` command will default to the `main` branch, but you can override it
+using an envvar to use a specific version of the template:
 
 ```bash
-# specify a branch name
-stellar scaffold init --tag feat/my-feature my-project-name
-# specify a tagged commit
-stellar scaffold init --tag v1.2.3 my-project-name
+# specify a branch name or tag after the `#`
+STELLAR_SCAFFOLD_UI_REPO="stellar-scaffold/ui#my-branch" stellar scaffold init my-app
 ```
+
+### Coordinating Changes Between Repos
+
+Since the CLI and the UI monorepo depend on each other, their GitHub Actions do as well: the CLI's integration tests
+degit the UI monorepo, and the UI tests install the latest CLI release. In order to make a change that spans both repos
+**use the same branch name in both repos**.
+
+CI will detect the matching branch, if it exists, and will pin to it: the CLI tests init using `stellar-scaffold/ui#<branch>` via `STELLAR_SCAFFOLD_UI_REPO`, and
+the UI tests build the CLI from `<branch>`. That way tests on both PRs can go green without merging/releasing breaking changes.
+
+You can reproduce this locally by pointing `init`/`upgrade` at a UI branch using the envvar above.
 
 ## Troubleshooting
 
@@ -75,3 +86,4 @@ stellar scaffold init --tag v1.2.3 my-project-name
 - If you run `just test` or other commands in WSL (Windows Subsystem for Linux), the build may consume a lot of memory. On machines with limited WSL resources, builds can terminate unexpectedly due to out-of-memory errors. Solution: increase WSL resources by editing (or creating) `C:\Users\YOUR_USER\.wslconfig` file if possible.
 
 - For Windows users, please refer [here](./WINDOWS.md).
+
