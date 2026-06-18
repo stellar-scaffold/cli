@@ -22,7 +22,7 @@ const SOROBAN_EXAMPLES_REPO: &str = "https://github.com/stellar/soroban-examples
 const STELLAR_PREFIX: &str = "stellar/";
 const OZ_EXAMPLES_REPO: &str = "https://github.com/OpenZeppelin/stellar-contracts/examples";
 const OZ_PREFIX: &str = "oz/";
-const LATEST_SUPPORTED_OZ_RELEASE: &str = "v0.6.0";
+const LATEST_SUPPORTED_OZ_RELEASE: &str = "v0.7.2";
 
 #[derive(Deserialize)]
 struct Release {
