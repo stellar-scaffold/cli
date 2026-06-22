@@ -14,7 +14,7 @@ stellar-build = { path = "../stellar-build", version = "0.0.6" }
 proc-macro2 = "1.0"
 syn = { version = "2", features = ["full"] }
 quote = "1.0"
-stellar-strkey = "0.0.13"
+stellar-strkey = { workspace = true }
 regex = "1.12.3"
-stellar-xdr = "23.0.0"
+stellar-xdr = { workspace = true }
 sha2 = "0.10.9"
