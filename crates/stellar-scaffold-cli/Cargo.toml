@@ -64,7 +64,7 @@ shlex = "1.1.0"
 toml = { version = "0.9", features = ["parse", "preserve_order"] }
 serde_yaml = "0.9"
 semver = { version = "1", features = ["serde"] }
-rand = "0.8.5"
+rand = "0.9.2"
 notify = "8.2.0"
 stellar-strkey = { workspace = true }
 stellar-xdr = { workspace = true }
