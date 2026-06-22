@@ -12,7 +12,7 @@ repository = "https://github.com/stellar-scaffold/cli"
 [workspace.dependencies]
 stellar-scaffold-macro = { path = "crates/stellar-scaffold-macro" }
 stellar-scaffold-test = { path = "crates/stellar-scaffold-test" }
-stellar-scaffold-ext-types = { path = "crates/stellar-scaffold-ext-types", version = "0.0.2" }
+stellar-scaffold-ext-types = { path = "crates/stellar-scaffold-ext-types", version = "0.0.3" }
 
 stellar-cli = { version = "26.0.0", package = "soroban-cli", default-features = false }
 soroban-rpc = { package = "stellar-rpc-client", version = "26.0.0-rc.1" }

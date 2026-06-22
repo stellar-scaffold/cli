@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.0.7](https://github.com/stellar-scaffold/cli/compare/stellar-build-v0.0.6...stellar-build-v0.0.7) - 2026-06-22
+
+### Other
+
+- extract scaffold-cli from monorepo ([#535](https://github.com/stellar-scaffold/cli/pull/535))
+
 ## [0.0.6](https://github.com/theahaco/scaffold-stellar/compare/stellar-build-v0.0.5...stellar-build-v0.0.6) - 2026-02-16
 
 ### Added

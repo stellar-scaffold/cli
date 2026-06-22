@@ -1,6 +1,6 @@
 [package]
 name = "stellar-scaffold-macro"
-version = "0.8.14"
+version = "0.8.15"
 edition = "2024"
 description = "Macros needed by stellar-scaffold"
 license = "Apache-2.0"
@@ -10,7 +10,7 @@ repository = "https://github.com/stellar-scaffold/cli/tree/main/crates/stellar-s
 proc-macro = true
 
 [dependencies]
-stellar-build = { path = "../stellar-build", version = "0.0.6" }
+stellar-build = { path = "../stellar-build", version = "0.0.7" }
 proc-macro2 = "1.0"
 syn = { version = "2", features = ["full"] }
 quote = "1.0"
