@@ -60,7 +60,7 @@ itertools = "0.14.0"
 ignore = "0.4"
 heck = "0.5.0"
 hex = "0.4.3"
-shlex = "1.1.0"
+shlex = "2.0.1"
 toml = { version = "0.9", features = ["parse", "preserve_order"] }
 serde_yaml = "0.9"
 semver = { version = "1", features = ["serde"] }
