@@ -87,7 +87,7 @@ tempfile = "3.27"
 mockito = "0.31"
 
 [build-dependencies]
-crate-git-revision = "0.0.6"
+crate-git-revision = "0.0.9"
 
 [features]
 integration-tests = []
