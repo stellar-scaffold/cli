@@ -57,7 +57,6 @@ Clippy and warning flags are configured in `.cargo/config.toml` `rustflags` and 
 
 ### Other directories
 
-- `npm/` — npm wrapper that installs the prebuilt CLI binary
 - `docs/site/` — Docusaurus documentation site (published to scaffoldstellar.com)
 - `crates/stellar-scaffold-test/fixtures/` — fixture contracts and a boilerplate project for CLI integration tests
 
