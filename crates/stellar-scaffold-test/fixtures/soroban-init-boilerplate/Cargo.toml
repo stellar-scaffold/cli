@@ -9,8 +9,8 @@ edition = "2024"
 version = "0.0.0"
 
 [workspace.dependencies]
-soroban-sdk = "23.4.0"
-soroban-token-sdk = "23.2.1"
+soroban-sdk = "27.0.0-rc.1"
+soroban-token-sdk = "27.0.0-rc.1"
 
 [profile.release]
 opt-level = "z"

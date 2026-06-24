@@ -14,14 +14,13 @@ stellar-scaffold-macro = { path = "crates/stellar-scaffold-macro" }
 stellar-scaffold-test = { path = "crates/stellar-scaffold-test" }
 stellar-scaffold-ext-types = { path = "crates/stellar-scaffold-ext-types", version = "0.0.2" }
 
-stellar-cli = { version = "26.0.0", package = "soroban-cli", default-features = false }
-soroban-rpc = { package = "stellar-rpc-client", version = "26.0.0-rc.1" }
-soroban-spec-tools = "26.0.0"
+stellar-cli = { version = "27.0.0", package = "soroban-cli", default-features = false }
+soroban-rpc = { package = "stellar-rpc-client", version = "27.0.0" }
+soroban-spec-tools = "27.0.0"
 
-soroban-sdk = "25.3.1"
-admin-sep = { git = "https://github.com/theahaco/admin-sep", rev = "46ed159ff38ee81f4b61b5ddb8ca4b6bdf972028" }
-stellar-xdr = "=26.0.0"
-stellar-strkey = "0.0.15"
+soroban-sdk = "27.0.0-rc.1"
+stellar-xdr = "=27.0.0"
+stellar-strkey = "0.0.16"
 
 cargo_metadata = "0.18.1"
 thiserror = "2.0.17"

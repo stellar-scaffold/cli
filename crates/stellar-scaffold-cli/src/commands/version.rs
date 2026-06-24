@@ -32,8 +32,8 @@ pub fn long() -> String {
         ),
         format!(
             "stellar-xdr {} ({})
-xdr curr ({})",
-            xdr.pkg, xdr.rev, xdr.xdr_curr,
+xdr ({})",
+            xdr.pkg, xdr.rev, xdr.xdr,
         ),
     ]
     .join("\n")

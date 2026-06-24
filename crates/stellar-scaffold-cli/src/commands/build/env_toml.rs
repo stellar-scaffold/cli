@@ -230,7 +230,12 @@ impl From<&Network> for stellar_cli::config::network::Args {
             network: network.name.clone(),
             rpc_url: network.rpc_url.clone(),
             network_passphrase: network.network_passphrase.clone(),
-            rpc_headers: network.rpc_headers.clone().unwrap_or_default(),
+            rpc_headers: network
+                .rpc_headers
+                .iter()
+                .flatten()
+                .map(|(k, v)| format!("{k}: {v}"))
+                .collect(),
         }
     }
 }
