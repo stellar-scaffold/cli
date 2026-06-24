@@ -8,8 +8,8 @@ pub struct Contract;
 
 #[contractimpl]
 impl Contract {
-    pub fn __constructor(env: &Env, admin: Address) {
-        env.storage().instance().set(&ADMIN, &admin);
+    pub fn __constructor(env: &Env, admin: &Address) {
+        env.storage().instance().set(&ADMIN, admin);
     }
 
     pub fn upgrade(env: &Env, new_wasm_hash: BytesN<32>) {
