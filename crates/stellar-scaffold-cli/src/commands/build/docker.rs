@@ -1,10 +1,21 @@
 use std::error::Error;
 use stellar_cli::{CommandParser, commands as cli};
 
+/// Protocol version the local network is started with. Without this, quickstart
+/// arms its baked-in default (currently protocol 25), so contracts built against
+/// a newer soroban-sdk fail transaction simulation on deploy. Derived at build
+/// time from the `stellar-cli` pin in the workspace `Cargo.toml` (see build.rs),
+/// so it tracks the protocol automatically when that dependency is bumped.
+const LOCAL_PROTOCOL_VERSION: &str = env!("LOCAL_PROTOCOL_VERSION");
+
 pub async fn start_local_stellar() -> Result<(), Box<dyn Error>> {
-    let result = cli::container::StartCmd::parse_arg_vec(&["local"])?
-        .run(&stellar_cli::commands::global::Args::default())
-        .await;
+    let result = cli::container::StartCmd::parse_arg_vec(&[
+        "local",
+        "--protocol-version",
+        LOCAL_PROTOCOL_VERSION,
+    ])?
+    .run(&stellar_cli::commands::global::Args::default())
+    .await;
     if let Err(e) = result {
         if e.to_string().contains("already running")
             || e.to_string().contains("port is already allocated")
