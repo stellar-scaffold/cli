@@ -44,15 +44,16 @@ fn emit_local_protocol_version() {
     let version = parsed["workspace"]["dependencies"]["stellar-cli"]["version"]
         .as_str()
         .expect("stellar-cli workspace dependency must pin a version string");
-    // Strip any semver-requirement prefix (e.g. "=27.0.0") before taking the major.
-    let major = version
-        .trim_start_matches(['=', '^', '~', '>', '<', ' '])
-        .split('.')
-        .next()
-        .expect("stellar-cli version is empty");
-    assert!(
-        major.chars().all(|c| c.is_ascii_digit()),
-        "could not parse a protocol major version from stellar-cli = \"{version}\""
-    );
+    // The pin is a semver requirement (e.g. "=27.0.0"); take the major from its
+    // first comparator. stellar-cli's major version tracks the protocol.
+    let req = semver::VersionReq::parse(version)
+        .unwrap_or_else(|e| panic!("invalid stellar-cli version requirement \"{version}\": {e}"));
+    let major = req
+        .comparators
+        .first()
+        .unwrap_or_else(|| {
+            panic!("stellar-cli version requirement \"{version}\" has no comparator")
+        })
+        .major;
     println!("cargo:rustc-env=LOCAL_PROTOCOL_VERSION={major}");
 }
