@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.0.25](https://github.com/stellar-scaffold/cli/compare/stellar-scaffold-cli-v0.0.24...stellar-scaffold-cli-v0.0.25) - 2026-06-29
+
+### Added
+
+- upgrade to stellar protocol 27 ([#549](https://github.com/stellar-scaffold/cli/pull/549))
+- add version flag ([#492](https://github.com/stellar-scaffold/cli/pull/492))
+
+### Other
+
+- Template Monorepo ([#543](https://github.com/stellar-scaffold/cli/pull/543))
+- extract scaffold-cli from monorepo ([#535](https://github.com/stellar-scaffold/cli/pull/535))
+- Feat/pkg manager improvements ([#491](https://github.com/stellar-scaffold/cli/pull/491))
+
 ## [0.0.24](https://github.com/theahaco/scaffold-stellar/compare/stellar-scaffold-cli-v0.0.23...stellar-scaffold-cli-v0.0.24) - 2026-04-27
 
 ### Fixed

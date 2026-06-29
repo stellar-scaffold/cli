@@ -1,6 +1,6 @@
 [package]
 name = "stellar-scaffold-ext-types"
-version = "0.0.2"
+version = "0.0.3"
 edition = "2024"
 description = "Shared types for stellar-scaffold extension hooks"
 license = "Apache-2.0"
