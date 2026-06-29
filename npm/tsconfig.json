@@ -1,9 +1,0 @@
-{
-  "extends": "@sindresorhus/tsconfig/tsconfig.json",
-  "include": ["src/*.ts"],
-  "compilerOptions": {
-    "outDir": "./dist",
-    "module": "commonjs",
-		"target": "ES2019", // Node.js 12
-  }
-}

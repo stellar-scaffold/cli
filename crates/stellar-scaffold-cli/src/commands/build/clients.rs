@@ -32,8 +32,8 @@ use stellar_scaffold_ext_types::{
     CodegenContext, CompileContext, DeployContext, DeployKind, HookName, NetworkConfig,
 };
 use stellar_strkey::{self, Contract};
-use stellar_xdr::curr::ScSpecEntry::FunctionV0;
-use stellar_xdr::curr::{Error as xdrError, ScSpecEntry, ScSpecTypeBytesN, ScSpecTypeDef};
+use stellar_xdr::ScSpecEntry::FunctionV0;
+use stellar_xdr::{Error as xdrError, ScSpecEntry, ScSpecTypeBytesN, ScSpecTypeDef};
 
 /// Internal decision about what deploy action to take for a contract.
 /// Resolved before `pre-deploy` fires so the hook always has a clean execution context.
@@ -356,7 +356,7 @@ impl Builder {
         }
         Ok(self
             .get_contract_alias(name, &self.network)?
-            .map(|c| c.to_string()))
+            .map(|c| format!("{c}")))
     }
 
     /// Regenerate the single flattened Clients file `clients_dir/index.ts` from
@@ -612,9 +612,10 @@ impl Builder {
                     let rpc_client = soroban_rpc::Client::new(&network.rpc_url)?;
 
                     let public_key_cmd = cli::keys::public_key::Cmd {
-                        name: account.name.parse()?,
+                        name: Some(account.name.parse()?),
                         locator: config.clone(),
                         hd_path: None,
+                        ledger: false,
                     };
                     let address = public_key_cmd.public_key().await?;
 
@@ -839,7 +840,7 @@ impl Builder {
                     name,
                     wasm_path,
                     &new_hash,
-                    Some(contract_id.to_string()),
+                    Some(format!("{contract_id}")),
                     Some(deploy_kind.clone()),
                 ),
                 printer,
@@ -874,6 +875,7 @@ impl Builder {
         let cmd = cli::contract::upload::Cmd {
             config: self.config(),
             resources: stellar_cli::resources::Args::default(),
+            auth_mode: stellar_cli::auth_mode::Args::default(),
             wasm: Some(wasm_path.to_path_buf()),
             ignore_checks: false,
             build_only: false,
@@ -1232,7 +1234,11 @@ fn to_network(
         network: name,
         rpc_url,
         network_passphrase,
-        rpc_headers: rpc_headers.unwrap_or_default(),
+        rpc_headers: rpc_headers
+            .unwrap_or_default()
+            .into_iter()
+            .map(|(k, v)| format!("{k}: {v}"))
+            .collect(),
     }
     .get(&global.locator)
 }
@@ -1247,7 +1253,10 @@ fn to_args(
     network::Args {
         network: None,
         network_passphrase: Some(network_passphrase.clone()),
-        rpc_headers: rpc_headers.clone(),
+        rpc_headers: rpc_headers
+            .iter()
+            .map(|(k, v)| format!("{k}: {v}"))
+            .collect(),
         rpc_url: Some(rpc_url.clone()),
     }
 }

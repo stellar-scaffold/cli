@@ -18,7 +18,15 @@ use stellar_cli::print::Print;
 use tar::Archive;
 use toml::Value::Table;
 
-const SOROBAN_EXAMPLES_REPO: &str = "https://github.com/stellar/soroban-examples";
+// Source of the `stellar/<name>` example contracts. Points at a fork in our own
+// org, pinned to a tag whose contracts target the same protocol this CLI builds
+// against — upstream `stellar/soroban-examples` lags protocol releases (no tag
+// past v23 at time of writing). Both the repo slug and the ref are overridable
+// via env for CI/tests and for users who want to point back at upstream.
+const SOROBAN_EXAMPLES_SLUG: &str = "stellar-scaffold/soroban-examples";
+const SOROBAN_EXAMPLES_REF: &str = "v27.0.0-rc.1";
+const SOROBAN_EXAMPLES_REPO_ENV: &str = "STELLAR_SCAFFOLD_EXAMPLES_REPO";
+const SOROBAN_EXAMPLES_REF_ENV: &str = "STELLAR_SCAFFOLD_EXAMPLES_REF";
 const STELLAR_PREFIX: &str = "stellar/";
 const OZ_EXAMPLES_REPO: &str = "https://github.com/OpenZeppelin/stellar-contracts/examples";
 const OZ_PREFIX: &str = "oz/";
@@ -593,7 +601,10 @@ members = []
 
         printer.println("\nAvailable contract examples:");
         printer.println("────────────────────────────────");
-        printer.println(format!("From {SOROBAN_EXAMPLES_REPO}:"));
+        printer.println(format!(
+            "From https://github.com/{}:",
+            Self::soroban_examples_slug()
+        ));
 
         for example in &soroban_examples {
             printer.println(format!("  📁 {STELLAR_PREFIX}{example}"));
@@ -623,11 +634,15 @@ members = []
         .await
     }
 
-    async fn fetch_latest_soroban_examples_release() -> Result<Release, Error> {
-        Self::fetch_latest_release_from_url(
-            "https://api.github.com/repos/stellar/soroban-examples/releases/latest",
-        )
-        .await
+    /// `org/repo` slug for the soroban examples source, overridable via env.
+    fn soroban_examples_slug() -> String {
+        std::env::var(SOROBAN_EXAMPLES_REPO_ENV)
+            .unwrap_or_else(|_| SOROBAN_EXAMPLES_SLUG.to_string())
+    }
+
+    /// Git ref (tag) of the soroban examples to fetch, overridable via env.
+    fn soroban_examples_ref() -> String {
+        std::env::var(SOROBAN_EXAMPLES_REF_ENV).unwrap_or_else(|_| SOROBAN_EXAMPLES_REF.to_string())
     }
 
     async fn fetch_latest_release_from_url(url: &str) -> Result<Release, Error> {
@@ -654,7 +669,7 @@ members = []
         repo_cache_path: &Path,
         tag_name: &str,
     ) -> Result<(), Error> {
-        Self::cache_repository("stellar/soroban-examples", repo_cache_path, tag_name).await
+        Self::cache_repository(&Self::soroban_examples_slug(), repo_cache_path, tag_name).await
     }
 
     fn filter_soroban_examples_repository(repo_cache_path: &Path) -> Result<(), Error> {
@@ -812,7 +827,7 @@ members = []
         }
         let oz_tag_name = tag_name;
 
-        let Release { tag_name } = Self::fetch_latest_soroban_examples_release().await?;
+        let tag_name = Self::soroban_examples_ref();
         let soroban_examples_cache_path = soroban_examples_cache_path.join(&tag_name);
         if !soroban_examples_cache_path.exists() {
             Self::cache_soroban_examples_repository(&soroban_examples_cache_path, &tag_name)

@@ -7,7 +7,7 @@ use crate::metadata::{read_decimal, read_name, read_symbol, write_metadata};
 #[cfg(test)]
 use crate::storage_types::{AllowanceDataKey, AllowanceValue, DataKey};
 use crate::storage_types::{INSTANCE_BUMP_AMOUNT, INSTANCE_LIFETIME_THRESHOLD};
-use soroban_sdk::token::{self, Interface as _};
+use soroban_sdk::token;
 use soroban_sdk::{contract, contractevent, contractimpl, Address, Env, MuxedAddress, String};
 use soroban_token_sdk::metadata::TokenMetadata;
 

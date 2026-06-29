@@ -233,7 +233,6 @@ Your repo contains the following key folders:
 |`.cargo/`, `.config/`	| Rust and build settings|
 |`crates/`|	The `stellar-scaffold` CLI and its supporting Rust libraries|
 |`docs/site/`|	Documentation site (Docusaurus) published to scaffoldstellar.com|
-|`npm/`|	npm wrapper that installs the prebuilt CLI binary|
 |`justfile` |	Commands you can run with just|
 
 ---

@@ -36,7 +36,7 @@ jobs:
       - uses: taiki-e/install-action@just
       - uses: taiki-e/install-action@nextest
       - uses: cargo-bins/cargo-binstall@main
-      - uses: stellar/stellar-cli@v26.0.0
+      - uses: stellar/stellar-cli@v27.0.0
       - uses: mozilla-actions/sccache-action@v0.0.10
       - run: just build
       - run: just build-cli-test-contracts
@@ -85,25 +85,42 @@ jobs:
       STELLAR_NETWORK_PASSPHRASE: "Standalone Network ; February 2017"
       STELLAR_ACCOUNT: default
       STELLAR_CONTRACT_ID: core
-    services:
-      rpc:
-        image: stellar/quickstart:testing
-        ports:
-          - 8000:8000
-        env:
-          ENABLE_LOGS: true
-          NETWORK: local
-          ENABLE_SOROBAN_RPC: true
-        options: >-
-          --health-cmd "curl --no-progress-meter --fail-with-body -X POST \"http://localhost:8000/soroban/rpc\" -H 'Content-Type: application/json' -d '{\"jsonrpc\":\"2.0\",\"id\":8675309,\"method\":\"getNetwork\"}' && curl --no-progress-meter \"http://localhost:8000/friendbot\" | grep '\"invalid_field\": \"addr\"'"
-          --health-interval 2s
-          --health-timeout 5s
-          --health-retries 50
     steps:
       - uses: actions/checkout@v6
       - uses: taiki-e/install-action@just
       - uses: taiki-e/install-action@nextest
-      - uses: stellar/stellar-cli@v26.0.0
+      - uses: stellar/stellar-cli@v27.0.0
+      # Start the local network through the CLI itself — the same path
+      # `stellar scaffold build` drives for users — so the suite validates the
+      # real plumbing. Without an explicit protocol, quickstart's local network
+      # arms its baked-in default (p25) and p27 contracts fail transaction
+      # simulation on deploy.
+      - name: Start local Stellar network
+        run: |
+          # Single source of truth: derive the protocol from the stellar-cli pin
+          # in Cargo.toml — the same value build.rs bakes into the CLI binary.
+          PROTOCOL_VERSION=$(sed -n 's/.*stellar-cli = .*version = "\([0-9]*\).*/\1/p' Cargo.toml | head -1)
+          if [ -z "$PROTOCOL_VERSION" ]; then
+            echo "Could not derive protocol version from stellar-cli pin in Cargo.toml" >&2
+            exit 1
+          fi
+          echo "Starting local network at protocol $PROTOCOL_VERSION"
+          stellar container start local --protocol-version "$PROTOCOL_VERSION"
+          echo "Waiting for RPC + friendbot to become healthy..."
+          for _ in $(seq 1 50); do
+            if curl --no-progress-meter --fail-with-body -X POST "http://localhost:8000/soroban/rpc" \
+                 -H 'Content-Type: application/json' \
+                 -d '{"jsonrpc":"2.0","id":8675309,"method":"getNetwork"}' >/dev/null 2>&1 \
+               && curl --no-progress-meter "http://localhost:8000/friendbot" 2>/dev/null \
+                 | grep -q '"invalid_field": "addr"'; then
+              echo "Local network healthy."
+              exit 0
+            fi
+            sleep 2
+          done
+          echo "Local network failed to become healthy in time." >&2
+          docker logs stellar --tail 100 || true
+          exit 1
       - name: Download nextest archive
         uses: actions/download-artifact@v8
         with:

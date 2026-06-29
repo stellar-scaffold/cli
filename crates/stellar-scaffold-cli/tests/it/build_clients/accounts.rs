@@ -60,9 +60,10 @@ soroban_token_contract.client = false
                 locator: locator::Args {
                     config_dir: Some(env.config_dir()),
                 },
-                name: stellar_cli::config::UnresolvedMuxedAccount::AliasOrSecret(
+                name: Some(stellar_cli::config::UnresolvedMuxedAccount::AliasOrSecret(
                     "alice".to_string(),
-                ),
+                )),
+                ledger: false,
             },
         };
         cmd.run(&stellar_cli::commands::global::Args::default())
