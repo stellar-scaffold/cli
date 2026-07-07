@@ -25,28 +25,33 @@ fn main() {
 }
 
 /// Derive the Stellar protocol version the local network should run from the
-/// `stellar-cli` pin in the workspace `Cargo.toml`, and expose it as the
-/// `LOCAL_PROTOCOL_VERSION` compile-time env var. stellar-cli's major version
-/// tracks the protocol, so this stays correct across upgrades without a hardcoded
-/// number — bump the dependency and the local network follows.
+/// `stellar-cli` pin, and expose it as the `LOCAL_PROTOCOL_VERSION` compile-time
+/// env var. stellar-cli's major version tracks the protocol, so this stays correct
+/// across upgrades without a hardcoded number — bump the dependency and the local
+/// network follows.
+///
+/// In a normal workspace build the pin lives in the workspace `Cargo.toml` two
+/// levels up. During `cargo package`/`publish` the crate is copied to
+/// `target/package/<crate>/`, where that path no longer exists — but Cargo inlines
+/// the resolved version into the crate's own manifest (`workspace = true` becomes a
+/// concrete `version`). Read whichever manifest actually holds the pin so the
+/// build script works in both contexts.
 fn emit_local_protocol_version() {
     let manifest_dir = std::env::var("CARGO_MANIFEST_DIR").unwrap();
+    let crate_toml = std::path::Path::new(&manifest_dir).join("Cargo.toml");
     // crates/stellar-scaffold-cli -> workspace root is two levels up.
     let workspace_toml = std::path::Path::new(&manifest_dir).join("../../Cargo.toml");
-    println!("cargo:rerun-if-changed={}", workspace_toml.display());
 
-    let contents = std::fs::read_to_string(&workspace_toml)
-        .expect("failed to read workspace Cargo.toml for protocol version");
-    let parsed: toml::Table = contents
-        .parse()
-        .expect("workspace Cargo.toml is not valid TOML");
+    let version = read_stellar_cli_version(&workspace_toml)
+        .or_else(|| read_stellar_cli_version(&crate_toml))
+        .expect(
+            "could not find a stellar-cli version pin in the workspace or crate Cargo.toml \
+             for the protocol version",
+        );
 
-    let version = parsed["workspace"]["dependencies"]["stellar-cli"]["version"]
-        .as_str()
-        .expect("stellar-cli workspace dependency must pin a version string");
     // The pin is a semver requirement (e.g. "=27.0.0"); take the major from its
     // first comparator. stellar-cli's major version tracks the protocol.
-    let req = semver::VersionReq::parse(version)
+    let req = semver::VersionReq::parse(&version)
         .unwrap_or_else(|e| panic!("invalid stellar-cli version requirement \"{version}\": {e}"));
     let major = req
         .comparators
@@ -56,4 +61,25 @@ fn emit_local_protocol_version() {
         })
         .major;
     println!("cargo:rustc-env=LOCAL_PROTOCOL_VERSION={major}");
+}
+
+/// Read the `stellar-cli` version pin from a manifest, checking both the
+/// `[workspace.dependencies]` table (workspace root) and the `[dependencies]`
+/// table (a leaf crate, or a packaged crate with the pin inlined by Cargo).
+/// Returns `None` if the file is absent or holds no such pin.
+fn read_stellar_cli_version(path: &std::path::Path) -> Option<String> {
+    println!("cargo:rerun-if-changed={}", path.display());
+    let contents = std::fs::read_to_string(path).ok()?;
+    let parsed: toml::Table = contents
+        .parse()
+        .unwrap_or_else(|e| panic!("{} is not valid TOML: {e}", path.display()));
+
+    let deps = parsed
+        .get("workspace")
+        .and_then(|w| w.get("dependencies"))
+        .or_else(|| parsed.get("dependencies"))?;
+    deps.get("stellar-cli")?
+        .get("version")?
+        .as_str()
+        .map(str::to_owned)
 }
