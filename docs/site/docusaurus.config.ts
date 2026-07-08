@@ -58,7 +58,7 @@ const config: Config = {
           sidebarPath: './sidebars.ts',
           // Remove this to remove the "edit this page" links.
           editUrl:
-            'https://github.com/theahaco/scaffold-stellar/tree/main/docs/docs',
+            'https://github.com/stellar-scaffold/cli/tree/main/docs/site',
           editLocalizedFiles: true,
         },
         blog: {
@@ -69,7 +69,7 @@ const config: Config = {
           },
           // Remove this to remove the "edit this page" links.
           editUrl:
-            'https://github.com/theahaco/scaffold-stellar/tree/main/docs/blog',
+            'https://github.com/stellar-scaffold/cli/tree/main/docs/blog',
           // Useful options to enforce blogging best practices
           onInlineTags: 'warn',
           onInlineAuthors: 'warn',
