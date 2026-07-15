@@ -38,10 +38,15 @@ pub struct Cmd {
 
     /// Template selector. A bare framework name (e.g. `react`) picks an official
     /// template from the UI monorepo; a `user/repo` shorthand (optionally with a
-    /// `#branch`/`#tag` suffix) degits that community repo directly. Omit to
-    /// choose a framework interactively.
+    /// `#branch`/`#tag` suffix) degits that community repo directly; `none`
+    /// creates a contracts-only project with no frontend. Omit to choose
+    /// interactively.
     #[arg(long)]
     pub template: Option<String>,
+
+    /// Create a contracts-only project with no frontend (alias for `--template none`)
+    #[arg(long, conflicts_with = "template")]
+    pub no_template: bool,
 
     /// Specify package manager, omitting will prompt interactively
     #[arg(short = 'p', long)]
@@ -83,6 +88,8 @@ enum Source {
     Official(Option<String>),
     /// Community repo shorthand, degit'd as-is.
     Community(String),
+    /// Contracts only: monorepo acquired, all JS stripped, no `app/`.
+    NoFrontend,
 }
 
 impl Cmd {
@@ -104,22 +111,56 @@ impl Cmd {
             absolute_project_path.display()
         ));
 
-        // Resolve the source from --template using the slash heuristic.
-        let source = match &self.template {
-            None => Source::Official(None),
-            Some(s) => match instantiate::parse_template_arg(s) {
-                instantiate::TemplateSource::Framework(name) => Source::Official(Some(name)),
-                instantiate::TemplateSource::Community(repo) => Source::Community(repo),
-            },
+        // Resolve the source from --no-template / --template (slash heuristic).
+        let source = if self.no_template {
+            Source::NoFrontend
+        } else {
+            match &self.template {
+                None => Source::Official(None),
+                Some(s) => match instantiate::parse_template_arg(s) {
+                    instantiate::TemplateSource::Framework(name) => Source::Official(Some(name)),
+                    instantiate::TemplateSource::Community(repo) => Source::Community(repo),
+                    instantiate::TemplateSource::NoFrontend => Source::NoFrontend,
+                },
+            }
         };
 
         let repo = match &source {
-            Source::Official(_) => ui_repo(),
+            Source::Official(_) | Source::NoFrontend => ui_repo(),
             Source::Community(repo) => repo.clone(),
         };
 
         // acquire: degit the chosen repo into the project path.
         acquire(&repo, &absolute_project_path).await?;
+
+        // Settle the framework choice before anything package-manager related:
+        // the interactive prompt can pick "none", which has no JS to manage.
+        let source = match source {
+            Source::Official(None) => match select_framework(&absolute_project_path, self.yes)? {
+                Some(framework) => Source::Official(Some(framework)),
+                None => Source::NoFrontend,
+            },
+            other => other,
+        };
+
+        if matches!(source, Source::NoFrontend) {
+            // instantiate: strip the UI layer entirely; no package manager.
+            instantiate::instantiate_no_frontend(&absolute_project_path)?;
+
+            // prepare: build contracts, git — no dependency install.
+            setup::prepare(&absolute_project_path, None, global_args, self.yes).await?;
+
+            printer.blankln("\n\n");
+            printer.checkln(format!(
+                "Project successfully created at {}!",
+                absolute_project_path.display()
+            ));
+            printer.blankln(" You can now build your contracts with:\n");
+            printer.blankln(format!("\tcd {}", self.project_path.display()));
+            printer.blankln("\tstellar scaffold build");
+            printer.blankln("\n Happy hacking! 🚀");
+            return Ok(());
+        }
 
         // Gather the package-manager choice up front (both paths need it).
         // `--template` signals non-interactive intent (the framework is already
@@ -134,22 +175,26 @@ impl Cmd {
 
         // instantiate: official templates promote one framework + apply pkg-mgr fs.
         match &source {
-            Source::Official(framework) => {
-                let framework = match framework {
-                    Some(name) => name.clone(),
-                    None => select_framework(&absolute_project_path, self.yes)?,
-                };
-                instantiate::instantiate(&absolute_project_path, &framework)?;
+            Source::Official(Some(framework)) => {
+                instantiate::instantiate(&absolute_project_path, framework)?;
                 instantiate::apply_package_manager(&absolute_project_path, &pkg_manager)?;
             }
             Source::Community(_) => {
                 // Community repos own their own layout; just record the manager.
                 let _ = pkg_manager.write_to_package_json(&absolute_project_path);
             }
+            // Both settled above.
+            Source::Official(None) | Source::NoFrontend => unreachable!(),
         }
 
         // prepare: install, build, git.
-        setup::prepare(&absolute_project_path, &pkg_manager, global_args, self.yes).await?;
+        setup::prepare(
+            &absolute_project_path,
+            Some(&pkg_manager),
+            global_args,
+            self.yes,
+        )
+        .await?;
 
         let pm_command = pkg_manager.kind.command();
         printer.blankln("\n\n");
@@ -189,21 +234,24 @@ async fn acquire(repo: &str, project_path: &Path) -> Result<(), Error> {
 }
 
 /// Prompt for a framework from those available in the acquired monorepo, or pick
-/// the first when running non-interactively.
-fn select_framework(root: &Path, yes: bool) -> Result<String, Error> {
+/// the first when running non-interactively. Returns `None` when the user picks
+/// the "none" (no frontend) choice.
+fn select_framework(root: &Path, yes: bool) -> Result<Option<String>, Error> {
     let frameworks = instantiate::enumerate_templates(root)?;
     if frameworks.is_empty() {
         return Err(Error::Instantiate(instantiate::Error::NoTemplatesDir));
     }
-    if yes || frameworks.len() == 1 {
-        return Ok(frameworks[0].clone());
+    if yes {
+        return Ok(Some(frameworks[0].clone()));
     }
+    let mut items = frameworks.clone();
+    items.push(format!("{} (no frontend)", instantiate::NO_FRONTEND));
     let index = Select::with_theme(&ColorfulTheme::default())
         .with_prompt("Pick a framework")
-        .items(&frameworks)
+        .items(&items)
         .default(0)
         .interact()
         .ok()
         .ok_or(Error::Cancelled)?;
-    Ok(frameworks[index].clone())
+    Ok(frameworks.get(index).cloned())
 }

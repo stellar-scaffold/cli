@@ -13,12 +13,16 @@ stellar scaffold init <project-path> [name]
 Options:
 
 - `project-path`: Required. The path where the project will be created
+- `--template <name>`: Template selector. A bare framework name (e.g. `react`) picks an official template; a `user/repo` shorthand (optionally with `#branch`) uses a community template; `none` creates a contracts-only project with no frontend. Omit to choose interactively
+- `--no-template`: Create a contracts-only project with no frontend (alias for `--template none`)
 
 The init command creates:
 
 - A new Stellar smart contract project with best practices and configurations
 - A frontend application using the [scaffold-stellar-frontend](https://github.com/stellar-scaffold/ui) template
 - Configuration files for both contract and frontend development
+
+With `--no-template` (or `--template none`), the frontend layer is omitted entirely: no `app/`, no JS workspaces, no dependency install. Every contract in `environments.toml` is written with `client = false`, so `stellar scaffold build` and `watch` skip client package generation. Flip a contract back to `client = true` if you later need TypeScript clients.
 
 ## Generate Command
 
