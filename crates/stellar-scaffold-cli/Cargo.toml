@@ -27,7 +27,7 @@ doctest = false
 [dependencies]
 stellar-build = { path = "../stellar-build", version = "0.0.7" }
 stellar-scaffold-ext-types = { path = "../stellar-scaffold-ext-types", version = "0.0.3" }
-stellar-cli = { workspace = true, default-features = false }
+stellar-cli = { workspace = true, default-features = true }
 soroban-rpc = { workspace = true }
 soroban-spec-tools = { workspace = true }
 clap = { version = "4.6.1", features = [
