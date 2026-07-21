@@ -29,10 +29,11 @@ pub enum Error {
 /// project's files are in place. Package-manager *selection* and *file writes*
 /// happen earlier (in `init` and `instantiate`); this takes the already-chosen
 /// manager and does environment setup, dependency install, contract build, and
-/// git init.
+/// git init. `pkg_manager` is `None` for no-frontend projects, which have no
+/// JS dependencies to install.
 pub async fn prepare(
     project_path: &Path,
-    pkg_manager: &PackageManagerSpec,
+    pkg_manager: Option<&PackageManagerSpec>,
     global_args: &global::Args,
     yes: bool,
 ) -> Result<(), Error> {
@@ -62,13 +63,18 @@ pub async fn prepare(
 
     ensure_extensions_installed(project_path, &printer, yes);
 
-    let pm_command = pkg_manager.kind.command();
-    run_install(pm_command, project_path, &printer);
-
-    printer.infoln("Compiling contracts and generating client packages...");
+    if let Some(pkg_manager) = pkg_manager {
+        run_install(pkg_manager.kind.command(), project_path, &printer);
+        printer.infoln("Compiling contracts and generating client packages...");
+    } else {
+        printer.infoln("Compiling contracts...");
+    }
     let mut build_command = build::Command::parse_from(["build"]);
     build_command.build.manifest_path = Some(project_path.join("Cargo.toml"));
-    build_command.build_clients = true;
+    // The clients pipeline needs a network (account funding, deploys) even when
+    // every contract opts out with `client = false`; a no-frontend project has
+    // no clients to generate, so skip it and just compile.
+    build_command.build_clients = pkg_manager.is_some();
     let mut build_args = global_args.clone();
     if !(global_args.verbose && global_args.very_verbose) {
         build_args.quiet = true;
