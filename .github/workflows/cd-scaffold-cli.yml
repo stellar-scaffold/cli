@@ -61,7 +61,7 @@ jobs:
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@stable
       - if: runner.os == 'Linux'
-        run: sudo apt-get update
+        run: sudo apt-get update && sudo apt install libdbus-1-dev pkg-config
       - uses: taiki-e/install-action@cross
         if: contains(matrix.target, '-musl')
       - uses: taiki-e/upload-rust-binary-action@v1
