@@ -25,7 +25,7 @@ jobs:
     name: Check
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
       - run: rustup update
       - run: rustup target add wasm32v1-none
       - run: rustup component add rustfmt clippy
