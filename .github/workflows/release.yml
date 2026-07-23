@@ -24,6 +24,9 @@ jobs:
       - &install-rust
         name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@stable
+      - &install-deps
+        name: install deps
+        run: sudo apt-get update && sudo apt-get install libudev-dev libdbus-1-dev openssl libssl-dev
       - name: Run release-plz
         uses: release-plz/action@v0.5
         with:
@@ -45,8 +48,7 @@ jobs:
     steps:
       - *checkout
       - *install-rust
-      - name: install deps
-        run: sudo apt-get update && sudo apt-get install libudev-dev libdbus-1-dev openssl libssl-dev
+      - *install-deps
       - name: Run release-plz
         uses: release-plz/action@v0.5
         with:
