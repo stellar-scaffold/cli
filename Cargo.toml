@@ -22,7 +22,7 @@ soroban-sdk = "27.0.0-rc.1"
 stellar-xdr = "=27.0.0"
 stellar-strkey = "0.0.16"
 
-cargo_metadata = "0.18.1"
+cargo_metadata = "0.23.1"
 thiserror = "2.0.17"
 sha2 = "0.10.9"
 
