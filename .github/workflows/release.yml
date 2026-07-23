@@ -46,7 +46,7 @@ jobs:
       - *checkout
       - *install-rust
       - name: install deps
-        run: sudo apt-get update && sudo apt-get install -y libdbus-1-dev pkg-config libudev-dev
+        run: sudo apt-get update && sudo apt-get install libudev-dev libdbus-1-dev openssl libssl-dev
       - name: Run release-plz
         uses: release-plz/action@v0.5
         with:
