@@ -42,16 +42,10 @@ jobs:
             os: macos-14
           - target: x86_64-pc-windows-msvc
             os: windows-2022
-          - target: x86_64-unknown-linux-musl
-            os: ubuntu-22.04
           - target: aarch64-unknown-linux-gnu
             os: ubuntu-22.04-arm
-          - target: aarch64-unknown-linux-musl
-            os: ubuntu-22.04
           - target: aarch64-apple-darwin
             os: macos-14
-          - target: x86_64-unknown-freebsd
-            os: ubuntu-22.04
           - target: universal-apple-darwin
             os: macos-14
     timeout-minutes: 60
@@ -61,7 +55,7 @@ jobs:
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@stable
       - if: runner.os == 'Linux'
-        run: sudo apt-get update
+        run: sudo apt-get update && sudo apt-get install libudev-dev libdbus-1-dev openssl libssl-dev
       - uses: taiki-e/install-action@cross
         if: contains(matrix.target, '-musl')
       - uses: taiki-e/upload-rust-binary-action@v1

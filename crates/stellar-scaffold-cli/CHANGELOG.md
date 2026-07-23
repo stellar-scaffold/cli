@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.0.26](https://github.com/stellar-scaffold/cli/compare/stellar-scaffold-cli-v0.0.25...stellar-scaffold-cli-v0.0.26) - 2026-07-21
+
+### Added
+
+- allow --no-template option on init ([#564](https://github.com/stellar-scaffold/cli/pull/564))
+- optimize build ([#569](https://github.com/stellar-scaffold/cli/pull/569))
+
 ## [0.0.25](https://github.com/stellar-scaffold/cli/compare/stellar-scaffold-cli-v0.0.24...stellar-scaffold-cli-v0.0.25) - 2026-06-29
 
 ### Added
