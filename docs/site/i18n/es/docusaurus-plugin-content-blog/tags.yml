@@ -1,9 +1,9 @@
 scaffold:
   label: Scaffold
   permalink: /scaffold
-  description: Scaffold Stellar
+  description: Stellar Scaffold
 
 official:
   label: Official
   permalink: /official
-  description: Noticias oficiales sobre Scaffold Stellar
+  description: Noticias oficiales sobre Stellar Scaffold

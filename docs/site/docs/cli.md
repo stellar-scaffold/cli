@@ -1,10 +1,10 @@
 # CLI Commands
 
-Scaffold Stellar provides several CLI commands to help manage your Stellar smart contract development.
+Stellar Scaffold provides several CLI commands to help manage your Stellar smart contract development.
 
 ## Init Command
 
-Initialize a new Scaffold Stellar project:
+Initialize a new Stellar Scaffold project:
 
 ```bash
 stellar scaffold init <project-path> [name]

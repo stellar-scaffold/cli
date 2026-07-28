@@ -34,7 +34,7 @@ First, we need the `import_asset` macro from Stellar Registry. Add the following
 +import_asset!(xlm);
 ```
 
-Stellar Registry integrates with Scaffold Stellar, giving names & versions to contracts & contract Wasms. It also provides helpers like `import_asset` to make it easier to work with [Stellar Asset Contracts](https://developers.stellar.org/docs/tokens/stellar-asset-contract).
+Stellar Registry integrates with Stellar Scaffold, giving names & versions to contracts & contract Wasms. It also provides helpers like `import_asset` to make it easier to work with [Stellar Asset Contracts](https://developers.stellar.org/docs/tokens/stellar-asset-contract).
 
 ## Step 2: 💰 Add Funds to the Contract
 

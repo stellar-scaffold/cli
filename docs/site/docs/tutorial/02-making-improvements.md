@@ -76,17 +76,17 @@ On subsequent runs, the key will already exist and the account will already be f
 
 This is what it's all about! You can think of everything in `environments.toml` as existing to configure contract clients.
 
-Here's what that means: your frontend app relies on contracts. Depending on which version of your frontend you are using, those contracts will live on different networks. When you're working in your development environment, you probably want to use the local network (as configured in Scaffold Stellar by default). When you are ready to share an early, staging build of your app with others, you will probably use contracts deployed on Stellar's testnet. When you deploy your production app, you will make calls to mainnet contracts.
+Here's what that means: your frontend app relies on contracts. Depending on which version of your frontend you are using, those contracts will live on different networks. When you're working in your development environment, you probably want to use the local network (as configured in Stellar Scaffold by default). When you are ready to share an early, staging build of your app with others, you will probably use contracts deployed on Stellar's testnet. When you deploy your production app, you will make calls to mainnet contracts.
 
-Scaffold Stellar encourages you to build separate versions of your frontend for each of these environments. And for each, you specify the contracts you rely on.
+Stellar Scaffold encourages you to build separate versions of your frontend for each of these environments. And for each, you specify the contracts you rely on.
 
 :::tip But wait. Isn't the behavior of a given contract the same across different networks? 🤔🤔🤔
 
-If you think about the lifecycle of a contract like our Guess The Number game, you might imagine finalizing the contract, then deploying the exact same contract to your local network, to testnet, and even eventually to mainnet. Why does Scaffold Stellar and `environments.toml` make you specify the contract for each? Why does it rebuild the contract clients for each, as if they might be entirely different? Couldn't we just generate the contract client once, and then change the RPC URL and Network Passphrase that the client gets instantiated with? Same _behavior_, different networks & contracts?
+If you think about the lifecycle of a contract like our Guess The Number game, you might imagine finalizing the contract, then deploying the exact same contract to your local network, to testnet, and even eventually to mainnet. Why does Stellar Scaffold and `environments.toml` make you specify the contract for each? Why does it rebuild the contract clients for each, as if they might be entirely different? Couldn't we just generate the contract client once, and then change the RPC URL and Network Passphrase that the client gets instantiated with? Same _behavior_, different networks & contracts?
 
 In theory, this sounds reasonable. In practice, contracts rarely have the same exact implementation across different networks. Your local contract will have all the latest changes; it will be like your `main` branch or a nightly build. Messy, fast-paced, experimental. Your staging contract will be like a `beta` release—it will have stuff you haven't yet pushed to your main app. And even more, you could add feature flags to permanently ship different versions of your contract to staging and mainnet. Imagine a contract that adds admin backdoors in staging, but strips them out in production.
 
-Scaffold Stellar wants to help you avoid bugs in all these situations. The contract clients are rebuilt for each environment, and they're built _in strict TypeScript_. So if you worked locally on a cool new feature with a smart contract method `my_cool_new_method`, and your frontend makes unguarded calls to this, then your frontend build for staging and production will fail, because those contracts don't implement `my_cool_new_method`.
+Stellar Scaffold wants to help you avoid bugs in all these situations. The contract clients are rebuilt for each environment, and they're built _in strict TypeScript_. So if you worked locally on a cool new feature with a smart contract method `my_cool_new_method`, and your frontend makes unguarded calls to this, then your frontend build for staging and production will fail, because those contracts don't implement `my_cool_new_method`.
 
 :::
 
@@ -194,7 +194,7 @@ Nothing. Nothing happens. At least not yet.
 
 The contract didn't change, so Scaffold CLI didn't re-deploy the contract. You're still using the instance that had the `reset` method called right after deploy.
 
-Once [theahaco/scaffold-stellar#259](https://github.com/theahaco/scaffold-stellar/issues/259) is complete, you will be able to run `stellar scaffold reset`. Until then, you can remove the alias that Scaffold Stellar uses to keep track of this contract, which allows us to re-deploy a new `guess_the_number` contract. Stop the `npm run start` process, then run:
+Once [stellar-scaffold/cli#259](https://github.com/stellar-scaffold/cli/issues/259) is complete, you will be able to run `stellar scaffold reset`. Until then, you can remove the alias that Stellar Scaffold uses to keep track of this contract, which allows us to re-deploy a new `guess_the_number` contract. Stop the `npm run start` process, then run:
 
 ```bash
 stellar contract alias remove guess_the_number --network local

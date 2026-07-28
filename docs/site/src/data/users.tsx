@@ -104,7 +104,7 @@ export const Tags: {[type in TagType]: Tag} = {
     label: translate({message: 'Favorite'}),
     description: translate({
       message:
-        'Our favorite Scaffold Stellar dApp that you must absolutely check out!',
+        'Our favorite Stellar Scaffold dApp that you must absolutely check out!',
       id: 'showcase.tag.favorite.description',
     }),
     color: '#e9669e',
@@ -122,7 +122,7 @@ export const Tags: {[type in TagType]: Tag} = {
   frontend: {
     label: translate({message: 'Frontend'}),
     description: translate({
-      message: 'Beautiful Scaffold Stellar dApp, polished and standing out from the initial template!',
+      message: 'Beautiful Stellar Scaffold dApp, polished and standing out from the initial template!',
       id: 'showcase.tag.frontend.description',
     }),
     color: '#a44fb7',
@@ -131,7 +131,7 @@ export const Tags: {[type in TagType]: Tag} = {
   hackathon: {
     label: translate({message: 'Hackathon Winner'}),
     description: translate({
-      message: 'Scaffold Stellar dApp which won a hackathon!',
+      message: 'Stellar Scaffold dApp which won a hackathon!',
       id: 'showcase.tag.hackathon.description',
     }),
     color: '#dfd545',

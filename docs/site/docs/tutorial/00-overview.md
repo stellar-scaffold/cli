@@ -4,7 +4,7 @@ sidebar_label: Overview
 
 # Tutorial Overview
 
-This tutorial will help you learn how to use [Scaffold Stellar](https://github.com/stellar-scaffold/cli) to build and manage smart contracts on the Stellar blockchain and a decentralized application (dApp) to interact with them. Scaffold Stellar is a developer toolkit that provides CLI tools, contract templates, and a starter React UI to get your idea out of your head and on to the network as fast as possible.
+This tutorial will help you learn how to use [Stellar Scaffold](https://github.com/stellar-scaffold/cli) to build and manage smart contracts on the Stellar blockchain and a decentralized application (dApp) to interact with them. Stellar Scaffold is a developer toolkit that provides CLI tools, contract templates, and a starter React UI to get your idea out of your head and on to the network as fast as possible.
 
 :::tip
 
@@ -16,7 +16,7 @@ If you just want to get up and running quickly, check out the [Quick Start](../q
 
 Our smart contract will be a Guess The Number game. You (the admin) can deploy the contract, randomly select a number between 1 and 10, and seed the contract with a prize. Users can make guesses and win the prize if they're correct!
 
-We'll use Scaffold Stellar to create the initial project structure containing contract code and a frontend application to interact with it. It will handle all the heavy lifting for us, letting us focus on the game logic in the contract and immediately build up the frontend for users to play the game.
+We'll use Stellar Scaffold to create the initial project structure containing contract code and a frontend application to interact with it. It will handle all the heavy lifting for us, letting us focus on the game logic in the contract and immediately build up the frontend for users to play the game.
 
 ## 📋Prerequisites
 
