@@ -166,12 +166,6 @@
   text-decoration: underline;
 }
 
-.sectionLinks {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 1.5rem;
-}
-
 /* ── Dev loop rail ──────────────────────────────────── */
 
 /* The rail is the page's one piece of ornament: a scaffold pole with a clamp

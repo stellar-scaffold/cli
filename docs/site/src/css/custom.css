@@ -82,10 +82,6 @@
   --ifm-navbar-link-hover-color: var(--ss-band-ink);
   --ifm-navbar-shadow: none;
   --ifm-navbar-height: 3.5rem;
-  --ifm-footer-background-color: var(--ss-surface);
-  --ifm-footer-color: var(--ss-muted);
-  --ifm-footer-link-color: var(--ss-foreground);
-  --ifm-footer-title-color: var(--ss-foreground);
   --ifm-menu-color: var(--ss-muted);
   --ifm-menu-color-active: var(--ifm-color-primary);
   --ifm-breadcrumb-item-background-active: var(--ss-surface);
@@ -236,48 +232,6 @@ table td {
 
 table thead tr {
   border-bottom-color: var(--ss-border);
-}
-
-/* ── Footer ─────────────────────────────────────────── */
-
-.footer {
-  border-top: 1px solid var(--ss-border);
-}
-
-.footer--dark {
-  --ifm-footer-background-color: var(--ss-surface);
-  --ifm-footer-color: var(--ss-muted);
-  --ifm-footer-link-color: var(--ss-foreground);
-  --ifm-footer-title-color: var(--ss-foreground);
-}
-
-.footer__title {
-  font-size: 0.6875rem;
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
-  color: var(--ss-muted);
-}
-
-.footer__link-item {
-  font-size: 0.875rem;
-  opacity: 0.75;
-  transition: opacity var(--ss-duration) var(--ss-easing);
-}
-
-.footer__link-item:hover {
-  opacity: 1;
-  color: var(--ifm-color-primary);
-}
-
-.footer__copyright {
-  font-size: 0.8125rem;
-  color: var(--ss-muted);
-}
-
-.footer__copyright a {
-  color: var(--ss-muted);
-  text-decoration: underline;
 }
 
 /* ── Utilities ──────────────────────────────────────── */
