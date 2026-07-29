@@ -1,82 +1,117 @@
 import type {ReactNode} from 'react';
-import clsx from 'clsx';
-import Heading from '@theme/Heading';
+import Link from '@docusaurus/Link';
 import {translate} from '@docusaurus/Translate';
-import Translate from '@docusaurus/Translate';
+import Heading from '@theme/Heading';
 import styles from './styles.module.css';
 
 type FeatureItem = {
   title: string;
-  Svg: React.ComponentType<React.ComponentProps<'svg'>>;
-  description: ReactNode;
+  to: string;
+  description: string;
+  cta: string;
 };
 
+/**
+ * The four entry points into the documentation, ordered the way a reader
+ * arrives at them: install, follow along, look things up, then ship.
+ */
 const FeatureList: FeatureItem[] = [
   {
     title: translate({
-      id: 'homepage.features.stellar.title',
-      message: 'Build with Stellar Smart Contracts',
-      description: 'Title for the first feature card',
+      id: 'homepage.features.quickstart.title',
+      message: 'Quickstart',
+      description: 'Title for the quickstart card',
     }),
-    Svg: require('@site/static/img/stellar.svg').default,
-    description: (
-      <Translate id="homepage.features.stellar.description">
-        Simple and power Stellar Smart Contract management.
-      </Translate>
-    ),
+    to: '/docs/quick-start',
+    description: translate({
+      id: 'homepage.features.quickstart.description',
+      message:
+        'Install the CLI, create a project, and get a contract and frontend running against a local network in a few minutes.',
+      description: 'Description for the quickstart card',
+    }),
+    cta: translate({
+      id: 'homepage.features.quickstart.cta',
+      message: 'Start here',
+      description: 'Link label on the quickstart card',
+    }),
   },
   {
     title: translate({
-      id: 'homepage.features.tooling.title',
-      message: 'Smart Contract Tooling',
-      description: 'Title for the second feature card',
+      id: 'homepage.features.tutorial.title',
+      message: 'Tutorial',
+      description: 'Title for the tutorial card',
     }),
-    Svg: require('@site/static/img/tooling.svg').default,
-    description: (
-      <Translate id="homepage.features.tooling.description">
-        Use standard-redefining tools at all levels of the Stellar software stack, making it easier to build, test, and ship dapps.
-      </Translate>
-    ),
+    to: '/docs/tutorial/overview',
+    description: translate({
+      id: 'homepage.features.tutorial.description',
+      message:
+        'Build a complete dApp end to end — write the contract, wire up the generated client, add payments, and harden it.',
+      description: 'Description for the tutorial card',
+    }),
+    cta: translate({
+      id: 'homepage.features.tutorial.cta',
+      message: 'Build a dApp',
+      description: 'Link label on the tutorial card',
+    }),
   },
   {
     title: translate({
-      id: 'homepage.features.practices.title',
-      message: 'Best Practices',
-      description: 'Title for the third feature card',
+      id: 'homepage.features.cli.title',
+      message: 'CLI reference',
+      description: 'Title for the CLI card',
     }),
-    Svg: require('@site/static/img/code_hero.svg').default,
-    description: (
-      <Translate id="homepage.features.practices.description">
-        Write beautiful, maintainable and secure code from the get go.
-      </Translate>
-    ),
-  }
+    to: '/docs/cli',
+    description: translate({
+      id: 'homepage.features.cli.description',
+      message:
+        'Every command in detail: init, build, generate, watch, and upgrade, plus the configuration each one reads.',
+      description: 'Description for the CLI card',
+    }),
+    cta: translate({
+      id: 'homepage.features.cli.cta',
+      message: 'Look up a command',
+      description: 'Link label on the CLI card',
+    }),
+  },
+  {
+    title: translate({
+      id: 'homepage.features.registry.title',
+      message: 'Registry',
+      description: 'Title for the registry card',
+    }),
+    to: '/docs/registry',
+    description: translate({
+      id: 'homepage.features.registry.description',
+      message:
+        'Publish a WASM, deploy named contract instances, and reuse contracts other people have already published.',
+      description: 'Description for the registry card',
+    }),
+    cta: translate({
+      id: 'homepage.features.registry.cta',
+      message: 'Publish and deploy',
+      description: 'Link label on the registry card',
+    }),
+  },
 ];
 
-function Feature({title, Svg, description}: FeatureItem) {
+function Feature({title, to, description, cta}: FeatureItem) {
   return (
-    <div className={clsx('col col--4')}>
-      <div className="text--center">
-        <Svg className={styles.featureSvg} role="img" />
-      </div>
-      <div className="text--center padding-horiz--md">
-        <Heading as="h3">{title}</Heading>
-        <p>{description}</p>
-      </div>
-    </div>
+    <Link to={to} className={styles.card}>
+      <Heading as="h2" className={styles.cardTitle}>
+        {title}
+      </Heading>
+      <p className={styles.cardDesc}>{description}</p>
+      <span className={styles.cardLink}>{cta} &rarr;</span>
+    </Link>
   );
 }
 
 export default function HomepageFeatures(): ReactNode {
   return (
     <section className={styles.features}>
-      <div className="container">
-        <div className="row">
-          {FeatureList.map((props, idx) => (
-            <Feature key={idx} {...props} />
-          ))}
-        </div>
-      </div>
+      {FeatureList.map((props) => (
+        <Feature key={props.to} {...props} />
+      ))}
     </section>
   );
 }

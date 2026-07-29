@@ -327,42 +327,168 @@
     "description": "The title of the tag list page"
   },
   "homepage.mainMessage": {
-    "message": "Scaffold - El ciclo de vida de aplicaciones Stellar simplificado",
+    "message": "Stellar Scaffold — un conjunto de herramientas para crear contratos inteligentes y dApps en Stellar",
     "description": "The homepage message"
   },
   "homepage.tagline": {
-    "message": "El ciclo de vida de aplicaciones Stellar simplificado",
+    "message": "Pasa de un directorio vacío a una dApp de Stellar desplegada sin conectar las piezas tú mismo.",
     "description": "The homepage tagline"
-  },
-  "homepage.features.stellar.title": {
-    "message": "Construye con Contratos Inteligentes Stellar",
-    "description": "Title for the first feature card"
-  },
-  "homepage.features.tooling.title": {
-    "message": "Herramientas de Contratos Inteligentes",
-    "description": "Title for the second feature card"
-  },
-  "homepage.features.practices.title": {
-    "message": "Mejores Prácticas",
-    "description": "Title for the third feature card"
   },
   "homepage.quickstart": {
     "message": "Inicio Rápido"
   },
-  "homepage.features.stellar.description": {
-    "message": "Gestión simple y potente de Contratos Inteligentes Stellar."
+  "homepage.install.copy": {
+    "message": "Copiar comando de instalación",
+    "description": "Accessible label for the copy button"
   },
-  "homepage.features.tooling.description": {
-    "message": "Usa herramientas que redefinen estándares en todos los niveles de la pila de software Stellar, facilitando la construcción, prueba y despliegue de dapps."
+  "homepage.install.copied": {
+    "message": "Comando copiado",
+    "description": "Accessible label after copying the install command"
   },
-  "homepage.features.practices.description": {
-    "message": "Escribe código hermoso, mantenible y seguro desde el principio."
+  "homepage.features.quickstart.title": {
+    "message": "Inicio Rápido",
+    "description": "Title for the quickstart card"
+  },
+  "homepage.features.quickstart.description": {
+    "message": "Instala la CLI, crea un proyecto y pon a funcionar un contrato y un frontend contra una red local en pocos minutos.",
+    "description": "Description for the quickstart card"
+  },
+  "homepage.features.quickstart.cta": {
+    "message": "Empieza aquí",
+    "description": "Link label on the quickstart card"
+  },
+  "homepage.features.tutorial.title": {
+    "message": "Tutorial",
+    "description": "Title for the tutorial card"
+  },
+  "homepage.features.tutorial.description": {
+    "message": "Crea una dApp completa de principio a fin: escribe el contrato, conecta el cliente generado, añade pagos y refuérzala.",
+    "description": "Description for the tutorial card"
+  },
+  "homepage.features.tutorial.cta": {
+    "message": "Crea una dApp",
+    "description": "Link label on the tutorial card"
+  },
+  "homepage.features.cli.title": {
+    "message": "Referencia de la CLI",
+    "description": "Title for the CLI card"
+  },
+  "homepage.features.cli.description": {
+    "message": "Cada comando en detalle: init, build, generate, watch y upgrade, además de la configuración que lee cada uno.",
+    "description": "Description for the CLI card"
+  },
+  "homepage.features.cli.cta": {
+    "message": "Consulta un comando",
+    "description": "Link label on the CLI card"
+  },
+  "homepage.features.registry.title": {
+    "message": "Registro",
+    "description": "Title for the registry card"
+  },
+  "homepage.features.registry.description": {
+    "message": "Publica un WASM, despliega instancias de contrato con nombre y reutiliza contratos que otras personas ya han publicado.",
+    "description": "Description for the registry card"
+  },
+  "homepage.features.registry.cta": {
+    "message": "Publica y despliega",
+    "description": "Link label on the registry card"
+  },
+  "homepage.about.heading": {
+    "message": "¿Qué es Stellar Scaffold?"
+  },
+  "homepage.about.p1": {
+    "message": "Stellar Scaffold es un plugin para la CLI de Stellar que crea y mantiene proyectos Soroban de pila completa. Genera el workspace de contratos en Rust, una plantilla de frontend y los clientes TypeScript tipados que conectan ambos, y mantiene esos clientes sincronizados a medida que cambian tus contratos."
+  },
+  "homepage.about.p2": {
+    "message": "Está pensado para la parte del trabajo que no es tu idea: configurar la red local, las direcciones de despliegue, la regeneración de clientes y la configuración de entornos. Tú escribes contratos e interfaz; el conjunto de herramientas mantiene el cableado correcto."
+  },
+  "homepage.about.cta": {
+    "message": "Lee la introducción"
+  },
+  "homepage.loop.heading": {
+    "message": "El ciclo"
+  },
+  "homepage.loop.intro": {
+    "message": "Cuatro comandos cubren todo el ciclo de vida. Todo lo que hay en medio —compilar contratos, desplegar en una red local, generar clientes TypeScript— ocurre por sí solo."
+  },
+  "homepage.loop.init": {
+    "message": "Prepara los contratos, un frontend en el framework que elijas y el código de utilidades que los conecta, ya listos para funcionar.",
+    "description": "Description of the init step"
+  },
+  "homepage.loop.generate": {
+    "message": "Añade un contrato al workspace y lo registra en la configuración de tu entorno.",
+    "description": "Description of the generate step"
+  },
+  "homepage.loop.dev": {
+    "message": "Observa tus contratos, los recompila y redespliega al cambiar, regenera los clientes tipados y sirve el frontend.",
+    "description": "Description of the dev step"
+  },
+  "homepage.loop.publish": {
+    "message": "Publica tu WASM en el Stellar Registry para poder desplegarlo por nombre en testnet o mainnet.",
+    "description": "Description of the publish step"
+  },
+  "footer.banner.eyebrow": {
+    "message": "Registro de Contratos"
+  },
+  "footer.banner.title": {
+    "message": "Publica y despliega tus contratos con Stellar Registry"
+  },
+  "footer.banner.description": {
+    "message": "Publica un WASM una vez, despliega instancias con nombre a partir de él y deja que otras personas construyan sobre tus contratos por nombre en lugar de por dirección."
+  },
+  "footer.banner.cta": {
+    "message": "Explora el registro"
+  },
+  "footer.col.scaffold": {
+    "message": "Stellar Scaffold"
+  },
+  "footer.col.stellar": {
+    "message": "Stellar"
+  },
+  "footer.col.builtBy": {
+    "message": "Creado por"
+  },
+  "footer.link.quickstart": {
+    "message": "Inicio Rápido"
+  },
+  "footer.link.tutorial": {
+    "message": "Tutorial"
+  },
+  "footer.link.cli": {
+    "message": "Referencia de la CLI"
+  },
+  "footer.link.blog": {
+    "message": "Blog"
+  },
+  "footer.link.showcase": {
+    "message": "Proyectos"
+  },
+  "footer.link.github": {
+    "message": "GitHub"
+  },
+  "footer.link.smartContracts": {
+    "message": "Contratos Inteligentes"
+  },
+  "footer.link.developerDocs": {
+    "message": "Documentación para Desarrolladores"
+  },
+  "footer.link.registry": {
+    "message": "Stellar Registry"
+  },
+  "footer.link.expert": {
+    "message": "Stellar Expert"
+  },
+  "footer.brand.description": {
+    "message": "Un estudio de software que crea herramientas para desarrolladores y para los equipos que los apoyan."
+  },
+  "footer.builtWith": {
+    "message": "Creado con"
   },
   "Favorite": {
     "message": "Favorite"
   },
   "showcase.tag.favorite.description": {
-    "message": "Our favorite Scaffold Stellar dApp that you must absolutely check out!"
+    "message": "Our favorite Stellar Scaffold dApp that you must absolutely check out!"
   },
   "Stellar Smart Contract": {
     "message": "Stellar Smart Contract"
@@ -374,23 +500,23 @@
     "message": "Frontend"
   },
   "showcase.tag.frontend.description": {
-    "message": "Beautiful Scaffold Stellar dApp, polished and standing out from the initial template!"
+    "message": "Beautiful Stellar Scaffold dApp, polished and standing out from the initial template!"
   },
   "Hackathon Winner": {
     "message": "Hackathon Winner"
   },
   "showcase.tag.hackathon.description": {
-    "message": "Scaffold Stellar dApp which won a hackathon!"
+    "message": "Stellar Scaffold dApp which won a hackathon!"
   },
   "showcase.filters.resultCount": {
     "message": "1 site|{sitesCount} sites",
     "description": "Pluralized label for the number of sites found on the showcase. Use as much plural forms (separated by \"|\") as your language support (see https://www.unicode.org/cldr/cldr-aux/charts/34/supplemental/language_plural_rules.html)"
   },
-  "Scaffold Stellar Showcase": {
-    "message": "Scaffold Stellar Showcase"
+  "Stellar Scaffold Showcase": {
+    "message": "Stellar Scaffold Showcase"
   },
-  "List of dApp people are building with Scaffold Stellar": {
-    "message": "List of dApp people are building with Scaffold Stellar"
+  "List of dApp people are building with Stellar Scaffold": {
+    "message": "List of dApp people are building with Stellar Scaffold"
   },
   "showcase.header.button": {
     "message": "🙏 Please add your site"

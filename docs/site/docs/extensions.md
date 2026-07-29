@@ -119,8 +119,8 @@ At each hook invocation, Scaffold writes a flat JSON object to the extension's s
 | `wasm_path` | string (path) | Absolute path to this contract's compiled WASM |
 | `wasm_hash` | string | Hex-encoded SHA-256 of the uploaded WASM bytecode |
 | `contract_id` | string \| null | Stellar contract address (`C…` strkey); `null` at `pre-deploy` |
-| `ts_package_dir` | string (path) | `<project_root>/packages/<name>/` |
-| `src_template_path` | string (path) | `<project_root>/src/contracts/<name>.ts` |
+| `ts_package_dir` | string (path) | This contract's generated client package — `<clients_dir>/<name>/`, so `<project_root>/app-lib/clients/<name>/` by default |
+| `src_template_path` | string (path) | The index file all generated clients share — `<clients_dir>/index.ts`, so `<project_root>/app-lib/clients/index.ts` by default |
 | `contracts` | object[] | Per-contract summary array; optional fields are `null` at `pre-dev` |
 | `watch_paths` | string[] | Directories being watched; empty in one-shot builds |
 

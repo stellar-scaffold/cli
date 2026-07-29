@@ -1,6 +1,6 @@
 # Quickstart
 
-This section walks you through setting up Scaffold Stellar from scratch.
+This section walks you through setting up Stellar Scaffold from scratch.
 
 ## Prerequisites
 
@@ -13,13 +13,13 @@ Before you begin, make sure you have the following installed:
 | [Stellar CLI](https://github.com/stellar/stellar-cli) | For building, deploying, and interacting with smart contracts | [`Link for the repo`](https://github.com/stellar/stellar-cli) |
 | [Docker](https://docs.docker.com/get-started/) | For running a Stellar node locally | Download from official site |
 
-### 1. Install the Scaffold Stellar CLI
+### 1. Install the Stellar Scaffold CLI
 
 ```
 cargo install --locked stellar-scaffold-cli
 ```
 
-The Scaffold Stellar CLI is installed as a plugin under the `stellar` CLI.
+The Stellar Scaffold CLI is installed as a plugin under the `stellar` CLI.
 
 > We recommend the use of [cargo-binstall](https://github.com/cargo-bins/cargo-binstall) to install pre-compiled binaries.
 
@@ -29,6 +29,8 @@ The Scaffold Stellar CLI is installed as a plugin under the `stellar` CLI.
 stellar scaffold init my-project
 cd my-project
 ```
+
+`init` asks which frontend framework you want. Pass `--template react` or `--template svelte` to skip the prompt, or `--template none` for a contracts-only project with no frontend at all.
 
 ### 3. Configure Your Frontend Environment
 
@@ -47,7 +49,7 @@ npm install
 npm run dev
 ```
 
-You should see your React frontend at http://localhost:5173.
+This starts two processes together: `stellar scaffold watch`, which rebuilds and redeploys your contracts and regenerates their clients on every change, and Vite, which serves the frontend. You should see your app at http://localhost:5173.
 
 ### 6. For testnet/mainnet deployment:
 
@@ -81,20 +83,46 @@ After scaffolding a project, your folder structure will look like this:
 
 ```
 my-project/
-├── contracts/            # Rust smart contracts (compiled to WASM)
-├── packages/             # Auto-generated TypeScript contract clients
-├── src/                  # React frontend code
-│   ├── components/       # Reusable UI pieces
-│   ├── contracts/        # Contract interaction logic
-│   ├── App.tsx           # Main app component
-│   └── main.tsx          # Entry point
-├── environments.toml     # Configuration per environment (dev/test/prod)
+├── contracts/            # Your Rust smart contracts (compiled to Wasm)
+├── app/                  # Your frontend
+│   └── src/              # Components, pages, hooks, entry point
+├── app-lib/              # Utility code, ready to use from your app
+│   ├── clients/          # Generated contract clients — regenerated, don't edit
+│   ├── wallet.ts         # Wallet connection
+│   └── ...               # Network config, storage, formatting helpers
+├── e2e/                  # End-to-end tests
+├── environments.toml     # Networks, accounts, and contracts per environment
+├── scaffold.yml          # CLI configuration
 ├── .env                  # Local environment variables
-├── package.json          # Frontend packages
+├── Cargo.toml            # Rust workspace
+├── package.json          # npm workspace root
 ├── target/               # Build outputs
 ```
 
-This template provides a ready-to-use frontend application with example smart contracts and their TypeScript clients. You can use these as reference while building your own contracts and UI. The frontend is set up with `Vite`, `React`, and includes basic components for interacting with the contracts.
+All of it is yours. There is no hidden framework and nothing to eject from — `app/` and `app-lib/` are ordinary source files you can read, edit, or delete.
+
+`app-lib/` holds the plumbing most Stellar apps need: connecting a wallet, reading network settings from your environment, funding a test account, formatting balances. Your app imports it as `@stellar-scaffold/app-lib`. Use it, change it, or ignore it and write your own — nothing in the toolchain depends on you keeping it.
+
+The one exception is `app-lib/clients/`, which is generated.
+
+### Contract clients
+
+Every time your contracts build or redeploy, Stellar Scaffold rewrites `app-lib/clients/` to match them. Treat it as build output:
+
+- `app-lib/clients/<name>/` — one package per contract: a type-safe interface with every method, argument, and return type taken from the contract itself.
+- `app-lib/clients/index.ts` — connects each of those to your current environment's network and deployed address, and exports one ready-to-call object per contract.
+
+That means your components never hold a contract address or an RPC URL. They import a name and call a method:
+
+```ts
+import { guessTheNumber } from "@stellar-scaffold/app-lib/clients";
+
+const { result } = await guessTheNumber.get_prize();
+```
+
+Switching environments — local to testnet, say — changes what those objects point at, with no change to your code.
+
+Because the directory is rewritten on every build, edits inside it are lost. To customize how a contract is called, wrap it in your own module under `app/` and import that instead.
 
 See the [CLI Documentation](./cli.md) for detailed command information and the [Environments Guide](./environments.md) for configuration details.
 
@@ -102,7 +130,7 @@ See the [CLI Documentation](./cli.md) for detailed command information and the [
 
 ## CLI Tools
 
-Scaffold Stellar provides two main CLI tools:
+Stellar Scaffold provides two main CLI tools:
 
 **stellar-scaffold** Initialize and manage dApp projects:
 

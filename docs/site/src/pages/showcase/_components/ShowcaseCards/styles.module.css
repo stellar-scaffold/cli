@@ -14,11 +14,7 @@
 .showcaseFavorite {
   padding-top: 2rem;
   padding-bottom: 2rem;
-  background-color: #f6fdfd;
-}
-
-html[data-theme='dark'] .showcaseFavorite {
-  background-color: #232525;
+  background-color: var(--ss-surface);
 }
 
 .headingFavorites {

@@ -1,10 +1,10 @@
 {
   "title": {
-    "message": "Scaffold Stellar",
+    "message": "Stellar Scaffold",
     "description": "El título en la barra de navegación"
   },
   "logo.alt": {
-    "message": "Scaffold Stellar Logo",
+    "message": "Stellar Scaffold Logo",
     "description": "Texto alternativo del logo de la barra de navegación"
   },
   "item.label.Documentation": {

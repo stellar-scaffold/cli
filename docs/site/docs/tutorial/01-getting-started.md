@@ -2,9 +2,9 @@
 sidebar_label: Getting Started
 ---
 
-# Getting Started with Scaffold Stellar
+# Getting Started with Stellar Scaffold
 
-This section will guide you through the development workflow for using Scaffold Stellar to build and deploy a Guess the Number game with a simple smart contract and an integrated frontend application.
+This section will guide you through the development workflow for using Stellar Scaffold to build and deploy a Guess the Number game with a simple smart contract and an integrated frontend application.
 
 :::tip
 
@@ -29,7 +29,7 @@ First, follow the [Setup Instructions](https://developers.stellar.org/docs/build
 - Configure your editor for Rust development
 - Install the Stellar CLI
 
-To work with Scaffold Stellar, we'll need a few more things.
+To work with Stellar Scaffold, we'll need a few more things.
 
 ### Node
 
@@ -45,11 +45,11 @@ npm -v # should print "10.9.3" or higher
 
 ### Docker
 
-We'll run a local Stellar network inside a Docker container, so head to the [Get Docker page](https://docs.docker.com/get-started/get-docker/) and follow the instructions for installing Docker Desktop for your operating system. Once it's installed, open it up. It needs to be running in the background but then Scaffold Stellar will handle the rest.
+We'll run a local Stellar network inside a Docker container, so head to the [Get Docker page](https://docs.docker.com/get-started/get-docker/) and follow the instructions for installing Docker Desktop for your operating system. Once it's installed, open it up. It needs to be running in the background but then Stellar Scaffold will handle the rest.
 
-### Scaffold Stellar
+### Stellar Scaffold
 
-Lastly, we'll install the Scaffold Stellar plugin for the Stellar CLI. We suggest using cargo-binstall to install it, which is a tool for installing Rust binaries.
+Lastly, we'll install the Stellar Scaffold plugin for the Stellar CLI. We suggest using cargo-binstall to install it, which is a tool for installing Rust binaries.
 
 If you don't have it installed, you can do so with:
 
@@ -67,7 +67,7 @@ Set-ExecutionPolicy Unrestricted -Scope Process; iex (iwr "https://raw.githubuse
 ```
 </details>
 
-Then install Scaffold Stellar with:
+Then install Stellar Scaffold with:
 
 ```bash
 cargo binstall -y stellar-scaffold-cli
@@ -97,7 +97,7 @@ This creates a new project from our starter template containing everything you n
 
 ```bash
 cd guessing-game-tutorial
-npm start
+npm run dev
 ```
 
 This command does two things:
@@ -109,7 +109,7 @@ That's it! You have a running application communicating with your local Stellar 
 
 ## 🚀 Open the App
 
-The `npm start` command should tell you it's running at Vite's default port, [http://localhost:5173](http://localhost:5173). Open it up and you should see the home page:
+The `npm run dev` command should tell you it's running at Vite's default port, [http://localhost:5173](http://localhost:5173). Open it up and you should see the home page:
 
 ```
 Welcome to your app!
@@ -159,7 +159,11 @@ Open the project in your editor. You will see a generated project structure incl
 │          ├── lib.rs
 │          └── test.rs
 ├── environments.toml
-├── packages/
+├── scaffold.yml
+├── app/
+├── app-lib/
+│   ├── clients/
+│   └── wallet.ts
 ├── README.md
 └── rust-toolchain.toml
 ```
@@ -171,25 +175,28 @@ There are a few more files than the ones listed here, but let's highlight some i
   - `Cargo.lock`: Cargo's [lockfile](https://doc.rust-lang.org/cargo/guide/cargo-toml-vs-cargo-lock.html) with exact info about the project's dependencies. We should not manually edit this file, though we should check it into `git` or other source control.
   - `rust-toolchain.toml`: specifies which version of Rust we're using and what platform we're targeting.
 - `contracts/`: holds each smart contract as a separate package in our project's Rust workspace. We only need one for this project, but it's nice to know that we can use the same structure for more complex projects that require multiple contracts. The other example contracts in this folder come from our friends at [OpenZeppelin](https://wizard.openzeppelin.com/stellar).
-- `packages/`: holds each smart contract's client and types as a separate package for the project's NPM workspace. These are built by Scaffold Stellar and we should not manually edit them. They'll be used by the frontend.
-- `.env`: is where we store environment variables that we'll be used by Scaffold Stellar commands.
-- `environments.toml`: This is the Scaffold Stellar secret sauce! This file is where we configure:
+- `app/`: our frontend. This is our code, and we'll spend most of the tutorial here.
+- `app-lib/`: utility code that came with the project — connecting a wallet, reading network settings, funding an account, formatting balances. It saves us writing the same plumbing every Stellar app needs, but it isn't special: it's plain source we can read and change, and we can ignore it entirely if we'd rather write our own. We import it as `@stellar-scaffold/app-lib`.
+- `app-lib/clients/`: the one directory we should _not_ edit. Stellar Scaffold generates our contract clients here and rewrites them every time the contracts build, so anything we change by hand gets overwritten. More on this below.
+- `.env`: is where we store environment variables that we'll be used by Stellar Scaffold commands.
+- `scaffold.yml`: tells the CLI where things live — which directory holds our contracts, and where to write the generated clients. The defaults are fine for this tutorial.
+- `environments.toml`: This is the Stellar Scaffold secret sauce! This file is where we configure:
   - our project's various _environments_, ...
   - which _networks_ are used by each environment, ...
   - all in service of which _contracts_ our project depends on in each of those environments.
 
-So how do all these pieces work together? Here's what Scaffold Stellar handles for you:
+So how do all these pieces work together? Here's what Stellar Scaffold handles for you:
 
-1. Our `npm start` command runs `stellar scaffold watch --build-clients`
+1. Our `npm run dev` command runs `stellar scaffold watch --build-clients`
 2. Our `.env` file set an environment variable to say we're in our _development_ environment (`STELLAR_SCAFFOLD_ENV=development`)
-3. Scaffold Stellar looked to `environments.toml` for the development environment's configuration, which told it to:
+3. Stellar Scaffold looked to `environments.toml` for the development environment's configuration, which told it to:
    - Start up a local Stellar network
    - Create an account on the network
    - Build the contracts
    - Deploy them to the network
    - Generate their clients for the frontend
 
-That's a lot of heavy lifting! Normally you'd have to do all this yourself, perhaps in a procedural script, but Scaffold Stellar does it for you. And it's deterministic, meaning you can always reproduce the same results from the same environment configuration. You set configuration values, specifying the desired starting state for your app, and Scaffold Stellar does all the work to get your app into that state.
+That's a lot of heavy lifting! Normally you'd have to do all this yourself, perhaps in a procedural script, but Stellar Scaffold does it for you. And it's deterministic, meaning you can always reproduce the same results from the same environment configuration. You set configuration values, specifying the desired starting state for your app, and Stellar Scaffold does all the work to get your app into that state.
 
 We deployed the example contract, but we don't even know what it does. Luckily, we built a tool to help with that!
 
@@ -290,7 +297,7 @@ mod test {
 
 ### 👷 Let's Make a Change
 
-We should still have our original `npm start` command running. I told you it did a lot of heavy lifting for you, but it also updates all of that automatically whenever you make changes to your code. Let's test it out by making a small change and watch the dev server update immediately.
+We should still have our original `npm run dev` command running. I told you it did a lot of heavy lifting for you, but it also updates all of that automatically whenever you make changes to your code. Let's test it out by making a small change and watch the dev server update immediately.
 
 The docstring for our `guess` function says to guess a number "between 1 and 10". But does that include "10"? Let's clarify:
 
@@ -305,7 +312,7 @@ Tada!
 
 ## 🔎 Understand the Application Code
 
-The app's home page uses the `<GuessTheNumber />` component, so we can start by looking at that file in `src/components/GuessTheNumber.tsx`:
+The app's home page uses the `<GuessTheNumber />` component, so we can start by looking at that file in `app/src/components/GuessTheNumber.tsx`:
 
 ```ts
 export const GuessTheNumber = () => {
@@ -335,22 +342,36 @@ const submitGuess = async () => {
 };
 ```
 
-Next, we create a function to handle the user's submission. Hey! Look at that! It's one of our contract's methods right in our TypeScript code: `game.guess()`. Let's follow that import and look at `src/contracts/guess_the_number.ts`.
+Next, we create a function to handle the user's submission. Hey! Look at that! It's one of our contract's methods right in our TypeScript code. Let's follow that import to the top of the file:
 
 ```ts
-import * as Client from "guess_the_number";
-import { rpcUrl } from "./util";
+import { guessTheNumber } from "@stellar-scaffold/app-lib/clients";
+```
 
-export default new Client.Client({
-  networkPassphrase: "Standalone Network ; February 2017",
-  contractId: "CBPAPSB7SXM3MNJVLXPSD6BRQ2ZN33OQVYWO45332TOP4PQLMCHJV4QN",
+`guessTheNumber` is a ready-to-use client for our contract, and Stellar Scaffold generated it. Look at `app-lib/clients/index.ts` and you'll find it:
+
+```ts
+// AUTO-GENERATED by `stellar scaffold` — do not edit.
+
+import { network } from "@stellar-scaffold/app-lib";
+import { Client as GuessTheNumber } from "guess_the_number";
+
+const { passphrase: networkPassphrase, rpcUrl, id } = network;
+
+export const guessTheNumber = new GuessTheNumber({
+  networkPassphrase,
   rpcUrl,
-  allowHttp: true,
+  allowHttp: id === "local",
+  contractId: "CBPAPSB7SXM3MNJVLXPSD6BRQ2ZN33OQVYWO45332TOP4PQLMCHJV4QN",
   publicKey: undefined,
 });
 ```
 
-This is the generated RPC client that Scaffold Stellar built for us. It allows us to call methods on the contract and even understand the types for their arguments and return values. You won't ever have to change this file, or the `Client` class in the `/packages` directory.
+Two generated pieces are at work here. The `guess_the_number` package under `app-lib/clients/guess_the_number/` knows the _shape_ of our contract — every method, argument, and return type, read straight from the Rust we wrote. `app-lib/clients/index.ts` then connects it to the network we're running against and the address it got deployed to.
+
+That's why our component can call `guessTheNumber.guess(...)` without knowing a contract address, an RPC URL, or a network passphrase. When we move from local to testnet later, this file changes and our component doesn't.
+
+Notice too that we didn't ask for any of this — it appeared when the contract built, and it will be rewritten the next time the contract changes. That's the trade: we get types that can never drift out of sync with our contract, and in exchange we don't edit these files. If we want to customize how a contract is called, we wrap it in our own module under `app/`.
 
 All you have to do is the fun part, focus on building your application instead of fussing about with all the details of how to get your application to talk to your contracts.
 
@@ -359,10 +380,10 @@ All you have to do is the fun part, focus on building your application instead o
 That covered a lot, but let's summarize how simple it actually was:
 
 1. We ran `stellar scaffold init guessing-game-tutorial` to generate a project from a starter template
-2. We ran `npm start` to build and deploy the contracts to our local network, then run the application
+2. We ran `npm run dev` to build and deploy the contracts to our local network, then run the application
 3. We saw the application running in our browser and how it reacted and rebuilt everything anytime we changed the code
 
-That's it! Scaffold Stellar does all the heavy lifting, letting you jump right in to the fun parts of developing your contract and applications. 🎉
+That's it! Stellar Scaffold does all the heavy lifting, letting you jump right in to the fun parts of developing your contract and applications. 🎉
 
 ## What's Next?
 

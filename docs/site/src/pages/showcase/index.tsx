@@ -16,11 +16,11 @@ import ShowcaseSearchBar from '@site/src/pages/showcase/_components/ShowcaseSear
 import ShowcaseCards from './_components/ShowcaseCards';
 import ShowcaseFilters from './_components/ShowcaseFilters';
 
-const TITLE = translate({message: 'Scaffold Stellar Showcase'});
+const TITLE = translate({ message: "Stellar Scaffold Showcase" });
 const DESCRIPTION = translate({
-  message: 'List of dApp people are building with Scaffold Stellar',
+  message: "List of dApps people are building with Stellar Scaffold",
 });
-const SUBMIT_URL = 'https://github.com/theahaco/scaffold-stellar/issues/319';
+const SUBMIT_URL = "https://github.com/stellar-scaffold/cli/issues/319";
 
 function ShowcaseHeader() {
   return (

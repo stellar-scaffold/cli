@@ -19,7 +19,7 @@ By the end of this step, you'll have:
 
 To understand the bug in our code, let's trigger it. We'll do this by making a small change in `environments.toml`. On our way to finding the line we need to change, we'll learn more about how `environments.toml` works.
 
-Open up `environments.toml` in your editor. Put it side-by-side with the output from `npm run start`. We'll walk through it bit by bit.
+Open up `environments.toml` in your editor. Put it side-by-side with the output from `npm run dev`. We'll walk through it bit by bit.
 
 ### 1. The Network
 
@@ -35,7 +35,7 @@ run-locally = true
 
 Every Stellar network is identified by a `network-passphrase`; it's like the fingerprint of the network and helps keep transactions cryptographically secure between networks. And you connect to any given Stellar network via a configurable `rpc-url`. If you look at the rest of `environments.toml`, every environment's network requires these settings. For our development environment, we also want to run the network locally. `run-locally` tells Scaffold CLI to use _Stellar_ CLI to run a local network container (`stellar container start`) and wait for it to finish startup before moving on to parse the rest of the `development` settings.
 
-These settings correspond to the following `npm run start` output:
+These settings correspond to the following `npm run dev` output:
 
 ```
 [0] ℹ️ Starting local Stellar Docker container...
@@ -62,7 +62,7 @@ If you wanted to create another named account/keypair to use throughout the rest
 name = "alice"
 ```
 
-If you look at the `npm run start` output again, this is the corresponding output:
+If you look at the `npm run dev` output again, this is the corresponding output:
 
 ```
 [0] ℹ️ Creating keys for "me"
@@ -76,17 +76,17 @@ On subsequent runs, the key will already exist and the account will already be f
 
 This is what it's all about! You can think of everything in `environments.toml` as existing to configure contract clients.
 
-Here's what that means: your frontend app relies on contracts. Depending on which version of your frontend you are using, those contracts will live on different networks. When you're working in your development environment, you probably want to use the local network (as configured in Scaffold Stellar by default). When you are ready to share an early, staging build of your app with others, you will probably use contracts deployed on Stellar's testnet. When you deploy your production app, you will make calls to mainnet contracts.
+Here's what that means: your frontend app relies on contracts. Depending on which version of your frontend you are using, those contracts will live on different networks. When you're working in your development environment, you probably want to use the local network (as configured in Stellar Scaffold by default). When you are ready to share an early, staging build of your app with others, you will probably use contracts deployed on Stellar's testnet. When you deploy your production app, you will make calls to mainnet contracts.
 
-Scaffold Stellar encourages you to build separate versions of your frontend for each of these environments. And for each, you specify the contracts you rely on.
+Stellar Scaffold encourages you to build separate versions of your frontend for each of these environments. And for each, you specify the contracts you rely on.
 
 :::tip But wait. Isn't the behavior of a given contract the same across different networks? 🤔🤔🤔
 
-If you think about the lifecycle of a contract like our Guess The Number game, you might imagine finalizing the contract, then deploying the exact same contract to your local network, to testnet, and even eventually to mainnet. Why does Scaffold Stellar and `environments.toml` make you specify the contract for each? Why does it rebuild the contract clients for each, as if they might be entirely different? Couldn't we just generate the contract client once, and then change the RPC URL and Network Passphrase that the client gets instantiated with? Same _behavior_, different networks & contracts?
+If you think about the lifecycle of a contract like our Guess The Number game, you might imagine finalizing the contract, then deploying the exact same contract to your local network, to testnet, and even eventually to mainnet. Why does Stellar Scaffold and `environments.toml` make you specify the contract for each? Why does it rebuild the contract clients for each, as if they might be entirely different? Couldn't we just generate the contract client once, and then change the RPC URL and Network Passphrase that the client gets instantiated with? Same _behavior_, different networks & contracts?
 
 In theory, this sounds reasonable. In practice, contracts rarely have the same exact implementation across different networks. Your local contract will have all the latest changes; it will be like your `main` branch or a nightly build. Messy, fast-paced, experimental. Your staging contract will be like a `beta` release—it will have stuff you haven't yet pushed to your main app. And even more, you could add feature flags to permanently ship different versions of your contract to staging and mainnet. Imagine a contract that adds admin backdoors in staging, but strips them out in production.
 
-Scaffold Stellar wants to help you avoid bugs in all these situations. The contract clients are rebuilt for each environment, and they're built _in strict TypeScript_. So if you worked locally on a cool new feature with a smart contract method `my_cool_new_method`, and your frontend makes unguarded calls to this, then your frontend build for staging and production will fail, because those contracts don't implement `my_cool_new_method`.
+Stellar Scaffold wants to help you avoid bugs in all these situations. The contract clients are rebuilt for each environment, and they're built _in strict TypeScript_. So if you worked locally on a cool new feature with a smart contract method `my_cool_new_method`, and your frontend makes unguarded calls to this, then your frontend build for staging and production will fail, because those contracts don't implement `my_cool_new_method`.
 
 :::
 
@@ -112,14 +112,14 @@ Let's walk through this line by line:
 - `[development.contracts.guess_the_number]`: this project only has one contract, so we can specify the settings for its contract clients here. You could also have a `[development.contracts]` with a more JSON-like specification for `guess_the_number` (`guess_the_number = { client = true, … }`).
 - `guess_the_number`: this name must match the name of the contract specified in its `Cargo.toml` file, but in underscore-case. Compare it to the `name` field in `contracts/guess-the-number/Cargo.toml` and the generated Wasm files (`ls target/wasm32v1-none/release/*.wasm`).
 
-   The `npm run start` output that corresponds to this came out right at the top:
+   The `npm run dev` output that corresponds to this came out right at the top:
 
    ```
    [0] ℹ️ Watching …/guessing-game-tutorial/contracts/guess-the-number
    ```
 - `client = true`: this tells Scaffold CLI to generate a contract client for this contract.
 
-   This results in the `npm run start` output:
+   This results in the `npm run dev` output:
 
    ```
    [0] ℹ️ Binding "guess_the_number" contract
@@ -132,7 +132,7 @@ Let's walk through this line by line:
 
    ```bash
    stellar contract deploy \
-       --wasm-hash [find this in npm run start output] \
+       --wasm-hash [find this in npm run dev output] \
        --source me \
        -- \
        --admin me
@@ -140,7 +140,7 @@ Let's walk through this line by line:
 
    As you can see, the `constructor_args` get passed directly along to this `stellar contract deploy` command.
 
-   `client = true` and the `constructor_args` settings together resulted in this `npm run start` output:
+   `client = true` and the `constructor_args` settings together resulted in this `npm run dev` output:
 
    ```
    [0] ℹ️ Installing "guess_the_number" wasm bytecode on-chain...
@@ -164,7 +164,7 @@ Let's walk through this line by line:
        reset
    ```
 
-   This `after_deploy` script produces this `npm run start` output:
+   This `after_deploy` script produces this `npm run dev` output:
 
    ```
    [0] ℹ️ Running after_deploy script for "guess_the_number"
@@ -194,13 +194,13 @@ Nothing. Nothing happens. At least not yet.
 
 The contract didn't change, so Scaffold CLI didn't re-deploy the contract. You're still using the one that had the `reset` method called right after deploy.
 
-Once [theahaco/scaffold-stellar#259](https://github.com/theahaco/scaffold-stellar/issues/259) is complete, you will be able to run `stellar scaffold reset`. Until then, you can remove the alias that Scaffold Stellar uses to keep track of this contract. Stop the `npm run start` process, then run:
+Once [stellar-scaffold/cli#259](https://github.com/stellar-scaffold/cli/issues/259) is complete, you will be able to run `stellar scaffold reset`. Until then, you can remove the alias that Stellar Scaffold uses to keep track of this contract. Stop the `npm run dev` process, then run:
 
 ```bash
 stellar contract alias remove guess_the_number --network local
 ```
 
-Re-run `npm run start` and you'll see it churn through re-deploying the contract. This time you won't see the output about running the `after_deploy` script.
+Re-run `npm run dev` and you'll see it churn through re-deploying the contract. This time you won't see the output about running the `after_deploy` script.
 
 Now you can trigger the bug in two exciting ways!
 
@@ -288,7 +288,7 @@ pub fn reset(env: &Env) {
 Much cleaner! The logic is now centralized in our helper function. Note that this is still a public function, see the `pub`? The distinction between "public" and "private" might seem confusing here. Let's run the application and it should clear everything up:
 
 ```bash
-$ npm start
+$ npm run dev
 ```
 
 Click over to `&lt;/&gt; Debugger` if you're not there already and select the `guess_the_number` contract. You'll see that `reset` is listed here, but `set_random_number` is not.
@@ -449,7 +449,7 @@ mod test;
 
 ## Step 6: 🧪 Test Your Improvements
 
-Let's test that our improvements work. You should still have the `npm start` process running from earlier. If not, run it again and we can look a little closer at what it's doing. There's two concurrent processes:
+Let's test that our improvements work. You should still have the `npm run dev` process running from earlier. If not, run it again and we can look a little closer at what it's doing. There's two concurrent processes:
 
 1. `stellar scaffold watch --build-clients`: watches for any changes in your `contracts/` folders, then rebuilds and redeploys them
 2. `vite`: watches for any changes in your `src/` folder and hot-reloads the UI
