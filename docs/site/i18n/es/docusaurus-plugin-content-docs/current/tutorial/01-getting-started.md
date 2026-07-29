@@ -91,7 +91,7 @@ This creates a new project from our starter template containing everything you n
 
 ```bash
 cd guessing-game-tutorial
-npm start
+npm run dev
 ```
 
 This command does two things:
@@ -103,7 +103,7 @@ That's it! You have a running application communicating with your local Stellar 
 
 ## 🚀 Open the App
 
-The `npm start` command should tell you it's running at Vite's default port, [http://localhost:5173](http://localhost:5173). Open it up and you should see the home page:
+The `npm run dev` command should tell you it's running at Vite's default port, [http://localhost:5173](http://localhost:5173). Open it up and you should see the home page:
 
 ```
 Welcome to your app!
@@ -174,7 +174,7 @@ There are a few more files than the ones listed here, but let's highlight some i
 
 So how do all these pieces work together? Here's what Stellar Scaffold handles for you:
 
-1. Our `npm start` command runs `stellar scaffold watch --build-clients`
+1. Our `npm run dev` command runs `stellar scaffold watch --build-clients`
 2. Our `.env` file set an environment variable to say we're in our _development_ environment (`STELLAR_SCAFFOLD_ENV=development`)
 3. Stellar Scaffold looked to `environments.toml` for the development environment's configuration, which told it to:
     - Start up a local Stellar network
@@ -282,7 +282,7 @@ mod test {
 
 ### 👷 Let's Make a Change
 
-We should still have our original `npm start` command running. I told you it did a lot of heavy lifting for you, but it also updates all of that automatically whenever you make changes to your code. Let's test it out by making a small change and watch the dev server update immediately.
+We should still have our original `npm run dev` command running. I told you it did a lot of heavy lifting for you, but it also updates all of that automatically whenever you make changes to your code. Let's test it out by making a small change and watch the dev server update immediately.
 
 The docstring for our `guess` function says to guess a number "between 1 and 10". But does that include "10"? Let's clarify:
 
@@ -348,7 +348,7 @@ All you have to do is the fun part, focus on building your application instead o
 That covered a lot, but let's summarize how simple it actually was:
 
 1. We ran `stellar scaffold init guessing-game-tutorial` to generate a project from a starter template
-2. We ran `npm start` to build and deploy the contracts to our local network, then run the application
+2. We ran `npm run dev` to build and deploy the contracts to our local network, then run the application
 3. We saw the application running in our browser and how it reacted and rebuilt everything anytime we changed the code
 
 That's it! Stellar Scaffold does all the heavy lifting, letting you jump right in to the fun parts of developing your contract and applications. 🎉

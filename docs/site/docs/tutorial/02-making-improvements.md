@@ -19,7 +19,7 @@ By the end of this step, you'll have:
 
 To understand the bug in our code, let's trigger it. We'll do this by making a small change in `environments.toml`. On our way to finding the line we need to change, we'll learn more about how `environments.toml` works.
 
-Open up `environments.toml` in your editor. Put it side-by-side with the output from `npm run start`. We'll walk through it bit by bit.
+Open up `environments.toml` in your editor. Put it side-by-side with the output from `npm run dev`. We'll walk through it bit by bit.
 
 ### 1. The Network
 
@@ -35,7 +35,7 @@ run-locally = true
 
 Every Stellar network is identified by a `network-passphrase`; it's like the fingerprint of the network and helps keep transactions cryptographically secure between networks. And you connect to any given Stellar network via a configurable `rpc-url`. If you look at the rest of `environments.toml`, every environment's network requires these settings. For our development environment, we also want to run the network locally. `run-locally` tells Scaffold CLI to use _Stellar_ CLI to run a local network container (`stellar container start`) and wait for it to finish startup before moving on to parse the rest of the `development` settings.
 
-These settings correspond to the following `npm run start` output:
+These settings correspond to the following `npm run dev` output:
 
 ```
 [0] ℹ️ Starting local Stellar Docker container...
@@ -62,7 +62,7 @@ If you wanted to create another named account/keypair to use throughout the rest
 name = "alice"
 ```
 
-If you look at the `npm run start` output again, this is the corresponding output:
+If you look at the `npm run dev` output again, this is the corresponding output:
 
 ```
 [0] ℹ️ Creating keys for "me"
@@ -112,7 +112,7 @@ Let's walk through this line by line:
 - `[development.contracts.guess_the_number]`: this project only has one contract, so we can specify the settings for its contract clients here. You could also have a `[development.contracts]` with a more JSON-like specification for `guess_the_number` (`guess_the_number = { client = true, … }`).
 - `guess_the_number`: this name must match the name of the contract specified in its `Cargo.toml` file, but in underscore-case. Compare it to the `name` field in `contracts/guess-the-number/Cargo.toml` and the generated Wasm files (`ls target/wasm32v1-none/release/*.wasm`).
 
-  The `npm run start` output that corresponds to this came out right at the top:
+  The `npm run dev` output that corresponds to this came out right at the top:
 
   ```
   [0] ℹ️ Watching …/guessing-game-tutorial/contracts/guess-the-number
@@ -120,7 +120,7 @@ Let's walk through this line by line:
 
 - `client = true`: this tells Scaffold CLI to generate a contract client for this contract.
 
-  This results in the `npm run start` output:
+  This results in the `npm run dev` output:
 
   ```
   [0] ℹ️ Binding "guess_the_number" contract
@@ -133,7 +133,7 @@ Let's walk through this line by line:
 
   ```bash
   stellar contract deploy \
-      --wasm-hash [find this in npm run start output] \
+      --wasm-hash [find this in npm run dev output] \
       --source me \
       -- \
       --admin me
@@ -141,7 +141,7 @@ Let's walk through this line by line:
 
   As you can see, the `constructor_args` get passed directly along to this `stellar contract deploy` command.
 
-  `client = true` and the `constructor_args` settings together resulted in this `npm run start` output:
+  `client = true` and the `constructor_args` settings together resulted in this `npm run dev` output:
 
   ```
   [0] ℹ️ Installing "guess_the_number" wasm bytecode on-chain...
@@ -164,7 +164,7 @@ Let's walk through this line by line:
       reset
   ```
 
-  This `after_deploy` script produces this `npm run start` output:
+  This `after_deploy` script produces this `npm run dev` output:
 
   ```
   [0] ℹ️ Running after_deploy script for "guess_the_number"
@@ -194,13 +194,13 @@ Nothing. Nothing happens. At least not yet.
 
 The contract didn't change, so Scaffold CLI didn't re-deploy the contract. You're still using the instance that had the `reset` method called right after deploy.
 
-Once [stellar-scaffold/cli#259](https://github.com/stellar-scaffold/cli/issues/259) is complete, you will be able to run `stellar scaffold reset`. Until then, you can remove the alias that Stellar Scaffold uses to keep track of this contract, which allows us to re-deploy a new `guess_the_number` contract. Stop the `npm run start` process, then run:
+To get a fresh deployment, clear the artifacts Stellar Scaffold is tracking — the generated clients, the build output, and the contract and identity aliases it uses to remember what is already deployed. Stop the `npm run dev` process, then run:
 
 ```bash
-stellar contract alias remove guess_the_number --network local
+stellar scaffold clean
 ```
 
-Re-run `npm run start` and you'll see it churn through re-deploying the contract. This time you won't see the output about running the `after_deploy` script.
+Re-run `npm run dev` and you'll see it churn through re-deploying the contract. This time you won't see the output about running the `after_deploy` script.
 
 Now you can trigger the bug in two exciting ways!
 
@@ -288,7 +288,7 @@ pub fn reset(env: &Env) {
 Much cleaner! The logic is now centralized in our helper function. Note that this is still a public function, see the `pub`? The distinction between "public" and "private" might seem confusing here. Let's run the application and it should clear everything up:
 
 ```bash
-$ npm start
+$ npm run dev
 ```
 
 Click over to the Debugger if you're not there already and select the `guess_the_number` contract. You'll see that `reset` is listed here, but `set_random_number` is not.
@@ -450,7 +450,7 @@ mod test;
 
 ## Step 6: 🧪 Test Your Improvements
 
-Let's test that our improvements work. You should still have the `npm start` process running from earlier. If not, run it again and we can look a little closer at what it's doing. There's two concurrent processes:
+Let's test that our improvements work. You should still have the `npm run dev` process running from earlier. If not, run it again and we can look a little closer at what it's doing. There's two concurrent processes:
 
 1. `stellar scaffold watch --build-clients`: watches for any changes in your `contracts/` folders, then rebuilds and redeploys them
 2. `vite`: watches for any changes in your `src/` folder and hot-reloads the UI

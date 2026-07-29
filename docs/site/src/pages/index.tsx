@@ -154,7 +154,7 @@ function DevLoop() {
       detail: translate({
         id: 'homepage.loop.init',
         message:
-          'Creates a project from the template monorepo: contracts, a frontend, and the shared app library, already wired together.',
+          'Sets up contracts, a frontend in the framework you pick, and the utility code connecting them — already wired together.',
         description: 'Description of the init step',
       }),
     },

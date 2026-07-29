@@ -2,6 +2,31 @@
 
 Stellar Scaffold uses an `environments.toml` file to manage different deployment environments and contract configurations.
 
+## Two configuration files
+
+A scaffolded project has two config files at its root, and they answer different questions:
+
+| File | Answers |
+| --- | --- |
+| `scaffold.yml` | _Where_ things live — which directories the CLI reads contracts from and writes clients to |
+| `environments.toml` | _What_ to deploy — networks, accounts, and contracts, per environment |
+
+Most of this page is about `environments.toml`. `scaffold.yml` is short and you will rarely change it:
+
+```yaml
+version: 1
+
+config:
+  contracts_dir: contracts
+  clients_dir: app-lib/clients
+```
+
+- `version` is the schema version. It is required, and version `1` is the only value this CLI accepts.
+- `contracts_dir` is where your Rust contract crates live. Default: `contracts`.
+- `clients_dir` is where your generated contract clients are written: one package per contract in `clients_dir/<name>/`, plus a `clients_dir/index.ts` your app imports as `@stellar-scaffold/app-lib/clients`. Default: `app-lib/clients`. Everything here is regenerated on each build, so changes you make by hand will be overwritten.
+
+Both keys are optional and fall back to the defaults above, so a `scaffold.yml` containing only `version: 1` is valid.
+
 ## Configuration File Structure
 
 ```toml

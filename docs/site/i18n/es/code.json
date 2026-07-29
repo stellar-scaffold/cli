@@ -412,7 +412,7 @@
     "message": "Cuatro comandos cubren todo el ciclo de vida. Todo lo que hay en medio —compilar contratos, desplegar en una red local, generar clientes TypeScript— ocurre por sí solo."
   },
   "homepage.loop.init": {
-    "message": "Crea un proyecto a partir del monorepo de plantillas: contratos, un frontend y la biblioteca compartida de la app, ya conectados entre sí.",
+    "message": "Prepara los contratos, un frontend en el framework que elijas y el código de utilidades que los conecta, ya listos para funcionar.",
     "description": "Description of the init step"
   },
   "homepage.loop.generate": {
