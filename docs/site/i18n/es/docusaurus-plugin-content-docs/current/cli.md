@@ -17,7 +17,7 @@ Options:
 The init command creates:
 
 - A new Stellar smart contract project with best practices and configurations
-- A frontend application using the [scaffold-stellar-frontend](https://github.com/stellar-scaffold/ui) template
+- A frontend application using the [stellar-scaffold/ui](https://github.com/stellar-scaffold/ui) template
 - Configuration files for both contract and frontend development
 
 ## Generate Command
