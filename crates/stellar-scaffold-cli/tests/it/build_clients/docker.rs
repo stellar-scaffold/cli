@@ -16,7 +16,7 @@ async fn start_local_stellar_is_idempotent() {
 /// the error message still contains at least one of the substrings we rely on
 /// to detect an already-running container.
 ///
-/// See: <https://github.com/theahaco/scaffold-stellar/pull/392>
+/// See: <https://github.com/stellar-scaffold/cli/pull/392>
 #[tokio::test]
 async fn container_start_error_contains_expected_substring() {
     let cmd = cli::container::StartCmd::parse_arg_vec(&["local"])

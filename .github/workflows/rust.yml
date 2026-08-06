@@ -8,6 +8,7 @@ on:
   push:
     branches: [main]
   pull_request:
+    types: [opened, synchronize, reopened, labeled, unlabeled]
     paths-ignore:
       - "website/**"
 
@@ -46,18 +47,27 @@ jobs:
         run: just clippy
       - name: Run cargo clippy on tests
         run: just clippy-test
-      # `init_copies_frontend_template` degits the UI monorepo. If this PR's
-      # branch name also exists there, pin to it so coordinated cross-repo
-      # changes can go green before merging.
+      # Label a PR `cross-repo` to degit the UI from a same-named branch on the
+      # UI repo, so coordinated cross-repo changes can go green before the UI
+      # is released. Unlabeled PRs always use the main branch.
       - name: Resolve UI repo ref
+        env:
+          CROSS_REPO: ${{ contains(github.event.pull_request.labels.*.name, 'cross-repo') }}
         run: |
           REF="${{ github.head_ref }}"
-          if [ -n "$REF" ] && git ls-remote --exit-code --heads \
-              https://github.com/stellar-scaffold/ui "$REF" >/dev/null 2>&1; then
-            echo "STELLAR_SCAFFOLD_UI_REPO=stellar-scaffold/ui#$REF" >> "$GITHUB_ENV"
-            echo "Pinned UI monorepo -> $REF"
-          else
-            echo "Using default UI monorepo (main)"
+          if [ "$CROSS_REPO" != "true" ]; then
+            echo "Using default UI monorepo (main)."
+            echo "To test against a UI branch, label this PR 'cross-repo'."
+            exit 0
           fi
+          if ! git ls-remote --exit-code --heads \
+              https://github.com/stellar-scaffold/ui "$REF" >/dev/null 2>&1; then
+            echo "::error::PR is labeled 'cross-repo' but no branch named" \
+              "'$REF' exists on stellar-scaffold/ui. Push that branch, or" \
+              "remove the label to use main."
+            exit 1
+          fi
+          echo "STELLAR_SCAFFOLD_UI_REPO=stellar-scaffold/ui#$REF" >> "$GITHUB_ENV"
+          echo "Pinned UI monorepo -> $REF"
       - name: Unit Tests
         run: just test
