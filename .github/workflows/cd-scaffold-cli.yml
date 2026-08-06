@@ -11,6 +11,14 @@ on:
   pull_request:
     paths:
       - crates/stellar-scaffold-cli/CHANGELOG.md
+  # Allow manual escape hatch for tags that never fired this workflow, so a
+  # release missing its binaries can be backfilled without re-tagging.
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Tag to build and upload assets for (e.g. stellar-scaffold-cli-v0.0.26)"
+        required: true
+        type: string
 env:
   CARGO_INCREMENTAL: 0
   CARGO_NET_GIT_FETCH_WITH_CLI: true
@@ -52,6 +60,8 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v6
+        with:
+          ref: ${{ inputs.tag || github.ref }}
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@stable
       - if: runner.os == 'Linux'
@@ -62,6 +72,7 @@ jobs:
         with:
           bin: stellar-scaffold
           target: ${{ matrix.target }}
+          ref: ${{ inputs.tag && format('refs/tags/{0}', inputs.tag) || '' }}
           tar: all
           zip: windows
           archive: $tag-$target
