@@ -1,0 +1,22 @@
+[package]
+name = "asset_test"
+version = "0.0.0"
+edition = "2024"
+publish = false
+
+
+[package.metadata.stellar]
+# Set contract metadata for authors, homepage, and version based on the Cargo.toml package values
+cargo_inherit = true
+
+[lib]
+crate-type = ["cdylib"]
+doctest = false
+
+[dependencies]
+soroban-sdk = {workspace = true }
+stellar-registry = { workspace = true }
+admin-sep = { workspace = true }
+
+[dev-dependencies]
+soroban-sdk = {workspace = true, features = ["testutils"] }
