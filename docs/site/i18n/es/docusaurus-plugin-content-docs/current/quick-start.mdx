@@ -1,153 +1,190 @@
-# Quickstart
+# Inicio Rápido
 
-This section walks you through setting up Stellar Scaffold from scratch.
+Esta sección te guía a través de la configuración de Stellar Scaffold desde cero.
 
-## Prerequisites
+## Requisitos Previos
 
-Before you begin, make sure you have the following installed:
+Antes de comenzar, asegúrate de tener instalado lo siguiente:
 
-| Tool | Description | Install Link |
+| Herramienta | Descripción | Enlace de Instalación |
 | --- | --- | --- |
-| [Rust & Cargo](https://www.rust-lang.org/tools/install) | For writing and compiling smart contracts | `curl https://sh.rustup.rs -sSf \| sh` |
-| [Node.js & npm](https://nodejs.org/) | For frontend development | Download from official site |
-| [Stellar CLI](https://github.com/stellar/stellar-cli) | For building, deploying, and interacting with smart contracts | [`Link for the repo`](https://github.com/stellar/stellar-cli) |
-| [Docker](https://docs.docker.com/get-started/) | For running a Stellar node locally | Download from official site |
+| [Rust y Cargo](https://www.rust-lang.org/tools/install) | Para escribir y compilar contratos inteligentes | `curl https://sh.rustup.rs -sSf \| sh` |
+| [Node.js y npm](https://nodejs.org/) | Para el desarrollo del frontend | Descargar desde el sitio oficial |
+| [Stellar CLI](https://github.com/stellar/stellar-cli) | Para compilar, desplegar e interactuar con contratos inteligentes | [`Enlace al repo`](https://github.com/stellar/stellar-cli) |
+| [Docker](https://docs.docker.com/get-started/) | Para ejecutar un nodo de Stellar localmente | Descargar desde el sitio oficial |
 
-### 1. Install the Stellar Scaffold CLI
+### 1. Instalar la CLI de Stellar Scaffold
 
 ```
 cargo install --locked stellar-scaffold-cli
 ```
 
-The Stellar Scaffold CLI is installed as a plugin under the `stellar` CLI.
+La CLI de Stellar Scaffold se instala como un plugin bajo la CLI de `stellar`.
 
-> We recommend the use of [cargo-binstall](https://github.com/cargo-bins/cargo-binstall) to install pre-compiled binaries.
+> Recomendamos usar [cargo-binstall](https://github.com/cargo-bins/cargo-binstall) para instalar binarios precompilados.
 
-### 2. Create a New Project
+### 2. Crear un Nuevo Proyecto
 
 ```
 stellar scaffold init my-project
 cd my-project
 ```
 
-### 3. Configure Your Frontend Environment
+`init` pregunta qué framework de frontend quieres usar. Pasa `--template react` o `--template svelte` para omitir la pregunta, o `--template none` para un proyecto solo de contratos sin frontend en absoluto.
 
-Edit `.env` with your preferred network, and other settings.
+### 3. Configurar Tu Entorno de Frontend
 
-### 4. Install Frontend Dependencies
+Edita `.env` con tu red preferida y otras configuraciones.
+
+### 4. Instalar Dependencias del Frontend
 
 ```
-# Install Frontend dependencies
+# Instalar dependencias del Frontend
 npm install
 ```
 
-### 5. Start Development
+### 5. Iniciar el Desarrollo
 
 ```
 npm run dev
 ```
 
-You should see your React frontend at http://localhost:5173.
+Esto inicia dos procesos juntos: `stellar scaffold watch`, que reconstruye y redespliega tus contratos y regenera sus clientes en cada cambio, y Vite, que sirve el frontend. Deberías ver tu aplicación en http://localhost:5173.
 
-### 6. For testnet/mainnet deployment:
+### 6. Para despliegue en testnet/mainnet:
+
+El registry tiene dos namespaces: **verificado** (requiere aprobación del administrador) y **no verificado** (abierto a todos). Usa el prefijo `unverified/` para el registry no verificado:
 
 ```
-# First publish your contract to the registry
-stellar registry publish --wasm path/to/contract.wasm --wasm-name my-contract
+# Primero publica tu contrato en el registry no verificado
+stellar registry publish --wasm path/to/contract.wasm --wasm-name unverified/my-contract --binver "1.0.0"
 
-# Then deploy an instance with constructor parameters
+# Luego despliega una instancia con parámetros del constructor
 stellar registry deploy \
-  --contract-name my-contract-instance \
-  --wasm-name my-contract \
+  --contract-name unverified/my-contract-instance \
+  --wasm-name unverified/my-contract \
   -- \
   --param1 value1
 
-# Can access the help docs for constructor parameters
+# Puedes acceder a la ayuda para los parámetros del constructor
 stellar registry deploy \
-  --contract-name my-contract-instance \
-  --wasm-name my-contract \
+  --contract-name unverified/my-contract-instance \
+  --wasm-name unverified/my-contract \
   -- \
   --help
 
-# Install the deployed contract locally for use with stellar-cli
-stellar registry create-alias my-contract-instance
+# Crear un alias del contrato desplegado localmente para usar con stellar-cli
+stellar registry create-alias unverified/my-contract-instance
 ```
 
-## Project Layout
+## Estructura del Proyecto
 
-After scaffolding a project, your folder structure will look like this:
+Después de generar un proyecto, la estructura de carpetas se verá así:
 
 ```
 my-project/
-├── contracts/            # Rust smart contracts (compiled to WASM)
-├── packages/             # Auto-generated TypeScript contract clients
-├── src/                  # React frontend code
-│   ├── components/       # Reusable UI pieces
-│   ├── contracts/        # Contract interaction logic
-│   ├── App.tsx           # Main app component
-│   └── main.tsx          # Entry point
-├── environments.toml     # Configuration per environment (dev/test/prod)
-├── .env                  # Local environment variables
-├── package.json          # Frontend packages
-├── target/               # Build outputs
+├── contracts/            # Tus contratos inteligentes en Rust (compilados a Wasm)
+├── app/                  # Tu frontend
+│   └── src/              # Componentes, páginas, hooks, punto de entrada
+├── app-lib/              # Código de utilidad, listo para usar desde tu app
+│   ├── clients/          # Clientes de contrato generados — se regeneran, no editar
+│   ├── wallet.ts         # Conexión de wallet
+│   └── ...               # Configuración de red, almacenamiento, helpers de formato
+├── e2e/                  # Pruebas end-to-end
+├── environments.toml     # Redes, cuentas y contratos por entorno
+├── scaffold.yml          # Configuración de la CLI
+├── .env                  # Variables de entorno locales
+├── Cargo.toml            # Workspace de Rust
+├── package.json          # Raíz del workspace de npm
+├── target/               # Resultados de compilación
 ```
 
-This template provides a ready-to-use frontend application with example smart contracts and their TypeScript clients. You can use these as reference while building your own contracts and UI. The frontend is set up with `Vite`, `React`, and includes basic components for interacting with the contracts.
+Todo esto te pertenece. No hay ningún framework oculto ni nada de qué "eject" — `app/` y `app-lib/` son archivos fuente comunes que puedes leer, editar o eliminar.
 
-See the [CLI Documentation](./cli.md) for detailed command information and the [Environments Guide](./environments.md) for configuration details.
+`app-lib/` contiene la plomería que la mayoría de las apps de Stellar necesitan: conectar una wallet, leer configuraciones de red desde tu entorno, fondear una cuenta de prueba, formatear balances. Tu app lo importa como `@stellar-scaffold/app-lib`. Úsalo, cámbialo, o ignóralo y escribe el tuyo propio — nada en la cadena de herramientas depende de que lo conserves.
+
+La única excepción es `app-lib/clients/`, que es generado.
+
+### Clientes de contrato
+
+Cada vez que tus contratos se compilan o redespliegan, Stellar Scaffold reescribe `app-lib/clients/` para que coincida con ellos. Trátalo como resultado de compilación:
+
+- `app-lib/clients/<name>/` — un paquete por contrato: una interfaz con tipos seguros con cada método, argumento y tipo de retorno tomado del propio contrato.
+- `app-lib/clients/index.ts` — conecta cada uno de esos a la red y dirección desplegada de tu entorno actual, y exporta un objeto listo para usar por contrato.
+
+Esto significa que tus componentes nunca contienen una dirección de contrato o una URL de RPC. Importan un nombre y llaman a un método:
+
+```ts
+import { guessTheNumber } from "@stellar-scaffold/app-lib/clients";
+
+const { result } = await guessTheNumber.get_prize();
+```
+
+Cambiar de entorno — de local a testnet, por ejemplo — cambia a qué apuntan esos objetos, sin ningún cambio en tu código.
+
+Debido a que el directorio se reescribe en cada compilación, las ediciones dentro de él se pierden. Para personalizar cómo se llama a un contrato, envuélvelo en tu propio módulo bajo `app/` e importa eso en su lugar.
+
+Consulta la [Documentación de la CLI](./cli.md) para información detallada de comandos y la [Guía de Entornos](./environments.md) para detalles de configuración.
 
 ---
 
-## CLI Tools
+## Herramientas CLI
 
-Stellar Scaffold provides two main CLI tools:
+Stellar Scaffold proporciona dos herramientas CLI principales:
 
-**stellar-scaffold** Initialize and manage dApp projects:
+**stellar-scaffold** Inicializa y gestiona proyectos de dApps:
 
 ```
 stellar scaffold init my-project
 stellar scaffold build
 ```
 
-**stellar-registry** Manage contract deployment and versions:
+**stellar-registry** Gestiona el despliegue y las versiones de contratos:
 
 ```
-stellar registry publish --wasm contract.wasm --wasm-name my-contract    # Publish contract to the registry
-stellar registry deploy --contract-name instance --wasm-name my-contract # Deploy a contract instance
-stellar registry create-alias my-contract-instance                       # Install deployed contracts locally
+# Publicar en el registry no verificado (no requiere aprobación)
+stellar registry publish --wasm contract.wasm --wasm-name unverified/my-contract
+
+# Desplegar una instancia de contrato
+stellar registry deploy --contract-name unverified/instance --wasm-name unverified/my-contract
+
+# Instalar contratos desplegados localmente
+stellar registry create-alias unverified/instance
 ```
 
-> Use `--help` on any command for usage instructions.
+> Usa `--help` en cualquier comando para instrucciones de uso. Usa el prefijo `unverified/` para publicación abierta.
 
 ---
 
-## Smart Contract Deployment
+## Despliegue de Contratos Inteligentes
 
-### 1. Publish Your Contract
+El registry soporta dos namespaces:
+
+- **Registry verificado** (por defecto) - Requiere aprobación del administrador para publicaciones iniciales
+- **Registry no verificado** - Abierto para que cualquiera publique (usa el prefijo `unverified/`)
+
+### 1. Publicar Tu Contrato
 
 ```bash
-# Publish with automatic metadata extraction
-stellar registry publish --wasm target/stellar/my_contract.wasm
-
-# Or specify details manually
+# Publicar en el registry no verificado (no requiere aprobación)
 stellar registry publish \
   --wasm target/stellar/my_contract.wasm \
-  --wasm-name my-contract \
+  --wasm-name unverified/my-contract \
   --binver "1.0.0"
 ```
 
-### 2. Deploy the Contract
+### 2. Desplegar el Contrato
 
 ```bash
-# Deploy without initialization
+# Desplegar sin inicialización
 stellar registry deploy \
-  --contract-name my-contract-instance \
-  --wasm-name my-contract
+  --contract-name unverified/my-contract-instance \
+  --wasm-name unverified/my-contract
 
-# Deploy with constructor parameters
+# Desplegar con parámetros del constructor
 stellar registry deploy \
-  --contract-name my-token \
-  --wasm-name token \
+  --contract-name unverified/my-token \
+  --wasm-name unverified/token \
   --version "1.0.0" \
   -- \
   --name "My Token" \
@@ -155,18 +192,18 @@ stellar registry deploy \
   --decimals 7
 ```
 
-### 3. Install the Deployed Contract
+### 3. Instalar el Contrato Desplegado
 
 ```bash
-stellar registry create-alias my-contract-instance
+stellar registry create-alias unverified/my-contract-instance
 ```
 
-After installation, you can interact with the contract using `stellar-cli`:
+Después de la instalación, puedes interactuar con el contrato usando `stellar-cli`:
 
 ```bash
 stellar contract invoke --id my-contract-instance -- --help
 ```
 
-> You can deploy to testnet or mainnet depending on your `.env` and `environments.toml`.
+> Puedes desplegar en testnet o mainnet dependiendo de tu `.env` y `environments.toml`. Los nombres se normalizan (guiones bajos → guiones, minúsculas).
 
-Happy hacking!
+¡Feliz programación!

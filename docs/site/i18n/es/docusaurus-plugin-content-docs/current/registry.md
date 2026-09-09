@@ -13,7 +13,7 @@ El sistema de registry consta de dos componentes principales:
 
 Hay dos tipos de registries:
 
-- **Registry Verificado (Raíz)** - Un registry gestionado donde una cuenta administradora debe aprobar las publicaciones iniciales y los registros de nombres de contratos. Esto asegura que los contratos establecidos en el registry verificado han sido revisados.
+- **Registry Verificado (Raíz)** - Un registry gestionado donde una cuenta administradora debe aprobar las publicaciones iniciales y los registros de nombres de contratos. Esto asegura que los contratos establecidos en el registry verificado han sido revisados. Si te interesa que tu contrato sea agregado al registry, abre un issue y podremos comenzar a verificar tu contrato y proyecto.
 - **Registry No Verificado** - Un registry no gestionado donde cualquiera puede publicar wasms o registrar nombres de contratos sin aprobación.
 
 ### Resolución de Nombres

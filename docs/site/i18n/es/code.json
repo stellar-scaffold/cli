@@ -64,7 +64,7 @@
     "description": "The label used to navigate to the next doc"
   },
   "theme.colorToggle.ariaLabel.mode.system": {
-    "message": "system mode",
+    "message": "modo del sistema",
     "description": "The name for the system color mode"
   },
   "theme.colorToggle.ariaLabel.mode.light": {
@@ -88,7 +88,7 @@
     "description": "The title of the page for a docs tag"
   },
   "theme.docs.versionBadge.label": {
-    "message": "Version: {versionLabel}"
+    "message": "Versión: {versionLabel}"
   },
   "theme.docs.versions.unreleasedVersionLabel": {
     "message": "Esta es la documentación sin publicar para {siteTitle}, versión {versionLabel}.",
@@ -179,7 +179,7 @@
     "description": "The ARIA label to collapse the sidebar category"
   },
   "theme.IconExternalLink.ariaLabel": {
-    "message": "(opens in new tab)",
+    "message": "(se abre en una pestaña nueva)",
     "description": "The ARIA label for the external link icon"
   },
   "theme.NavBar.navAriaLabel": {
@@ -255,11 +255,11 @@
     "description": "The ARIA label for hamburger menu button of mobile navigation"
   },
   "theme.navbar.mobileDropdown.collapseButton.expandAriaLabel": {
-    "message": "Expand the dropdown",
+    "message": "Expandir el menú desplegable",
     "description": "The ARIA label of the button to expand the mobile dropdown navbar item"
   },
   "theme.navbar.mobileDropdown.collapseButton.collapseAriaLabel": {
-    "message": "Collapse the dropdown",
+    "message": "Colapsar el menú desplegable",
     "description": "The ARIA label of the button to collapse the mobile dropdown navbar item"
   },
   "theme.docs.sidebar.expandButtonTitle": {
@@ -287,15 +287,15 @@
     "description": "The title of the page for a blog author"
   },
   "theme.blog.authorsList.pageTitle": {
-    "message": "Authors",
+    "message": "Autores",
     "description": "The title of the authors page"
   },
   "theme.blog.authorsList.viewAll": {
-    "message": "View All Authors",
+    "message": "Ver Todos los Autores",
     "description": "The label of the link targeting the blog authors page"
   },
   "theme.blog.author.noPosts": {
-    "message": "This author has not written any posts yet.",
+    "message": "Este autor aún no ha escrito ninguna publicación.",
     "description": "The text for authors with 0 blog post"
   },
   "theme.contentVisibility.unlistedBanner.title": {
@@ -307,11 +307,11 @@
     "description": "The unlisted content banner message"
   },
   "theme.contentVisibility.draftBanner.title": {
-    "message": "Draft page",
+    "message": "Página en borrador",
     "description": "The draft content banner title"
   },
   "theme.contentVisibility.draftBanner.message": {
-    "message": "This page is a draft. It will only be visible in dev and be excluded from the production build.",
+    "message": "Esta página es un borrador. Solo será visible en desarrollo y se excluirá de la compilación de producción.",
     "description": "The draft content banner message"
   },
   "theme.ErrorPageContent.tryAgain": {
@@ -484,59 +484,59 @@
     "message": "Creado con"
   },
   "Favorite": {
-    "message": "Favorite"
+    "message": "Favorito"
   },
   "showcase.tag.favorite.description": {
-    "message": "Our favorite Stellar Scaffold dApp that you must absolutely check out!"
+    "message": "¡Nuestra dApp favorita de Stellar Scaffold que definitivamente debes ver!"
   },
   "Stellar Smart Contract": {
-    "message": "Stellar Smart Contract"
+    "message": "Contrato Inteligente de Stellar"
   },
   "showcase.tag.contract.description": {
-    "message": "Great examples of Stellar smart contract!"
+    "message": "¡Excelentes ejemplos de contratos inteligentes de Stellar!"
   },
   "Frontend": {
     "message": "Frontend"
   },
   "showcase.tag.frontend.description": {
-    "message": "Beautiful Stellar Scaffold dApp, polished and standing out from the initial template!"
+    "message": "¡Hermosa dApp de Stellar Scaffold, pulida y que destaca sobre la plantilla inicial!"
   },
   "Hackathon Winner": {
-    "message": "Hackathon Winner"
+    "message": "Ganador de Hackathon"
   },
   "showcase.tag.hackathon.description": {
-    "message": "Stellar Scaffold dApp which won a hackathon!"
+    "message": "¡dApp de Stellar Scaffold que ganó un hackathon!"
   },
   "showcase.filters.resultCount": {
-    "message": "1 site|{sitesCount} sites",
+    "message": "1 sitio|{sitesCount} sitios",
     "description": "Pluralized label for the number of sites found on the showcase. Use as much plural forms (separated by \"|\") as your language support (see https://www.unicode.org/cldr/cldr-aux/charts/34/supplemental/language_plural_rules.html)"
   },
   "Stellar Scaffold Showcase": {
-    "message": "Stellar Scaffold Showcase"
+    "message": "Proyectos de Stellar Scaffold"
   },
   "List of dApp people are building with Stellar Scaffold": {
-    "message": "List of dApp people are building with Stellar Scaffold"
+    "message": "Lista de dApps que la gente está construyendo con Stellar Scaffold"
   },
   "showcase.header.button": {
-    "message": "🙏 Please add your site"
+    "message": "🙏 Por favor, agrega tu sitio"
   },
   "showcase.card.sourceLink": {
-    "message": "source"
+    "message": "código fuente"
   },
   "showcase.filters.title": {
-    "message": "Filters"
+    "message": "Filtros"
   },
   "showcase.usersList.noResult": {
-    "message": "No result"
+    "message": "Sin resultados"
   },
   "showcase.favoritesList.title": {
-    "message": "Our favorites"
+    "message": "Nuestros favoritos"
   },
   "showcase.usersList.allUsers": {
-    "message": "All sites"
+    "message": "Todos los sitios"
   },
   "showcase.searchBar.placeholder": {
-    "message": "Search for site name..."
+    "message": "Buscar por nombre de sitio..."
   },
   "theme.IdealImageMessage.loading": {
     "message": "Cargando...",
@@ -559,6 +559,6 @@
     "description": "When the image fails to load for unknown error"
   },
   "List of dApps people are building with Stellar Scaffold": {
-    "message": "List of dApps people are building with Stellar Scaffold"
+    "message": "Lista de dApps que la gente está construyendo con Stellar Scaffold"
   }
 }

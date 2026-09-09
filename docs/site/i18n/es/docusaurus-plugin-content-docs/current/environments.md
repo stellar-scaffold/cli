@@ -1,198 +1,223 @@
-# Environment Configuration
+# Configuración de Entornos
 
-Stellar Scaffold uses an `environments.toml` file to manage different deployment environments and contract configurations.
+Stellar Scaffold usa un archivo `environments.toml` para gestionar diferentes entornos de despliegue y configuraciones de contratos.
 
-## Configuration File Structure
+## Dos archivos de configuración
+
+Un proyecto generado con scaffold tiene dos archivos de configuración en su raíz, y responden a preguntas diferentes:
+
+| Archivo | Responde |
+| --- | --- |
+| `scaffold.yml` | _Dónde_ viven las cosas — de qué directorios lee los contratos la CLI y a cuáles escribe los clientes |
+| `environments.toml` | _Qué_ desplegar — redes, cuentas y contratos, por entorno |
+
+La mayor parte de esta página trata sobre `environments.toml`. `scaffold.yml` es breve y rara vez lo cambiarás:
+
+```yaml
+version: 1
+
+config:
+  contracts_dir: contracts
+  clients_dir: app-lib/clients
+```
+
+- `version` es la versión del esquema. Es obligatoria, y la versión `1` es el único valor que acepta esta CLI.
+- `contracts_dir` es donde viven tus crates de contratos en Rust. Por defecto: `contracts`.
+- `clients_dir` es donde se escriben tus clientes de contrato generados: un paquete por contrato en `clients_dir/<name>/`, más un `clients_dir/index.ts` que tu app importa como `@stellar-scaffold/app-lib/clients`. Por defecto: `app-lib/clients`. Todo aquí se regenera en cada compilación, así que los cambios que hagas a mano se sobrescribirán.
+
+Ambas claves son opcionales y recurren a los valores por defecto anteriores, así que un `scaffold.yml` que contenga solo `version: 1` es válido.
+
+## Estructura del Archivo de Configuración
 
 ```toml
 [development]
 network = {
-    name = "local",                 # use local network
-    run_locally = true              # start up the local docker container
+    name = "local",                 # usar la red local
+    run_locally = true              # iniciar el contenedor Docker local
 }
-accounts = ["account1", "account2"] # Account aliases to create
+accounts = ["account1", "account2"] # Alias de cuentas a crear
 
 [staging]
 network = {
-    name = "testnet",               # Use Stellar testnet
+    name = "testnet",               # Usar la testnet de Stellar
 }
 
 [production]
 network = {
-    name = "mainnet",               # Use Stellar mainnet
+    name = "mainnet",               # Usar la mainnet de Stellar
 }
 ```
 
-## Network Configuration
+## Configuración de Red
 
-Each environment can specify network settings:
+Cada entorno puede especificar configuraciones de red:
 
 ```toml
 network = {
-    name = "<network-name>",           # Optional: Use predefined network (mainnet/testnet/local)
-    rpc_url = "<url>",                # Optional: Custom RPC endpoint
-    network_passphrase = "<phrase>",   # Optional: Network passphrase
-    rpc_headers = [["key", "value"]], # Optional: Custom RPC headers
-    run_locally = false               # Optional: Whether to run local network (default: false)
+    name = "<network-name>",           # Opcional: Usar red predefinida (mainnet/testnet/local)
+    rpc_url = "<url>",                # Opcional: Endpoint RPC personalizado
+    network_passphrase = "<phrase>",   # Opcional: Passphrase de red
+    rpc_headers = [["key", "value"]], # Opcional: Encabezados RPC personalizados
+    run_locally = false               # Opcional: Si se debe ejecutar la red local (por defecto: false)
 }
 ```
 
-## Account Configuration
+## Configuración de Cuentas
 
-Configure accounts for contract deployment and testing:
+Configura cuentas para el despliegue y prueba de contratos:
 
 ```toml
 accounts = [
-    "account1",                        # Simple account alias
-    { name = "admin", default = true } # Account with additional settings
+    "account1",                        # Alias de cuenta simple
+    { name = "admin", default = true } # Cuenta con configuraciones adicionales
 ]
 ```
 
-## Contract Configuration
+## Configuración de Contratos
 
-Configure smart contracts for each environment:
+Configura contratos inteligentes para cada entorno:
 
 ```toml
 [development.contracts.my_contract]
-client = true                      # Generate TypeScript client (default: true)
-constructor_args = """             # Initialization script if needed
+client = true                      # Generar cliente TypeScript (por defecto: true)
+constructor_args = """             # Script de inicialización si se necesita
     --arg1 param1 --arg2 param2
 """
-after_deploy = """                 # contract setup invocation logic for after initial deployment
+after_deploy = """                 # lógica de invocación de configuración del contrato después del despliegue inicial
     STELLAR_ACCOUNT=admin fund --to admin --amount 100
 """
 
 [production.contracts.my_contract]
-id = "C..."                        # Contract ID for production/staging
-client = true                      # Generate TypeScript client
+id = "C..."                        # ID del contrato para producción/staging
+client = true                      # Generar cliente TypeScript
 ```
 
-### Configuration Options
+### Opciones de Configuración
 
-#### `client` (boolean, default: true)
+#### `client` (booleano, por defecto: true)
 
-- Controls whether a TypeScript client package is generated for this contract
-- Set to `false` to skip client generation for utility contracts
+- Controla si se genera un paquete de cliente de TypeScript para este contrato
+- Establécelo en `false` para omitir la generación de cliente en contratos utilitarios
 
 ```toml
 [development.contracts.my_contract]
-client = false  # Skip TypeScript client generation
+client = false  # Omitir la generación de cliente TypeScript
 ```
 
-#### `id` (string, optional)
+#### `id` (string, opcional)
 
-- Specifies a fixed contract ID for the contract
-- Required in production/staging environments
-- Must be a valid Stellar contract ID
+- Especifica un ID de contrato fijo para el contrato
+- Requerido en entornos de producción/staging
+- Debe ser un ID de contrato de Stellar válido
 
 ```toml
 [production.contracts.my_contract]
-id = "C..."  # Use specific contract ID
+id = "C..."  # Usar un ID de contrato específico
 ```
 
-#### `constructor_args` (string, optional)
+#### `constructor_args` (string, opcional)
 
-- Arguments passed to contract constructor during deployment
-- Executes as part of the deployment transaction
-- Single line of space-separated arguments
-- Can use `STELLAR_ACCOUNT=<alias>` to specify the deployer account
-- Supports command substitution with `$(command)`
+- Argumentos pasados al constructor del contrato durante el despliegue
+- Se ejecuta como parte de la transacción de despliegue
+- Una sola línea de argumentos separados por espacios
+- Puede usar `STELLAR_ACCOUNT=<alias>` para especificar la cuenta que despliega
+- Admite sustitución de comandos con `$(command)`
 
 ```toml
 [development.contracts.my_contract]
-constructor_args = "--arg1 1000 --account $(stellar keys address admin)"  # Basic args
+constructor_args = "--arg1 1000 --account $(stellar keys address admin)"  # Argumentos básicos
 
-# With specific deployer account
+# Con una cuenta específica que despliega
 constructor_args = "STELLAR_ACCOUNT=admin --arg1 value1 --arg2 value2"
 
-# With command substitution
+# Con sustitución de comandos
 constructor_args = "--account1 $(stellar keys address user1) --account2 $(stellar keys address user2)"
 ```
 
-#### `after_deploy` (string, optional)
+#### `after_deploy` (string, opcional)
 
-- Initialization script to run after contract deployment
-- Only runs in development/testing environments
-- Supports multiple commands on separate lines
-- Can use `STELLAR_ACCOUNT=<alias>` to specify the source account
-- Supports command substitution with `$(command)`
+- Script de inicialización que se ejecuta después del despliegue del contrato
+- Solo se ejecuta en entornos de desarrollo/pruebas
+- Admite múltiples comandos en líneas separadas
+- Puede usar `STELLAR_ACCOUNT=<alias>` para especificar la cuenta de origen
+- Admite sustitución de comandos con `$(command)`
 
 ```toml
 [development.contracts.my_contract]
 after_deploy = """
-# Basic initialization
+# Inicialización básica
 initialize --param1 value1 --param2 value2
 
-# Use specific account
+# Usar una cuenta específica
 STELLAR_ACCOUNT=admin set_admin --admin "new_admin"
 
-# Command substitution
+# Sustitución de comandos
 set_value --value "$(stellar keys address admin)"
 
-# Multiple operations
+# Múltiples operaciones
 create_pool --name "Pool A"
 add_liquidity --amount 1000
 set_fee_rate --rate 0.003
 """
 ```
 
-### Example Configurations
+### Ejemplos de Configuración
 
 ```toml
-# Token contract with constructor args
+# Contrato de token con argumentos de constructor
 [development.contracts.token]
 client = true
 constructor_args = "--name Token --symbol TKN --decimals 8"
 
-# Contract deployed by admin with dynamic arguments
+# Contrato desplegado por el admin con argumentos dinámicos
 [development.contracts.marketplace]
 client = true
 constructor_args = "STELLAR_ACCOUNT=admin --treasury-account $(stellar keys address treasury)"
 
-# Contract with both constructor args and after_deploy script
+# Contrato con argumentos de constructor y script after_deploy
 [development.contracts.game]
 client = true
 constructor_args = "STELLAR_ACCOUNT=admin --name GameV1 --start 1000"
 after_deploy = """
-    # Additional setup after deployment
+    # Configuración adicional después del despliegue
     add_player --address "$(stellar keys address player1)"
     set_difficulty --difficulty 3
 """
 
-# Production environment with fixed contract ID
+# Entorno de producción con ID de contrato fijo
 [production.contracts.token]
 client = true
-id = "CC5YYARE2TSLA..."  # Must be valid contract ID
+id = "CC5YYARE2TSLA..."  # Debe ser un ID de contrato válido
 
-# Utility contract without client generation
+# Contrato utilitario sin generación de cliente
 [development.contracts.utils]
 client = false
 
-# Complex initialization with multiple accounts
+# Inicialización compleja con múltiples cuentas
 [development.contracts.marketplace]
 client = true
 after_deploy = """
-    # Set up admin
+    # Configurar admin
     STELLAR_ACCOUNT=admin set_admin_account --account "$(stellar keys address admin)"
 
-    # Configure fees
+    # Configurar tarifas
     STELLAR_ACCOUNT=admin set_fee_rate --rate 250
 
-    # Add initial listing
+    # Agregar listado inicial
     STELLAR_ACCOUNT=seller create_listing --name "Item A" --price 1000
 """
 ```
 
-## Environment Variables
+## Variables de Entorno
 
-- `STELLAR_SCAFFOLD_ENV`: Set the current environment (development/testing/staging/production)
-- `STELLAR_ACCOUNT`: Default account for transactions (set automatically)
-- `STELLAR_RPC_URL`: RPC endpoint URL (set from network config)
-- `STELLAR_NETWORK_PASSPHRASE`: Network passphrase (set from network config)
+- `STELLAR_SCAFFOLD_ENV`: Establece el entorno actual (development/testing/staging/production)
+- `STELLAR_ACCOUNT`: Cuenta por defecto para transacciones (se establece automáticamente)
+- `STELLAR_RPC_URL`: URL del endpoint RPC (se establece a partir de la configuración de red)
+- `STELLAR_NETWORK_PASSPHRASE`: Passphrase de la red (se establece a partir de la configuración de red)
 
-## Usage
+## Uso
 
-1. Create `environments.toml` in your project root
-2. Configure environments, networks, and contracts
-3. Set `STELLAR_SCAFFOLD_ENV` to choose environment
-4. Use `stellar scaffold build` or `stellar scaffold watch` to deploy and generate clients
+1. Crea `environments.toml` en la raíz de tu proyecto
+2. Configura entornos, redes y contratos
+3. Establece `STELLAR_SCAFFOLD_ENV` para elegir el entorno
+4. Usa `stellar scaffold build` o `stellar scaffold watch` para desplegar y generar clientes
