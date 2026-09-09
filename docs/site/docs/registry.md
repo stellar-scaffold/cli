@@ -2,6 +2,10 @@
 
 The Stellar Registry is a system for publishing, deploying, and managing smart contracts—and their underlying Wasms—on the Stellar network. This guide explains how to use the Registry CLI and UI to manage your contracts.
 
+<div class="videoWrapper">
+  <iframe src="https://www.youtube-nocookie.com/embed/xAlWmJOdMSQ?si=n2yYDkKbyqTAhiNP" title="Stellar Registry Full Walk-Through" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" referrerpolicy="strict-origin-when-cross-origin" allowfullscreen></iframe>
+</div>
+
 ## Overview
 
 At its core, Stellar Registry is a smart contract.
