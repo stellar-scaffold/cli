@@ -63,14 +63,14 @@ When you first publish or deploy to Stellar Registry, you will need to use the `
 
 This:
 
-```
+```bash
 # ✅ WORKS
 stellar registry publish --wasm-name unverified/my-wasm
 ```
 
 Not this:
 
-```
+```bash
 # ❌ DOES NOT WORK
 stellar registry publish --wasm-name my-wasm
 ```
