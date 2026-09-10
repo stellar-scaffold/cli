@@ -61,18 +61,18 @@ Some popular subregistries, to help you get a sense of how this all works:
 
 When you first publish or deploy to Stellar Registry, you will need to use the `unverified` subregistry.
 
-Never this:
-
-```
-# ❌ DOES NOT WORK
-stellar registry publish --wasm-name my-wasm
-```
-
-Instead, this:
+This:
 
 ```
 # ✅ WORKS
 stellar registry publish --wasm-name unverified/my-wasm
+```
+
+Not this:
+
+```
+# ❌ DOES NOT WORK
+stellar registry publish --wasm-name my-wasm
 ```
 
 :::tip
