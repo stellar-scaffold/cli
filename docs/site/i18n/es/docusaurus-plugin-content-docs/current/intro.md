@@ -1,28 +1,28 @@
-# Welcome to Stellar Scaffold!
+# ¡Bienvenido a Stellar Scaffold!
 
-**Stellar Scaffold** is a developer toolkit for building decentralized applications (dApps) and smart contracts on the [**Stellar** blockchain](https://stellar.org).
+**Stellar Scaffold** es un kit de herramientas para desarrolladores que permite construir aplicaciones descentralizadas (dApps) y contratos inteligentes en la [blockchain de **Stellar**](https://stellar.org).
 
-It helps you go from **idea** to **working full-stack dApp** faster — by providing CLI tools, reusable contract templates, a smart contract registry, and a modern frontend.
-
----
-
-## Why Use Stellar Scaffold?
-
-- Simplifies blockchain dApp development
-- Generates smart contract projects and React UIs
-- Deploys smart contracts and manages versions
-- Easy to learn for newcomers; powerful for pros
+Te ayuda a pasar de la **idea** a una **dApp full-stack funcional** más rápido — proporcionando herramientas CLI, plantillas de contratos reutilizables, un registry de contratos inteligentes y un frontend moderno.
 
 ---
 
-## What Is Stellar?
+## ¿Por Qué Usar Stellar Scaffold?
 
-[**Stellar**](https://www.stellar.org/) is a blockchain designed for fast, low-cost financial transactions and smart contracts written in **Rust** and compiled to **WebAssembly (Wasm)**.
-
-With Stellar Scaffold, you write smart contracts in Rust and interact with them using modern TypeScript + React tooling.
+- Simplifica el desarrollo de dApps para blockchain
+- Genera proyectos de contratos inteligentes e interfaces de usuario en React
+- Despliega contratos inteligentes y gestiona versiones
+- Fácil de aprender para principiantes; potente para expertos
 
 ---
 
-## Additional Developer Resources
+## ¿Qué Es Stellar?
 
-Check out the [Stellar Scaffold Playlist](https://www.youtube.com/playlist?list=PLmr3tp_7-7Gjj6gn5-bBn-QTMyaWzwOU5) on the Stellar Development Foundation YouTube channel!
+[**Stellar**](https://www.stellar.org/) es una blockchain diseñada para transacciones financieras rápidas y de bajo costo, con contratos inteligentes escritos en **Rust** y compilados a **WebAssembly (Wasm)**.
+
+Con Stellar Scaffold, escribes contratos inteligentes en Rust e interactúas con ellos usando herramientas modernas de TypeScript + React.
+
+---
+
+## Recursos Adicionales para Desarrolladores
+
+¡Consulta la [Lista de Reproducción de Stellar Scaffold](https://www.youtube.com/playlist?list=PLmr3tp_7-7Gjj6gn5-bBn-QTMyaWzwOU5) en el canal de YouTube de la Stellar Development Foundation!
