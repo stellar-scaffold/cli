@@ -18,15 +18,15 @@ The Registry smart contract keeps track of two kinds of information:
 
    This gets your Wasm file/blob/binary/module on-chain, _identified only by its content hash._ This looks like a string of 65 hexadecimal characters like `d1d4e69…`.
 
-   Stellar Registry allows you, the contract author, to also give that Wasm module a _name_ and a _version._ Key insight here: Stellar is _already a module-distribution system_, like NPM or Crates.io. It's just that, without Registry, it's unusable. Registry provides the name+version+search layer that reveals this truth and makes it useful.
+   Stellar Registry allows you, the contract author, to also give that Wasm module a _name_ and a _version._ Key insight: Stellar is _already a module-distribution system_, like NPM or Crates.io. Registry makes it usable.
 
-   For this reason, Stellar Registry prefers the verb _publish_, rather than the more generic "upload." You're not merely uploading a Wasm blob to the blockchain; you're publishing a module. Like other module-distribution systems, you then keep control of this name, and the rights to publish new versions in the series.
+2. **Contracts:** Once a Wasm is on-chain, many contracts can use it. You can deploy a Contract for a Wasm you didn't write; someone else could deploy multiple Contracts all using your Wasm. If you're familiar with Object Oriented Programming, think of the Contract as the _instance_ and the Wasm as the _class._ A Wasm defines behavior; a Contract holds data (including a reference to the Wasm).
 
-2. **Contracts:** Once a Wasm is on-chain, anyone can deploy any number of contracts that all use that same underlying Wasm. If you're familiar with Object Oriented Programming, think of the Contract as the _instance_ and the Wasm as the _class._ A Wasm defines behavior; a Contract holds data (including a reference to the Wasm).
+   :::note Contracts don't have versions
 
-   For a concrete example, think of a Wasm like [`oz/ft-standard`](https://stellar.rgstry.xyz/wasms/oz/ft-standard)—Open Zeppelin's standard Fungible Token implementation. You could create three separate tokens from this one Wasm just by deploying three separate smart contracts and giving them different initialization parameters (maybe you are a scammer and so you call them "USDC", "EURC", and "BTC"—nothing stops you from doing this). All these _Contracts_ reference the same _Wasm_ and thus have the same behavior, the same interface, the same methods; they only differ in their _storage_; in their initialization parameters and the various interactions (deposits, withdrawals, transfers) that adjust their stored data.
+   You always interact with a Contract's live, latest version.
 
-   While Stellar Registry gives Wasms both names and _versions_, it makes less sense for Contracts to have versions. A contract is not a module; it's more like an app or a datastore. You always interact with a Contract's live, latest version.
+   :::
 
 So that's it, at its core: Stellar Registry is a smart contract, which gives other smart contracts names, and which gives Wasms both names and versions.
 
@@ -120,6 +120,8 @@ cargo binstall stellar-registry-cli
 ## Commands
 
 ### Publish Contract
+
+Stellar Registry prefers the verb _publish_, rather than the more generic "upload." You're not merely uploading a Wasm blob to the blockchain; you're publishing a module. Like other module-distribution systems, you then keep control of this name, and the rights to publish new versions in the series.
 
 Publish a compiled contract to the Stellar Registry:
 
