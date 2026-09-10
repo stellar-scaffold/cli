@@ -170,7 +170,7 @@ Options:
 
 ### Deploy Unnamed Contract
 
-Deploy a published contract without registering a name in the registry. This is useful when you want to deploy a contract but don't need name resolution. You can do this with the "Deploy a contract using this Wasm" button on any Wasm page in https://rgstry.xyz, or to use the CLI:
+Deploy a published contract without registering a name in the registry. This is useful when you want to deploy a contract but don't need name resolution. You can do this with the "Deploy a contract using this Wasm" button on any Wasm page in https://stellar.rgstry.xyz/wasms, or to use the CLI:
 
 ```bash
 stellar registry deploy-unnamed \
