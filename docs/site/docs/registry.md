@@ -93,7 +93,7 @@ Names in the registry support namespace prefixes. The CLI resolves names using t
 
 ### Name Normalization
 
-All names are normalized by the [stellar-registry-names](https://crates.io/crates/stellar-registry-name) crate before storage:
+All names are normalized by the [stellar-registry-name](https://crates.io/crates/stellar-registry-name) crate before storage:
 
 - Underscores (`_`) are converted to hyphens (`-`)
 - Uppercase letters are converted to lowercase
