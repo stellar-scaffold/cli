@@ -164,9 +164,7 @@ Options:
 - `--wasm-name`: The name of the previously published contract to deploy, supports prefix notation (required)
 - `--version`: Specific version of the published contract to deploy (optional, defaults to most recent version)
 - `--deployer`: Optional deployer address for deterministic contract ID resolution (advanced feature)
-- `CONSTRUCTOR_ARGS`: Optional arguments for the constructor function
-
-Note: Use `--` to separate CLI options from constructor arguments.
+- `-- [CONSTRUCTOR_ARGS]`: `--` is a standard CLI separator between "arguments for the main process" and "arguments for the sub-process". `stellar registry deploy` creates an "implicit CLI" for the deployed contract, passing `CONSTRUCTOR_ARGS` to it. If the Wasm being deployed does not have a `__constructor`, you do not need this.
 
 **Note:** For the root registry, the governance process ([see above](#quick-links)) must approve initial publishes. For the unverified registry, use the `unverified/` prefix.
 
