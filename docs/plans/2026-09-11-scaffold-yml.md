@@ -59,7 +59,7 @@ contracts:                    # not necessarily client config anymore
         args: { owner: ${account.ci-deployer}, initial_supply: "1000000" }
         after-deploy-script: ./scripts/seed-preview.ts   # relative to scaffold.yml
       testnet:
-        source: registry:test-usdc@0.1.0                  # per-network override of source
+        source: registry:circle/usdc                      # per-network override of source
 
   dex:                                 # third-party, consumed only
     source: CDLZFC3SYJYDZT7K67VZ75HPJVIEUVNIXF47ZG2FB2RMQQVU2HHGCYSC   # a strkey = deployed contract
