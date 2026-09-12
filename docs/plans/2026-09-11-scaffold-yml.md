@@ -160,7 +160,7 @@ codegen  ⟸ if project.clients-dir is set
 ```
 
 ## 4. Selecting network and accounts
-- `accounts` is a list that we'll **ensure** exists. Networks with Friendbot will generate + fund. Mainnet will verify only and error if absnet.
+- `accounts` is a list that we'll **ensure** exists. Networks with Friendbot will generate + fund. Mainnet will verify only and error if absent.
 - Signer is specified per network per contract, or falls back to network default.
 - `--network <name>` on `build`, `watch`, `check`, `config show`; then `STELLAR_SCAFFOLD_NETWORK`; then `local`. `STELLAR_SCAFFOLD_ENV` is aliased with a warning during 0.0.x and removed at 1.0.
 - Container start + health check only when the resolved network has `start-container: true`.
