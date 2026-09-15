@@ -209,15 +209,34 @@ fn download_from_registry(
 }
 
 /// Generates a contract Client for a given asset.
-/// It is expected that the name of an asset, e.g. "native" or "USDC:G1...."
+/// It produces 2 modules that can be used either in your contract code or in unit tests.
+/// As the first argument, it expects the name of an asset, e.g. "native" or "USDC:G1...."
+/// To generate the contract id for the asset, it uses the `STELLAR_NETWORK` environment variable,
+/// which could be either `local`, `testnet`, `futurenet` or `mainnet`. (uses `local` if not set)
 ///
+/// Example:
+/// ```ignore
+/// import_asset!("native");
+/// ```
+/// Can be used in unit tests as follows:
+/// ```ignore
+/// let env = &Env::default();
+/// let admin = &Address::generate(env);
+/// let sac = test_native::register(env, admin);
+/// let client = test_native::stellar_asset_client(env, &sac);
+/// assert_eq!(client.admin(), *admin);
+/// assert_eq!(client.balance(admin), 1000000000);
+/// ```
+/// And in your contract code:
+/// ```ignore
+/// ```
 /// # Panics
 ///
 #[proc_macro]
 pub fn import_asset(input: TokenStream) -> TokenStream {
     // Parse the input as a string literal
     let input_str = syn::parse_macro_input!(input as syn::LitStr);
-    asset::parse_literal(&input_str, &Network::passphrase_from_env()).into()
+    asset::parse_literal(&input_str).into()
 }
 
 #[cfg(test)]

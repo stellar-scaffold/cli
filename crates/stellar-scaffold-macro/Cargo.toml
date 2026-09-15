@@ -18,3 +18,6 @@ stellar-strkey = "0.0.13"
 regex = "1.12.3"
 stellar-xdr = "23.0.0"
 sha2 = "0.10.9"
+
+[dev-dependencies]
+soroban-sdk = { workspace = true, features = ["testutils"] }
