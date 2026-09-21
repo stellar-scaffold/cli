@@ -6,7 +6,7 @@ use stellar_scaffold_test::{AssertExt, TestEnv, rpc_url};
 /// perfectly healthy network.
 #[tokio::test]
 async fn probe_reports_a_running_network_as_healthy() {
-    let endpoints = docker::LocalEndpoints::from_rpc_url(Somr(&rpc_url()));
+    let endpoints = docker::LocalEndpoints::from_rpc_url(Some(&rpc_url()));
     let report = docker::probe_local_health(&endpoints).await;
 
     assert_eq!(
