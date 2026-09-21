@@ -12,6 +12,7 @@ use stellar_cli;
 
 pub mod build;
 pub mod clean;
+pub mod doctor;
 pub mod ext;
 pub mod generate;
 pub mod init;
@@ -22,6 +23,10 @@ pub mod version;
 pub mod watch;
 
 const ABOUT: &str = "Build smart contracts with frontend support";
+
+/// Appended to failures whose cause is usually an environment or config
+/// problem, which `doctor` can name precisely.
+pub const DOCTOR_HINT: &str = "Run `stellar scaffold doctor` to diagnose.";
 
 #[derive(Parser, Debug)]
 #[command(
@@ -66,6 +71,7 @@ impl Root {
             Cmd::UpdateEnv(e) => e.run()?,
             Cmd::Watch(watch_info) => watch_info.run(&self.global_args).await?,
             Cmd::Clean(clean) => clean.run(&self.global_args)?,
+            Cmd::Doctor(doctor) => doctor.run(&self.global_args).await?,
         }
         Ok(())
     }
@@ -106,6 +112,9 @@ pub enum Cmd {
 
     /// Clean Scaffold-generated artifacts from the given workspace
     Clean(clean::Cmd),
+
+    /// Diagnose environment and configuration problems in a scaffold project
+    Doctor(doctor::Cmd),
 }
 
 #[derive(thiserror::Error, Debug)]
@@ -127,6 +136,8 @@ pub enum Error {
     Watch(#[from] watch::Error),
     #[error(transparent)]
     Clean(#[from] clean::Error),
+    #[error(transparent)]
+    Doctor(#[from] doctor::Error),
 }
 
 #[derive(serde::Deserialize)]

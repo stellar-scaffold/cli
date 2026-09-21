@@ -61,6 +61,10 @@ fn emit_local_protocol_version() {
         })
         .major;
     println!("cargo:rustc-env=LOCAL_PROTOCOL_VERSION={major}");
+
+    // The same pin, unparsed, so `doctor` can report which stellar-cli this
+    // build expects alongside the one actually on PATH.
+    println!("cargo:rustc-env=PINNED_STELLAR_CLI_VERSION={version}");
 }
 
 /// Read the `stellar-cli` version pin from a manifest, checking both the
