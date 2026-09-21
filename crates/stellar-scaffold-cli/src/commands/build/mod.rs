@@ -50,7 +50,7 @@ pub enum Error {
     EnvironmentsToml(#[from] env_toml::Error),
     #[error(transparent)]
     CargoCmd(io::Error),
-    #[error("exit status {0}")]
+    #[error("exit status {0}. {hint}", hint = super::DOCTOR_HINT)]
     Exit(ExitStatus),
     #[error("package {package} not found")]
     PackageNotFound { package: String },
@@ -66,7 +66,7 @@ pub enum Error {
     BuildClients(#[from] clients::Error),
     #[error(transparent)]
     Build(#[from] build::Error),
-    #[error("Failed to start docker container")]
+    #[error("Failed to start docker container. {hint}", hint = super::DOCTOR_HINT)]
     DockerStart,
     #[error("package name is empty: {0}")]
     EmptyPackageName(Utf8PathBuf),

@@ -39,7 +39,7 @@ pub enum Error {
     Io(#[from] std::io::Error),
     #[error(transparent)]
     Env(#[from] env_toml::Error),
-    #[error("Failed to start docker container")]
+    #[error("Failed to start docker container. {hint}", hint = super::DOCTOR_HINT)]
     DockerStart,
     #[error(transparent)]
     Manifest(#[from] cargo_metadata::Error),
