@@ -27,72 +27,91 @@ pub async fn start_local_stellar() -> Result<(), Box<dyn Error>> {
     } else {
         tokio::time::sleep(std::time::Duration::from_secs(10)).await;
     }
-    wait_for_stellar_health().await
+    wait_for_local_health(std::time::Duration::from_secs(60)).await
 }
 
-async fn wait_for_stellar_health() -> Result<(), Box<dyn Error>> {
-    let client = reqwest::Client::new();
+/// Cap on a single health request, so one hung socket can't stall the probe.
+const PROBE_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(3);
+const RPC_URL: &str = "http://localhost:8000/rpc";
+/// The address is invalid on purpose; friendbot answering at all is the signal.
+const FRIENDBOT_PROBE_URL: &str =
+    "http://localhost:8000/friendbot?addr=GAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAWHF";
+
+/// What one round of probes saw. An unreachable service is recorded, not raised
+/// as an error, so the caller decides whether it's fatal.
+pub struct HealthReport {
+    /// Status string RPC reported, or `None` if it didn't answer.
+    pub rpc_status: Option<String>,
+    /// Whether friendbot responded at all.
+    pub friendbot: bool,
+}
+
+impl HealthReport {
+    /// Both services up and RPC reporting healthy.
+    pub fn is_healthy(&self) -> bool {
+        self.rpc_status.as_deref() == Some("healthy") && self.friendbot
+    }
+}
+
+/// Probe RPC and friendbot once. Never retries; callers that want to wait loop
+/// over this themselves.
+pub async fn probe_local_health() -> HealthReport {
+    let Ok(client) = reqwest::Client::builder().timeout(PROBE_TIMEOUT).build() else {
+        return HealthReport {
+            rpc_status: None,
+            friendbot: false,
+        };
+    };
+
+    // Both run even if RPC is down, so a dead RPC doesn't hide friendbot's state.
+    HealthReport {
+        rpc_status: probe_rpc(&client).await,
+        friendbot: probe_friendbot(&client).await,
+    }
+}
+
+async fn probe_rpc(client: &reqwest::Client) -> Option<String> {
+    let response = client
+        .post(RPC_URL)
+        .header("Content-Type", "application/json")
+        .body(r#"{"jsonrpc": "2.0", "id": 1, "method": "getHealth"}"#)
+        .send()
+        .await
+        .ok()?;
+    if !response.status().is_success() {
+        return None;
+    }
+    let json: serde_json::Value = response.json().await.ok()?;
+    json["result"]["status"].as_str().map(ToString::to_string)
+}
+
+async fn probe_friendbot(client: &reqwest::Client) -> bool {
+    match client.get(FRIENDBOT_PROBE_URL).send().await {
+        // 400 is expected for the dummy address, and proves friendbot is up.
+        Ok(response) => response.status().is_success() || response.status() == 400,
+        Err(_) => false,
+    }
+}
+
+async fn wait_for_local_health(timeout: std::time::Duration) -> Result<(), Box<dyn Error>> {
     let start_time = std::time::Instant::now();
-    let timeout = std::time::Duration::from_secs(60);
 
-    // First check Stellar RPC health
     loop {
-        let elapsed_time = start_time.elapsed();
-        if elapsed_time > timeout {
-            eprintln!("Timeout reached: stopping health checks.");
-            return Err("Health check timed out".into());
+        let report = probe_local_health().await;
+        if report.is_healthy() {
+            return Ok(());
         }
-        let res = client
-            .post("http://localhost:8000/rpc")
-            .header("Content-Type", "application/json")
-            .body(r#"{"jsonrpc": "2.0", "id": 1, "method": "getHealth"}"#)
-            .send()
-            .await?;
-        if res.status().is_success() {
-            let health_status: serde_json::Value = res.json().await?;
-            if health_status["result"]["status"] == "healthy" {
-                eprintln!("Stellar RPC is healthy, now checking friendbot...");
-                break;
-            }
-            eprintln!("Stellar status is not healthy: {health_status:?}");
-        } else {
-            eprintln!("Health check request failed with status: {}", res.status());
+
+        // Checked after probing so the attempt at the deadline still counts.
+        if start_time.elapsed() > timeout {
+            return Err(format!(
+                "Health check timed out (rpc: {:?}, friendbot: {})",
+                report.rpc_status, report.friendbot
+            )
+            .into());
         }
+
+        eprintln!("Local network not ready, retrying health check.");
         tokio::time::sleep(std::time::Duration::from_secs(5)).await;
-        eprintln!("Retrying health check.");
     }
-
-    // Now check friendbot readiness
-    loop {
-        let elapsed_time = start_time.elapsed();
-        if elapsed_time > timeout {
-            eprintln!("Timeout reached: friendbot check failed.");
-            return Err("Friendbot readiness check timed out".into());
-        }
-
-        // Use a dummy address to test friendbot availability
-        let res = client
-            .get("http://localhost:8000/friendbot?addr=GAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAWHF")
-            .send()
-            .await;
-
-        match res {
-            Ok(response) => {
-                if response.status().is_success() || response.status() == 400 {
-                    // 400 is expected for invalid address, but means friendbot is responding
-                    eprintln!("Friendbot is ready!");
-                    break;
-                }
-                eprintln!("Friendbot not ready, status: {}", response.status());
-            }
-            Err(e) => {
-                eprintln!("Friendbot connection failed: {e}");
-            }
-        }
-
-        tokio::time::sleep(std::time::Duration::from_secs(2)).await;
-        eprintln!("Retrying friendbot check.");
-    }
-
-    Ok(())
 }
