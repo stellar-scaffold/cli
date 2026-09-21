@@ -5,7 +5,7 @@ use stellar_cli::{CommandParser, commands as cli};
 #[tokio::test]
 async fn start_local_stellar_is_idempotent() {
     // Test harness already sets up network, so this is _second_ call
-    let result = stellar_scaffold_cli::commands::build::docker::start_local_stellar().await;
+    let result = stellar_scaffold_cli::commands::build::docker::start_local_stellar(None).await;
     assert!(
         result.is_ok(),
         "start_local_stellar should succeed when the container is already running, got: {result:?}"

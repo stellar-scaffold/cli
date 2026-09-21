@@ -69,7 +69,11 @@ impl Check for Localnet {
             return vec![Diagnosis::skipped(self.name(), Category::Network, reason)];
         }
 
-        let report = docker::probe_local_health().await;
+        let rpc_url = ctx
+            .environment()
+            .and_then(|env| env.network.rpc_url.as_deref());
+        let report =
+            docker::probe_local_health(&docker::LocalEndpoints::from_rpc_url(rpc_url)).await;
 
         let rpc = match report.rpc_status.as_deref() {
             Some("healthy") => Diagnosis::ok("localnet-rpc", Category::Network, "RPC is healthy"),

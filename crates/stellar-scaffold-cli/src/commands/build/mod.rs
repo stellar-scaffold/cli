@@ -86,10 +86,12 @@ impl Command {
         if let Some(current_env) = env_toml::Environment::get(workspace_root, env)?
             && current_env.network.run_locally
         {
-            docker::start_local_stellar().await.map_err(|e| {
-                eprintln!("Failed to start Stellar Docker container: {e:?}");
-                Error::DockerStart
-            })?;
+            docker::start_local_stellar(current_env.network.rpc_url.as_deref())
+                .await
+                .map_err(|e| {
+                    eprintln!("Failed to start Stellar Docker container: {e:?}");
+                    Error::DockerStart
+                })?;
         }
         Ok(())
     }
