@@ -145,12 +145,12 @@ Options:
 
 Doctor runs every check and reports all of them — it does not stop at the first problem. Each finding is one of:
 
-| Symbol | Meaning |
-|--------|---------|
-| ✅ | The check passed |
-| ⚠️ | Something is likely wrong, but builds can still work |
-| ❌ | A problem that will break a build or deploy |
-| ℹ️ | The check does not apply here |
+| Symbol | Meaning                                              |
+| ------ | ---------------------------------------------------- |
+| ✅     | The check passed                                     |
+| ⚠️     | Something is likely wrong, but builds can still work |
+| ❌     | A problem that will break a build or deploy          |
+| ℹ️     | The check does not apply here                        |
 
 Findings that have a single-command remedy print it on a `fix:` line beneath.
 
