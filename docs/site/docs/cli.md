@@ -128,6 +128,92 @@ Clean removes:
 
 Reach for it when you want a genuinely fresh deployment. Because Stellar Scaffold only redeploys a contract when the contract itself changes, editing something else — an `after_deploy` script, for instance — will not produce a new instance on its own. Clearing the aliases makes the next `stellar scaffold watch` deploy from scratch.
 
+## Doctor Command
+
+Diagnose environment and configuration problems in a project:
+
+```bash
+stellar scaffold doctor [options]
+```
+
+Options:
+
+- `--env <name>`: Scaffold environment to diagnose (defaults to `development`, or `STELLAR_SCAFFOLD_ENV`)
+- `--manifest-path <path>`: Path to `Cargo.toml` (defaults to the current directory)
+- `--json`: Emit findings as JSON instead of a report
+- `--strict`: Treat warnings as failures
+
+Doctor runs every check and reports all of them — it does not stop at the first problem. Each finding is one of:
+
+| Symbol | Meaning                                              |
+| ------ | ---------------------------------------------------- |
+| ✅     | The check passed                                     |
+| ⚠️     | Something is likely wrong, but builds can still work |
+| ❌     | A problem that will break a build or deploy          |
+| ℹ️     | The check does not apply here                        |
+
+Findings that have a single-command remedy print it on a `fix:` line beneath.
+
+### What it checks
+
+**Toolchain** — runs anywhere, project or not:
+
+- `rustc` is installed, and matches `rust-toolchain.toml` if the project pins a version
+- The `wasm32v1-none` target contracts compile to is installed
+- The `stellar` CLI is installed, and its major version matches the one this release was built against
+- Node and the package manager named by your `package.json` `packageManager` field are installed
+
+**Project** — needs a Cargo workspace:
+
+- `scaffold.yml` exists and uses a schema version this CLI supports
+- The directories its `config:` section points at exist
+- The running CLI satisfies the project's `engines.stellar-scaffold` constraint
+- `.env` exists when there is a `.env.example` to copy from
+- `environments.toml` parses, defines the selected environment, has a usable network, and names contracts that exist in the workspace
+- Every extension the environment lists can be found and reports a valid manifest
+
+**Network** — only when the selected environment sets `run-locally = true`:
+
+- The Docker daemon is running, not merely installed
+- The local network's RPC endpoint reports healthy
+- Friendbot is responding
+
+### Example
+
+```bash
+$ stellar scaffold doctor
+   Toolchain
+✅ rustc              1.93.0 (rust-toolchain.toml: 1.93.0)
+✅ wasm-target        wasm32v1-none
+✅ stellar-cli        27.0.0
+✅ node               v24.16.0
+⚠️ package-manager    package.json pins npm@11.7.0, found 11.13.0
+    fix: corepack use npm@11.7.0
+   Project
+✅ scaffold-yml       scaffold.yml schema version 1
+✅ contracts-dir      contracts
+✅ clients-dir        app-lib/clients
+✅ engine-constraint  stellar-scaffold 0.0.27
+⚠️ dot-env            .env is missing
+    fix: cp .env.example .env
+   Network
+ℹ️ docker-daemon      network is not run locally
+ℹ️ localnet           network is not run locally
+   0 problems, 2 warnings
+```
+
+### Exit codes and CI
+
+Doctor exits `1` when any check reports a problem, and `0` otherwise — warnings alone do not fail it. Pass `--strict` to fail on warnings too.
+
+For CI, combine `--json` with `--strict`:
+
+```bash
+stellar scaffold doctor --json --strict
+```
+
+The JSON holds a `checks` array — each entry with `name`, `category`, `severity`, `message`, and `fix` — plus a `summary` object tallying each severity.
+
 ## Update Environment Command
 
 Update environment variables in the .env file:

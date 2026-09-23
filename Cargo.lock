@@ -5442,6 +5442,7 @@ version = "0.0.27"
 dependencies = [
  "assert_cmd",
  "assert_fs",
+ "async-trait",
  "cargo_metadata",
  "cargo_toml",
  "clap",

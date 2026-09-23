@@ -50,6 +50,7 @@ reqwest = { workspace = true, default-features = false, features = [
     "json",
     "rustls-tls",
 ] }
+async-trait = "0.1"
 thiserror = "2.0.17"
 serde = "1.0.228"
 serde_json = "1.0.149"
