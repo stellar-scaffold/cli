@@ -209,7 +209,7 @@ impl Lint<'_> {
             .filter(|(_, dir)| dir.starts_with(&contracts_dir))
             .map(|(name, _)| name.as_str())
             .collect();
-        if crates.contains(&src.value.as_str()) {
+        if crates.iter().any(|c| source::same_crate(c, &src.value)) {
             return;
         }
         let dir = self.project.contracts_dir.display();

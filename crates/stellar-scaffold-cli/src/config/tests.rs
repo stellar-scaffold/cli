@@ -207,6 +207,13 @@ fn missing_env_fails_show_but_not_check() {
 }
 
 #[test]
+fn crate_names_match_across_dash_and_underscore() {
+    let yaml = "version: 2\nnetworks:\n  local: { accounts: [me] }\ncontracts:\n  c:\n    type: workspace\n    source: fungible-token\n    networks: { local: }\n";
+    let (_dir, loaded) = load_str(yaml, None);
+    assert!(loaded.diagnostics.is_empty(), "{}", loaded.render());
+}
+
+#[test]
 fn crate_check_is_scoped_to_contracts_dir() {
     let yaml = "version: 2\nproject: { contracts-dir: elsewhere }\nnetworks:\n  local: { accounts: [me] }\ncontracts:\n  c:\n    type: workspace\n    source: fungible_token\n    networks: { local: }\n";
     let (_dir, loaded) = load_str(yaml, None);
