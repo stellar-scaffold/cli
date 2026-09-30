@@ -245,6 +245,10 @@ const MOVED_KEYS: &[(&str, &str)] = &[
     ),
     ("id", "set `type: contract` and `source: C…`"),
     ("client", "remove it; every listed contract gets a client"),
+    (
+        "optimize",
+        "builds are optimized by default; pass `--optimize=false` to `stellar scaffold build` to opt out",
+    ),
 ];
 
 /// Convert a serde-saphyr error into a diagnostic, adding "did you mean"

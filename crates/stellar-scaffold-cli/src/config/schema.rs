@@ -38,8 +38,6 @@ pub struct Config {
 pub struct Project {
     pub contracts_dir: PathBuf,
     pub clients_dir: PathBuf,
-    /// Pass `--optimize` to `stellar contract build`.
-    pub optimize: bool,
 }
 
 impl Default for Project {
@@ -47,7 +45,6 @@ impl Default for Project {
         Self {
             contracts_dir: "contracts".into(),
             clients_dir: "app-lib/clients".into(),
-            optimize: false,
         }
     }
 }
@@ -461,6 +458,13 @@ mod tests {
     fn moved_keys_explain_the_replacement() {
         let d = parse("version: 2\nnetworks:\n  local:\n    run_locally: true\n").unwrap_err();
         assert!(d.help.unwrap().contains("start-container"));
+    }
+
+    #[test]
+    fn optimize_points_at_the_build_flag() {
+        let d = parse("version: 2\nproject:\n  optimize: false\n").unwrap_err();
+        assert_eq!(d.code, Code::UnknownKey);
+        assert!(d.help.unwrap().contains("--optimize=false"));
     }
 
     #[test]

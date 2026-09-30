@@ -36,7 +36,7 @@ fn full_example_is_clean() {
     let yaml = format!(
         r#"version: 2
 project:
-  optimize: true
+  contracts-dir: contracts
 extensions:
   reporter: {{ warn-size-kb: 128 }}
 networks:
