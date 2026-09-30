@@ -374,7 +374,7 @@ fn check_version(version: Option<&Spanned<Value>>) -> Result<(), Diagnostic> {
         Some(v) if v == u64::from(SCHEMA_VERSION) => Ok(()),
         Some(1) => Err(Diagnostic::error(
             Code::SchemaVersion,
-            "this is a version 1 scaffold.yml; `check` validates version 2",
+            "this is a version 1 scaffold.yml; this command reads version 2",
         )
         .at(span(version))
         .help("version 1 is still read by `build`; version 2 moves `config:` to `project:` and adds `networks:` and `contracts:`")),

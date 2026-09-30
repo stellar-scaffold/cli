@@ -101,7 +101,7 @@ fn config_diagnoses(name: &'static str, root: &Path, loaded: &config::Loaded) ->
                 if errors == 1 { "" } else { "s" }
             ),
         )
-        .with_fix("stellar scaffold check")
+        .with_fix("stellar scaffold config check")
     };
     let mut findings = vec![summary];
     for d in &loaded.diagnostics {

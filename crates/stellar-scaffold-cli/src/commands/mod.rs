@@ -11,7 +11,6 @@ use regex::Regex;
 use stellar_cli;
 
 pub mod build;
-pub mod check;
 pub mod clean;
 pub mod config;
 pub mod doctor;
@@ -74,8 +73,7 @@ impl Root {
             Cmd::Watch(watch_info) => watch_info.run(&self.global_args).await?,
             Cmd::Clean(clean) => clean.run(&self.global_args)?,
             Cmd::Doctor(doctor) => doctor.run(&self.global_args).await?,
-            Cmd::Check(check) => check.run(&self.global_args)?,
-            Cmd::Config(config) => config.run()?,
+            Cmd::Config(config) => config.run(&self.global_args)?,
         }
         Ok(())
     }
@@ -120,10 +118,7 @@ pub enum Cmd {
     /// Diagnose environment and configuration problems in a scaffold project
     Doctor(doctor::Cmd),
 
-    /// Validate scaffold.yml (schema version 2) and exit non-zero on errors
-    Check(check::Cmd),
-
-    /// Inspect scaffold.yml
+    /// Validate and inspect scaffold.yml
     Config(config::Cmd),
 }
 
@@ -148,8 +143,6 @@ pub enum Error {
     Clean(#[from] clean::Error),
     #[error(transparent)]
     Doctor(#[from] doctor::Error),
-    #[error(transparent)]
-    Check(#[from] check::Error),
     #[error(transparent)]
     Config(#[from] config::Error),
 }

@@ -2,7 +2,7 @@
 //!
 //! Every problem found while loading or validating the config is a
 //! [`Diagnostic`] with a stable code, a severity, an optional source span, and
-//! an optional one-line remedy. The same values back `scaffold check`,
+//! an optional one-line remedy. The same values back `scaffold config check`,
 //! `scaffold config show`, and `doctor`, so wording stays identical everywhere.
 
 use std::fmt::Write as _;

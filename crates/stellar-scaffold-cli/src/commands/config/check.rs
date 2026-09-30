@@ -1,4 +1,4 @@
-//! `stellar scaffold check` — validate `scaffold.yml`.
+//! `stellar scaffold config check`: validate `scaffold.yml`.
 //!
 //! Deterministic from repository contents: no network calls, no keystore, no
 //! environment variables beyond network selection. Exits non-zero on any
