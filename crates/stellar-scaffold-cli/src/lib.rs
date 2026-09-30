@@ -5,6 +5,7 @@
 )]
 mod arg_parsing;
 pub mod commands;
+pub mod config;
 pub mod extension;
 
 use std::path::Path;

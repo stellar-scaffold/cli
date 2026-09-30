@@ -5,6 +5,7 @@ use crate::commands::build::scaffold_yml::{self, CONFIG_FILE, ScaffoldConfig};
 use crate::commands::check_engine_constraint;
 use crate::commands::doctor::diagnosis::{Category, Check, Context, Diagnosis};
 use crate::commands::{EngineConstraintError, version};
+use crate::config;
 use crate::extension::{ExtensionListStatus, list as list_extensions};
 
 /// Where the schema-version fixes point for migration instructions.
@@ -32,6 +33,10 @@ impl Check for ScaffoldYml {
                 "not in a Cargo workspace",
             )];
         };
+
+        if let Some(loaded) = &ctx.config {
+            return config_diagnoses(self.name(), root, loaded);
+        }
 
         // Matched per variant rather than reusing the error text, which is too
         // long for one report line. The fix carries the migration link instead.
@@ -75,6 +80,56 @@ impl Check for ScaffoldYml {
             ),
         ]
     }
+}
+
+/// Findings for a version 2 `scaffold.yml`: one per config diagnostic, named
+/// by its code, then the directories its `project:` section points at.
+fn config_diagnoses(name: &'static str, root: &Path, loaded: &config::Loaded) -> Vec<Diagnosis> {
+    let errors = loaded.diagnostics.iter().filter(|d| d.is_error()).count();
+    let summary = if errors == 0 {
+        Diagnosis::ok(
+            name,
+            Category::Project,
+            format!("{CONFIG_FILE} schema version {}", config::SCHEMA_VERSION),
+        )
+    } else {
+        Diagnosis::error(
+            name,
+            Category::Project,
+            format!(
+                "{CONFIG_FILE} has {errors} problem{}",
+                if errors == 1 { "" } else { "s" }
+            ),
+        )
+        .with_fix("stellar scaffold check")
+    };
+    let mut findings = vec![summary];
+    for d in &loaded.diagnostics {
+        let message = format!("{}: {}", d.location(CONFIG_FILE), d.message);
+        let finding = match d.severity {
+            config::Severity::Error => Diagnosis::error(d.code.slug(), Category::Project, message),
+            config::Severity::Warning => Diagnosis::warn(d.code.slug(), Category::Project, message),
+        };
+        findings.push(match &d.help {
+            Some(help) => finding.with_fix(help.clone()),
+            None => finding,
+        });
+    }
+    if let Some(config) = &loaded.config {
+        findings.push(dir_exists(
+            "contracts-dir",
+            root,
+            &config.project.contracts_dir,
+            "create it, or point project.contracts-dir at the right path",
+        ));
+        findings.push(dir_exists(
+            "clients-dir",
+            root,
+            &config.project.clients_dir,
+            "stellar scaffold build --build-clients",
+        ));
+    }
+    findings
 }
 
 /// Warns when a directory `scaffold.yml` points at is absent. Not an error: a
@@ -360,6 +415,7 @@ mod tests {
             env: ScaffoldEnv::Development,
             environment: Ok(None),
             package_names: Vec::new(),
+            config: None,
             printer,
         }
     }
@@ -372,6 +428,7 @@ mod tests {
             env: ScaffoldEnv::Development,
             environment: env_toml::Environment::get(root, &ScaffoldEnv::Development),
             package_names: packages.iter().map(ToString::to_string).collect(),
+            config: None,
             printer,
         }
     }
@@ -408,6 +465,55 @@ mod tests {
         assert_eq!(severity_of(&findings, "scaffold-yml"), Severity::Ok);
         assert_eq!(severity_of(&findings, "contracts-dir"), Severity::Ok);
         assert_eq!(severity_of(&findings, "clients-dir"), Severity::Ok);
+    }
+
+    /// A context carrying a version 2 `scaffold.yml` loaded from `root`.
+    fn context_with_config<'a>(root: &'a Path, yaml: &str, printer: &'a Print) -> Context<'a> {
+        std::fs::write(root.join(CONFIG_FILE), yaml).unwrap();
+        Context {
+            config: Some(config::load(root, Some(&[]), None)),
+            ..context(Some(root), printer)
+        }
+    }
+
+    #[tokio::test]
+    async fn scaffold_yml_v2_ok_reports_project_dirs() {
+        let dir = tempfile::TempDir::new().unwrap();
+        std::fs::create_dir_all(dir.path().join("src/contracts")).unwrap();
+        let yaml = "version: 2\nproject:\n  contracts-dir: src/contracts\nnetworks:\n  local: {}\n";
+        let printer = Print::new(true);
+        let findings = ScaffoldYml
+            .run(&context_with_config(dir.path(), yaml, &printer))
+            .await;
+
+        assert_eq!(severity_of(&findings, "scaffold-yml"), Severity::Ok);
+        assert_eq!(severity_of(&findings, "contracts-dir"), Severity::Ok);
+        assert_eq!(severity_of(&findings, "clients-dir"), Severity::Warn);
+    }
+
+    #[tokio::test]
+    async fn scaffold_yml_v2_reports_each_problem_by_code() {
+        let dir = tempfile::TempDir::new().unwrap();
+        let yaml = "version: 2\nnetworks:\n  preview: { extends: testnet }\n";
+        let printer = Print::new(true);
+        let findings = ScaffoldYml
+            .run(&context_with_config(dir.path(), yaml, &printer))
+            .await;
+
+        assert_eq!(severity_of(&findings, "scaffold-yml"), Severity::Error);
+        let problem = findings
+            .iter()
+            .find(|d| d.name == "unknown-network")
+            .unwrap();
+        assert!(
+            problem.message.starts_with("scaffold.yml:3:23: "),
+            "{}",
+            problem.message
+        );
+        assert_eq!(
+            problem.fix.as_deref(),
+            Some("add `testnet: {}` under `networks:`")
+        );
     }
 
     #[tokio::test]

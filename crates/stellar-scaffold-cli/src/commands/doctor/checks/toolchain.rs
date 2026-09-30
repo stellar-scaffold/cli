@@ -284,6 +284,7 @@ mod tests {
             env: ScaffoldEnv::Development,
             environment: Ok(None),
             package_names: Vec::new(),
+            config: None,
             printer,
         }
     }
