@@ -30,7 +30,7 @@ The init command creates:
 
 Official templates come from the [Stellar Scaffold templates repo](https://github.com/stellar-scaffold/ui).
 
-With `--no-template` (or `--template none`), the frontend layer is omitted entirely: no `app/`, no JS workspaces, no dependency install. Every contract in `environments.toml` is written with `client = false`, so `stellar scaffold build` and `watch` skip client package generation. Flip a contract back to `client = true` if you later need TypeScript clients.
+With `--no-template` (or `--template none`), the frontend layer is omitted entirely: no `app/`, no `app-lib/`, no JS workspaces, no dependency install. Use plain `stellar scaffold build` to compile the contracts. Adding `--build-clients` still deploys and generates a client for every contract listed in [`scaffold.yml`](./configuration.md), even though there is no app to consume them.
 
 ## Generate Command
 
@@ -52,7 +52,7 @@ Options:
 
 The generate command downloads the example, caches it locally, writes it to `contracts/<example-name>/`, and merges the dependencies it needs into your workspace `Cargo.toml`. Each example set is pinned to a supported release rather than tracking upstream `main`, so the version you get is the one this CLI release was tested against.
 
-If the contract takes constructor arguments, add them to `environments.toml` yourself — `generate` does not write them for you.
+`generate` does not add the contract to `scaffold.yml`. Add an entry under `contracts:` yourself, with `type: workspace`, the crate's package name as `source`, its constructor `args`, and the networks it belongs on. See [Configuration](./configuration.md#contracts).
 
 ## Upgrade Command
 
@@ -70,7 +70,7 @@ The upgrade command:
 
 - Validates the existing workspace (requires `Cargo.toml` and `contracts/` directory)
 - Downloads and integrates the frontend template
-- Generates `environments.toml` with discovered contracts
+- Generates `environments.toml` with discovered contracts. This is the legacy config format; see [Configuration](./configuration.md#legacy-environmentstoml) to move it to `scaffold.yml` version 2
 - Analyzes contracts for constructor arguments and prompts for configuration
 - Preserves all existing contract code and project structure
 - Adds development tools and configurations
@@ -91,9 +91,12 @@ stellar scaffold build [options]
 
 Options:
 
-- `--build-clients`: Generate TypeScript client packages for contracts
+- `--build-clients`: Deploy contracts and generate TypeScript client packages for them, as configured in [`scaffold.yml`](./configuration.md)
+- `--network <name>`: Network from `scaffold.yml` to build for. Defaults to `STELLAR_NETWORK`, then the network set with `stellar network use`, then `local`
 - `--list` or `--ls`: List package names in order of build
 - [Standard Soroban contract build options also supported]
+
+`build` validates `scaffold.yml` before compiling and stops if it has errors. Contracts that do not list the selected network are skipped: they are not deployed and not exported from the generated clients `index.ts`. Clients removed from `scaffold.yml` are dropped from `index.ts` on the next build.
 
 ## Dev Command
 
@@ -106,7 +109,9 @@ stellar scaffold watch [options]
 Options:
 
 - `--build-clients`: Generate TypeScript client packages while watching
-- All options from the build command are also supported
+- All options from the build command are also supported, including `--network`
+
+`watch` also rebuilds when `scaffold.yml` changes.
 
 ## Clean Command
 
@@ -126,7 +131,7 @@ Clean removes:
 - Everything generated into your clients directory, while leaving checked-in files such as `.gitkeep` alone
 - The contract and identity aliases the CLI created for the local and test networks
 
-Reach for it when you want a genuinely fresh deployment. Because Stellar Scaffold only redeploys a contract when the contract itself changes, editing something else — an `after_deploy` script, for instance — will not produce a new instance on its own. Clearing the aliases makes the next `stellar scaffold watch` deploy from scratch.
+Reach for it when you want a genuinely fresh deployment. Because Stellar Scaffold only redeploys a contract when the contract itself changes, editing something else — constructor `args` or `after-deploy` in `scaffold.yml`, for instance — will not produce a new instance on its own. Clearing the aliases makes the next `stellar scaffold watch` deploy from scratch.
 
 ## Doctor Command
 
@@ -138,7 +143,7 @@ stellar scaffold doctor [options]
 
 Options:
 
-- `--env <name>`: Scaffold environment to diagnose (defaults to `development`, or `STELLAR_SCAFFOLD_ENV`)
+- `--env <name>`: Environment to diagnose in projects still on `environments.toml` (defaults to `development`, or `STELLAR_SCAFFOLD_ENV`). Ignored for version 2 projects
 - `--manifest-path <path>`: Path to `Cargo.toml` (defaults to the current directory)
 - `--json`: Emit findings as JSON instead of a report
 - `--strict`: Treat warnings as failures
@@ -165,14 +170,14 @@ Findings that have a single-command remedy print it on a `fix:` line beneath.
 
 **Project** — needs a Cargo workspace:
 
-- `scaffold.yml` exists and uses a schema version this CLI supports
-- The directories its `config:` section points at exist
+- `scaffold.yml` exists and uses a schema version this CLI supports. For version 2, every problem `stellar scaffold config check` would report is listed under the `scaffold-yml` check
+- The `contracts-dir` and `clients-dir` directories exist
 - The running CLI satisfies the project's `engines.stellar-scaffold` constraint
 - `.env` exists when there is a `.env.example` to copy from
-- `environments.toml` parses, defines the selected environment, has a usable network, and names contracts that exist in the workspace
-- Every extension the environment lists can be found and reports a valid manifest
+- For projects still on `environments.toml`: it parses, defines the selected environment, has a usable network, and names contracts that exist in the workspace
+- For projects still on `environments.toml`: every extension the environment lists can be found and reports a valid manifest
 
-**Network** — only when the selected environment sets `run-locally = true`:
+**Network** — only for projects on `environments.toml` whose selected environment sets `run_locally = true`. These checks are skipped for version 2 projects:
 
 - The Docker daemon is running, not merely installed
 - The local network's RPC endpoint reports healthy
@@ -190,15 +195,15 @@ $ stellar scaffold doctor
 ⚠️ package-manager    package.json pins npm@11.7.0, found 11.13.0
     fix: corepack use npm@11.7.0
    Project
-✅ scaffold-yml       scaffold.yml schema version 1
+✅ scaffold-yml       scaffold.yml schema version 2
 ✅ contracts-dir      contracts
 ✅ clients-dir        app-lib/clients
 ✅ engine-constraint  stellar-scaffold 0.0.27
 ⚠️ dot-env            .env is missing
     fix: cp .env.example .env
    Network
-ℹ️ docker-daemon      network is not run locally
-ℹ️ localnet           network is not run locally
+ℹ️ docker-daemon      no environment configured
+ℹ️ localnet           no environment configured
    0 problems, 2 warnings
 ```
 
@@ -213,6 +218,36 @@ stellar scaffold doctor --json --strict
 ```
 
 The JSON holds a `checks` array — each entry with `name`, `category`, `severity`, `message`, and `fix` — plus a `summary` object tallying each severity.
+
+## Config Command
+
+Validate and inspect [`scaffold.yml`](./configuration.md):
+
+```bash
+stellar scaffold config check [options]
+stellar scaffold config show [options]
+```
+
+`config check` validates the whole file and reports every problem at once, each with its line, a code, and a suggested fix. It makes no network calls and reads no keys, so it is safe to run in CI. It exits non-zero on errors.
+
+- `--network <name>`: Also check that this network is declared under `networks:` (defaults to `STELLAR_NETWORK` if set)
+- `--strict`: Treat warnings as failures
+- `--json`: Print diagnostics as JSON (`[]` when clean)
+- `--manifest-path <path>`: Path to `Cargo.toml` (defaults to the current directory)
+
+`config show` prints the fully resolved config for one network, in YAML: `extends` applied, built-in defaults filled in, per-network contract overrides merged, and `${env.…}`/`${network.…}` substituted. `${account.…}` references are left as written.
+
+- `--network <name>`: Network to resolve (defaults to `STELLAR_NETWORK`, then `local`)
+- `--json`: Print JSON instead of YAML
+- `--manifest-path <path>`: Path to `Cargo.toml` (defaults to the current directory)
+
+```bash
+$ stellar scaffold config check
+✅ scaffold.yml is valid
+$ stellar scaffold config show --network testnet
+```
+
+Both commands read only version 2 files.
 
 ## Update Environment Command
 

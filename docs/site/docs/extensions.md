@@ -32,27 +32,28 @@ You only need to handle the hooks relevant to your extension. Hooks you do not l
 
 ## Registering an extension
 
-Add your extension to `environments.toml` under the environments where it should run:
+List your extension under `extensions:` in [`scaffold.yml`](/docs/configuration). Extensions run in the order listed, on every network:
 
-```toml
-[development]
-extensions = ["reporter"]
-
-[staging]
-extensions = ["reporter", "audit-tool"]
+```yaml
+extensions:
+  reporter:
+  audit-tool:
 ```
 
 ### Per-extension configuration
 
-You can pass arbitrary configuration to an extension via `[<env>.ext.<name>]`:
+Anything you write under an extension's name is passed to it as configuration:
 
-```toml
-[development.ext.reporter]
-warn_size_kb = 128
-log_file = ".scaffold/reports/dev.log"
+```yaml
+extensions:
+  reporter:
+    warn_size_kb: 128
+    log_file: .scaffold/reports/dev.log
 ```
 
-Scaffold serializes this table and injects it as the `config` field in every hook invocation for that extension. If no config section exists, `config` is absent from the JSON.
+Scaffold converts this value to JSON and injects it as the `config` field in every hook invocation for that extension. Keys are passed exactly as written. If the extension has no value (a bare `reporter:`), `config` is absent from the JSON.
+
+:::note Projects still on `environments.toml` register extensions per environment instead, with `extensions = ["reporter"]` under `[development]` and configuration in a `[development.ext.reporter]` table. :::
 
 ---
 
@@ -82,7 +83,7 @@ Only list hooks your extension actually handles. Listing a hook you do not handl
 
 ## The stdin JSON
 
-At each hook invocation, Scaffold writes a flat JSON object to the extension's stdin. The object always includes `config` (your extension's config from `environments.toml`, or `null` if none was provided) plus context fields that depend on which hook is firing.
+At each hook invocation, Scaffold writes a flat JSON object to the extension's stdin. The object always includes `config` (your extension's config from `scaffold.yml`, or `null` if none was provided) plus context fields that depend on which hook is firing.
 
 ### Field reference
 
@@ -108,9 +109,9 @@ At each hook invocation, Scaffold writes a flat JSON object to the extension's s
 
 | Field | Type | Description |
 | --- | --- | --- |
-| `config` | object \| null | Your extension's config table from `environments.toml`, or `null` |
+| `config` | object \| null | Your extension's config from `scaffold.yml`, or `null` |
 | `project_root` | string (path) | Absolute path to the Cargo workspace root |
-| `env` | string | Active environment: `"development"`, `"testing"`, `"staging"`, or `"production"` |
+| `env` | string | The selected network's name, such as `"local"` or `"testnet"`. In projects still on `environments.toml`, the active environment: `"development"`, `"testing"`, `"staging"`, or `"production"` |
 | `wasm_out_dir` | string (path) | Directory where compiled WASM files are written |
 | `source_dirs` | string[] | Contract source directories in topological build order |
 | `wasm_paths` | object | Map of `contract_name → wasm_path`; empty at `pre-compile` |
@@ -211,11 +212,11 @@ cargo install --path .
 
 Or copy the compiled binary somewhere on your `PATH`.
 
-### Step 5: Register it in `environments.toml`
+### Step 5: Register it in `scaffold.yml`
 
-```toml
-[development]
-extensions = ["my-extension"]
+```yaml
+extensions:
+  my-extension:
 ```
 
 Run `stellar scaffold build` or `stellar scaffold watch` and your extension will be called at each registered hook.
@@ -322,11 +323,11 @@ You can install it standalone with:
 cargo install stellar-scaffold-reporter
 ```
 
-And register it in `environments.toml`:
+And register it in `scaffold.yml`:
 
-```toml
-[development]
-extensions = ["reporter"]
+```yaml
+extensions:
+  reporter:
 ```
 
 Browse the [source code](https://github.com/stellar-scaffold/cli/tree/main/crates/stellar-scaffold-reporter) and its [README](https://github.com/stellar-scaffold/cli/tree/main/crates/stellar-scaffold-reporter/README.md) to see a complete, real-world extension that handles all eight hooks.

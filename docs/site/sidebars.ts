@@ -31,10 +31,11 @@ const sidebars: SidebarsConfig = {
       ],
     },
     "cli",
-    "environments",
+    "configuration",
     "extensions",
     "registry",
     "deploy",
+    "agent-skills",
   ],
 };
 

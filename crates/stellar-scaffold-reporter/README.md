@@ -22,11 +22,11 @@ To add it to an existing project, install the binary with [Cargo](https://doc.ru
 cargo install stellar-scaffold-reporter
 ```
 
-Then register it in your `environments.toml`:
+Then register it in your `scaffold.yml`:
 
-```toml
-[development]
-extensions = ["reporter"]
+```yaml
+extensions:
+  reporter:
 ```
 
 ## 🏃 Running
