@@ -1,3 +1,4 @@
+use crate::util::{fund, sequence};
 use stellar_scaffold_test::{TestEnv, rpc_url};
 
 #[test]
@@ -255,47 +256,13 @@ test_init --resolution 300000 --assets '[{{"Stellar": "$(stellar contract id ass
     });
 }
 
-/// Sequence number of `account`'s ledger entry. Every transaction an account
-/// submits increments it, so it shows who actually signed.
-fn sequence(env: &TestEnv, account: &str) -> i64 {
-    let output = env
-        .stellar("keys")
-        .args(["address", account])
-        .output()
-        .expect("stellar keys address");
-    let address = String::from_utf8(output.stdout).unwrap().trim().to_string();
-    let client = soroban_rpc::Client::new(&rpc_url()).unwrap();
-    let entry = tokio::runtime::Runtime::new()
-        .unwrap()
-        .block_on(client.get_account(&address))
-        .expect("account exists");
-    entry.seq_num.0
-}
-
 /// `STELLAR_ACCOUNT=` must decide who signs the deploy and after-deploy
 /// transactions, not only what the printed command shows.
 #[test]
 fn stellar_account_prefix_signs_deploy_and_after_deploy() {
     TestEnv::from("soroban-init-boilerplate", |env| {
         // Create bob first so his sequence number can be compared.
-        let funded = env
-            .stellar("keys")
-            .args([
-                "generate",
-                "bob",
-                "--fund",
-                "--rpc-url",
-                &rpc_url(),
-                "--network-passphrase",
-                "Standalone Network ; February 2017",
-            ])
-            .output()
-            .expect("stellar keys generate");
-        assert!(
-            funded.status.success(),
-            "{}",
-            String::from_utf8_lossy(&funded.stderr)
-        );
+        fund(env, "bob");
         let before = sequence(env, "bob");
 
         env.set_environments_toml(format!(
