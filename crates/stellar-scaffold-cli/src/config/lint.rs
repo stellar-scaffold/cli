@@ -117,11 +117,10 @@ impl Lint<'_> {
                 if let Some(ns) =
                     interpolate::namespaces(&segments).find(|ns| !allowed.contains(ns))
                 {
-                    let ns = format!("{ns:?}").to_lowercase();
                     self.diags.push(
                         Diagnostic::error(
                             Code::Interpolation,
-                            format!("`${{{ns}.…}}` cannot be used here"),
+                            format!("`${{{}.…}}` cannot be used here", ns.as_str()),
                         )
                         .at(span(s)),
                     );
@@ -209,7 +208,7 @@ impl Lint<'_> {
             .filter(|(_, dir)| dir.starts_with(&contracts_dir))
             .map(|(name, _)| name.as_str())
             .collect();
-        if crates.contains(&src.value.as_str()) {
+        if crates.iter().any(|c| source::same_crate(c, &src.value)) {
             return;
         }
         let dir = self.project.contracts_dir.display();

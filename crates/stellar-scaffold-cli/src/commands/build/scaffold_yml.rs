@@ -3,7 +3,8 @@ use std::path::Path;
 /// Name of the scaffold configuration file.
 pub const CONFIG_FILE: &str = "scaffold.yml";
 
-/// The only `version:` value this CLI accepts in `scaffold.yml`.
+/// The `version:` of the original `config:`-only format. Version 2 is
+/// `crate::config::SCHEMA_VERSION`; both are accepted.
 pub const CURRENT_SCHEMA_VERSION: u32 = 1;
 
 #[derive(thiserror::Error, Debug)]
@@ -15,8 +16,9 @@ pub enum Error {
     )]
     MissingVersion,
     #[error(
-        "scaffold.yml uses schema version {found}, but this CLI supports version {CURRENT_SCHEMA_VERSION}. \
-         See https://github.com/stellar-scaffold/cli/blob/main/CHANGELOG.md for migration instructions."
+        "scaffold.yml uses schema version {found}, but this CLI supports versions {CURRENT_SCHEMA_VERSION} and {v2}. \
+         See https://github.com/stellar-scaffold/cli/blob/main/CHANGELOG.md for migration instructions.",
+        v2 = crate::config::SCHEMA_VERSION
     )]
     UnsupportedVersion { found: u32 },
 }
@@ -54,12 +56,23 @@ impl Default for ScaffoldConfig {
     }
 }
 
-/// Top-level structure of `scaffold.yml`.
+/// Top-level structure of `scaffold.yml`. Version 1 keeps directories under
+/// `config:`; version 2 keeps them under `project:`.
 #[derive(Debug, serde::Deserialize, Default)]
 struct ScaffoldFile {
     version: Option<u32>,
     #[serde(default)]
     config: ScaffoldConfig,
+    #[serde(default)]
+    project: Option<ProjectDirs>,
+}
+
+/// The directory keys of a version 2 `project:` section.
+#[derive(Debug, serde::Deserialize, Default)]
+#[serde(rename_all = "kebab-case")]
+struct ProjectDirs {
+    contracts_dir: Option<std::path::PathBuf>,
+    clients_dir: Option<std::path::PathBuf>,
 }
 
 impl ScaffoldConfig {
@@ -75,14 +88,23 @@ impl ScaffoldConfig {
         let Ok(file) = serde_yaml::from_str::<ScaffoldFile>(&contents) else {
             return ScaffoldConfig::default();
         };
-        file.config
+        match file.project {
+            Some(project) if file.version == Some(crate::config::SCHEMA_VERSION) => {
+                let defaults = ScaffoldConfig::default();
+                ScaffoldConfig {
+                    contracts_dir: project.contracts_dir.unwrap_or(defaults.contracts_dir),
+                    clients_dir: project.clients_dir.unwrap_or(defaults.clients_dir),
+                }
+            }
+            _ => file.config,
+        }
     }
 }
 
 /// Validate the `version:` field in `scaffold.yml`.
 ///
-/// Returns `Ok(())` only if the file exists and its version matches
-/// `CURRENT_SCHEMA_VERSION`. A missing file is treated as an outdated project
+/// Returns `Ok(())` only if the file exists and its version is
+/// `CURRENT_SCHEMA_VERSION` or version 2. A missing file is treated as an outdated project
 /// (no `scaffold.yml` means pre-versioning). A missing or unsupported version
 /// field is also an error.
 pub fn check_version(workspace_root: &Path) -> Result<(), Error> {
@@ -95,7 +117,9 @@ pub fn check_version(workspace_root: &Path) -> Result<(), Error> {
     };
     match file.version {
         None => Err(Error::MissingVersion),
-        Some(v) if v != CURRENT_SCHEMA_VERSION => Err(Error::UnsupportedVersion { found: v }),
+        Some(v) if v != CURRENT_SCHEMA_VERSION && v != crate::config::SCHEMA_VERSION => {
+            Err(Error::UnsupportedVersion { found: v })
+        }
         Some(_) => Ok(()),
     }
 }
@@ -181,6 +205,20 @@ mod tests {
             check_version(dir.path()),
             Err(Error::UnsupportedVersion { found: 99 })
         ));
+    }
+
+    #[test]
+    fn reads_version_2_project_dirs() {
+        let dir = tempfile::TempDir::new().unwrap();
+        std::fs::write(
+            dir.path().join(CONFIG_FILE),
+            "version: 2\nproject:\n  clients-dir: src/contracts\nnetworks: {}\n",
+        )
+        .unwrap();
+        let config = ScaffoldConfig::get(dir.path());
+        assert_eq!(config.contracts_dir, PathBuf::from("contracts"));
+        assert_eq!(config.clients_dir, PathBuf::from("src/contracts"));
+        assert!(check_version(dir.path()).is_ok());
     }
 
     #[test]

@@ -61,6 +61,9 @@ pub struct Environment {
     pub contracts: Option<IndexMap<Box<str>, Contract>>,
     /// Extensions to invoke for this environment, in execution order.
     pub extensions: Vec<ExtensionEntry>,
+    /// True when built from a version 2 `scaffold.yml` rather than parsed
+    /// from `environments.toml`. Every contract then carries `resolved`.
+    pub from_scaffold_yml: bool,
 }
 
 fn deserialize_accounts<'de, D>(deserializer: D) -> Result<Option<Vec<Account>>, D::Error>
@@ -112,6 +115,7 @@ impl<'de> Deserialize<'de> for Environment {
             network: helper.network,
             contracts,
             extensions,
+            from_scaffold_yml: false,
         })
     }
 }
@@ -189,6 +193,39 @@ pub struct Contract {
 
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub constructor_args: Option<String>,
+
+    /// Deploy settings from a version 2 `scaffold.yml`, already resolved for
+    /// the selected network. `None` for contracts from `environments.toml`.
+    #[serde(skip)]
+    pub resolved: Option<ResolvedDeploy>,
+}
+
+/// A version 2 contract's deploy settings. Arguments are already split, so
+/// they reach stellar-cli without passing through a shell.
+#[derive(Debug, Clone, Default)]
+pub struct ResolvedDeploy {
+    /// The crate whose Wasm is built and deployed, when it differs from the
+    /// client name. `None` for contracts referenced by `id`.
+    pub crate_name: Option<String>,
+    /// Account alias that signs the deploy and after-deploy calls.
+    pub signer: Option<String>,
+    /// `--name value` pairs for the constructor.
+    pub constructor_args: Vec<String>,
+    /// Methods to invoke, with no arguments, after a fresh deploy or upgrade.
+    pub after_deploy: Vec<String>,
+}
+
+impl Contract {
+    /// The crate built for this contract, for version 2 workspace contracts.
+    pub fn crate_name(&self) -> Option<&str> {
+        self.resolved.as_ref()?.crate_name.as_deref()
+    }
+
+    /// The account that signs this contract's transactions, for version 2
+    /// contracts with a `signer`. `None` means the default account.
+    pub fn signer(&self) -> Option<&str> {
+        self.resolved.as_ref()?.signer.as_deref()
+    }
 }
 
 impl Default for Contract {
@@ -198,6 +235,7 @@ impl Default for Contract {
             after_deploy: None,
             id: None,
             constructor_args: None,
+            resolved: None,
         }
     }
 }

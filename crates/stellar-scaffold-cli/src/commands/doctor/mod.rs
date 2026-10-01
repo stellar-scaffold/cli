@@ -75,9 +75,7 @@ impl Cmd {
         // still checked by `ScaffoldYml`'s legacy path.
         let config = workspace_root
             .as_deref()
-            .filter(|root| {
-                config::declared_version(root) == Some(u64::from(config::SCHEMA_VERSION))
-            })
+            .filter(|root| crate::commands::build::v2::is_v2(root))
             .map(|root| {
                 let crates = metadata.as_ref().map(config::cdylib_crates);
                 config::load(root, crates.as_deref(), None)

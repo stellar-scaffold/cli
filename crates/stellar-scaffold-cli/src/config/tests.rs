@@ -174,11 +174,9 @@ fn workspace_contract_on_public_network_is_an_error() {
 }
 
 #[test]
-fn selected_network_must_be_covered_by_every_contract() {
+fn contracts_may_omit_the_selected_network() {
     let yaml = "version: 2\nnetworks:\n  local: { accounts: [me] }\n  testnet: {}\ncontracts:\n  c:\n    type: workspace\n    source: fungible_token\n    networks: { local: }\n";
     let (_dir, loaded) = load_str(yaml, Some("testnet"));
-    assert_eq!(codes(&loaded), vec![Code::MissingContractNetwork]);
-    let (_dir, loaded) = load_str(yaml, None);
     assert!(loaded.diagnostics.is_empty());
 }
 
@@ -204,6 +202,13 @@ fn missing_env_fails_show_but_not_check() {
     let token = |n: &str| (n == "TOKEN").then(|| "t".to_string());
     let view = resolved_view(loaded.config.as_ref().unwrap(), "local", &token).unwrap();
     assert_eq!(view["network"]["rpc-headers"]["Authorization"], "t");
+}
+
+#[test]
+fn crate_names_match_across_dash_and_underscore() {
+    let yaml = "version: 2\nnetworks:\n  local: { accounts: [me] }\ncontracts:\n  c:\n    type: workspace\n    source: fungible-token\n    networks: { local: }\n";
+    let (_dir, loaded) = load_str(yaml, None);
+    assert!(loaded.diagnostics.is_empty(), "{}", loaded.render());
 }
 
 #[test]

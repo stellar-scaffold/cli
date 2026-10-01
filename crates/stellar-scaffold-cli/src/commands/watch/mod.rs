@@ -98,6 +98,12 @@ impl Watcher {
         path == self.env_toml_dir.join(ENV_FILE)
     }
 
+    /// Whether `path` is the project's `scaffold.yml`. Canonicalized like
+    /// other watched paths, since event paths may go through symlinks.
+    pub fn is_scaffold_yml(&self, path: &Path) -> bool {
+        canonicalize_path(path) == self.env_toml_dir.join(crate::config::CONFIG_FILE)
+    }
+
     pub fn handle_event(&self, event: &notify::Event, tx: &mpsc::Sender<Message>) {
         if matches!(
             event.kind,
@@ -109,7 +115,9 @@ impl Watcher {
                 let Some(ext) = path.extension().and_then(|e| e.to_str()) else {
                     return false;
                 };
-                if ext.eq_ignore_ascii_case("toml") {
+                if ext.eq_ignore_ascii_case("yml") {
+                    return self.is_scaffold_yml(path);
+                } else if ext.eq_ignore_ascii_case("toml") {
                     let Some(stem) = path.file_stem().and_then(|s| s.to_str()) else {
                         return false;
                     };
@@ -149,23 +157,18 @@ impl Cmd {
         build::scaffold_yml::check_version(workspace_root)?;
         super::check_engine_constraint(workspace_root)?;
 
-        let scaffold_env = self
+        // Extensions for pre/post-dev hooks, and the label they see as `env`.
+        // The build pipeline hooks (compile/deploy/codegen) are handled inside
+        // build::Command::run(), which also resolves the network.
+        let Some(inputs) = self
             .build_cmd
-            .build_clients_args
-            .env
-            .unwrap_or(ScaffoldEnv::Development);
-
-        let Some(current_env) = env_toml::Environment::get(workspace_root, &scaffold_env)? else {
+            .inputs(workspace_root, metadata, &[], &printer, false)
+            .await?
+        else {
             return Ok(());
         };
-
-        // Discover extensions for pre/post-dev hooks. The build pipeline hooks
-        // (compile/deploy/codegen) are handled inside build::Command::run().
-        let extensions = if current_env.extensions.is_empty() {
-            vec![]
-        } else {
-            extension::discover(&current_env.extensions, &printer)
-        };
+        let env_label = inputs.env_label;
+        let extensions = extension::discover(&inputs.extensions, &printer);
         let all_packages = self.build_cmd.list_packages(metadata)?;
         let packages: Vec<PathBuf> = all_packages
             .iter()
@@ -211,7 +214,7 @@ impl Cmd {
         let project_ctx = ProjectContext {
             config: None,
             project_root: workspace_root.to_path_buf(),
-            env: scaffold_env.to_string(),
+            env: env_label,
             wasm_out_dir: stellar_build::deps::stellar_wasm_out_dir(target_dir),
             source_dirs: packages.clone(),
             network: None,
@@ -320,5 +323,26 @@ impl Cmd {
             .env
             .get_or_insert(ScaffoldEnv::Development);
         Arc::new((self.build_cmd.clone(), global_args.clone()))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    #[cfg(unix)]
+    fn scaffold_yml_matches_through_symlinked_paths() {
+        let dir = tempfile::TempDir::new().unwrap();
+        let real = dir.path().join("real");
+        std::fs::create_dir(&real).unwrap();
+        std::fs::write(real.join(crate::config::CONFIG_FILE), "version: 2\n").unwrap();
+        let link = dir.path().join("link");
+        std::os::unix::fs::symlink(&real, &link).unwrap();
+
+        let watcher = Watcher::new(&real, &[]);
+        assert!(watcher.is_scaffold_yml(&link.join(crate::config::CONFIG_FILE)));
+        assert!(watcher.is_scaffold_yml(&real.join(crate::config::CONFIG_FILE)));
+        assert!(!watcher.is_scaffold_yml(&real.join("other.yml")));
     }
 }

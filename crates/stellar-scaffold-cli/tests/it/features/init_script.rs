@@ -1,3 +1,4 @@
+use crate::util::{fund, sequence};
 use stellar_scaffold_test::{TestEnv, rpc_url};
 
 #[test]
@@ -252,5 +253,57 @@ test_init --resolution 300000 --assets '[{{"Stellar": "$(stellar contract id ass
             token_index < custom_types_index,
             "Token should be initialized before custom types"
         );
+    });
+}
+
+/// `STELLAR_ACCOUNT=` must decide who signs the deploy and after-deploy
+/// transactions, not only what the printed command shows.
+#[test]
+fn stellar_account_prefix_signs_deploy_and_after_deploy() {
+    TestEnv::from("soroban-init-boilerplate", |env| {
+        // Create bob first so his sequence number can be compared.
+        fund(env, "bob");
+        let before = sequence(env, "bob");
+
+        env.set_environments_toml(format!(
+            r#"
+development.accounts = [
+{{ name = "alice" }},
+{{ name = "bob" }},
+]
+
+[development.network]
+rpc-url = "{}"
+network-passphrase = "Standalone Network ; February 2017"
+
+[development.contracts]
+soroban_hello_world_contract.client = false
+soroban_increment_contract.client = false
+soroban_custom_types_contract.client = false
+soroban_auth_contract.client = false
+
+[development.contracts.soroban_token_contract]
+client = true
+constructor_args = """
+STELLAR_ACCOUNT=bob --symbol ABND --decimal 7 --name abundance --admin bob
+"""
+after_deploy = """
+STELLAR_ACCOUNT=bob mint --amount 2000000 --to bob
+"""
+"#,
+            rpc_url()
+        ));
+        let output = env
+            .scaffold_build("development", true)
+            .output()
+            .expect("Failed to execute command");
+        assert!(
+            output.status.success(),
+            "{}",
+            String::from_utf8_lossy(&output.stderr)
+        );
+
+        // alice (the default) uploads the Wasm; bob submits the deploy and the mint.
+        assert_eq!(sequence(env, "bob") - before, 2);
     });
 }

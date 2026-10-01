@@ -257,6 +257,7 @@ impl Cmd {
             },
             contracts: (!contract_configs.is_empty()).then_some(contract_configs),
             extensions: vec![],
+            from_scaffold_yml: false,
         };
 
         let mut doc = DocumentMut::new();
@@ -363,6 +364,8 @@ impl Cmd {
         // Run scaffold build to generate WASM files
         let build_cmd = build::Command {
             build_clients_args: build::clients::Args {
+                network: None,
+                plan: None,
                 env: Some(build::clients::ScaffoldEnv::Development),
                 workspace_root: Some(self.workspace_path.clone()),
                 out_dir: None,

@@ -18,6 +18,17 @@ pub enum Namespace {
     Network,
 }
 
+impl Namespace {
+    /// The namespace's spelling in the template
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Namespace::Account => "account",
+            Namespace::Env => "env",
+            Namespace::Network => "network",
+        }
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Segment {
     Lit(String),
@@ -124,16 +135,30 @@ pub struct Context<'a> {
     /// `(name, rpc-url, passphrase)` of the network being resolved, when the
     /// string may reference it.
     pub network: Option<(&'a str, &'a str, &'a str)>,
+    pub mode: Mode,
 }
 
-/// Resolve `env` and `network` references. `account` references are left in
-/// place: their addresses live in the keystore and may not exist until build
-/// generates them.
+/// What a resolved string is for.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Mode {
+    /// For showing config back to the user: `$${` escapes and
+    /// `${account.…}` references stay as written, so output is valid config.
+    Display,
+    /// For passing to stellar-cli: escapes become literal `${` and
+    /// `${account.x}` becomes the alias `x`, which stellar-cli resolves to
+    /// the account's address.
+    Final,
+}
+
+/// Resolve `env` and `network` references. `account` references never
+/// resolve to an address here: addresses live in the keystore and may not
+/// exist until build generates them. See [`Mode`].
 pub fn resolve(segments: &[Segment], ctx: &Context) -> Result<String, String> {
     let mut out = String::new();
     for segment in segments {
         match segment {
-            Segment::Lit(s) => out.push_str(&s.replace("${", "$${")),
+            Segment::Lit(s) if ctx.mode == Mode::Display => out.push_str(&s.replace("${", "$${")),
+            Segment::Lit(s) => out.push_str(s),
             Segment::Ref {
                 ns: Namespace::Env,
                 path,
@@ -164,9 +189,13 @@ pub fn resolve(segments: &[Segment], ctx: &Context) -> Result<String, String> {
                 path,
                 ..
             } => {
-                out.push_str("${account.");
-                out.push_str(path);
-                out.push('}');
+                if ctx.mode == Mode::Display {
+                    out.push_str("${account.");
+                    out.push_str(path);
+                    out.push('}');
+                } else {
+                    out.push_str(path);
+                }
             }
         }
     }
@@ -209,6 +238,7 @@ mod tests {
                 "https://rpc",
                 "Test SDF Network ; September 2015",
             )),
+            mode: Mode::Display,
         };
         resolve(&parse(s)?, &ctx)
     }
@@ -240,6 +270,17 @@ mod tests {
         let segs = parse("${account.admin}").unwrap();
         assert_eq!(accounts(&segs).collect::<Vec<_>>(), vec!["admin"]);
         assert_eq!(resolve_str("${account.admin}").unwrap(), "${account.admin}");
+    }
+
+    #[test]
+    fn final_mode_unescapes_and_uses_aliases() {
+        let ctx = Context {
+            env: &env,
+            network: None,
+            mode: Mode::Final,
+        };
+        let segs = parse("$${x} ${account.admin}").unwrap();
+        assert_eq!(resolve(&segs, &ctx).unwrap(), "${x} admin");
     }
 
     #[test]

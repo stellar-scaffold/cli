@@ -5,6 +5,7 @@
 //! - `lint.rs`        :: checks on individual values
 //! - `source.rs`      :: contract `type` kinds and `source` validation
 //! - `interpolate.rs` :: `${namespace.path}` grammar
+//! - `cli_args.rs`    :: constructor `args` as stellar-cli arguments
 //! - `resolve.rs`     :: `extends` and per-network merging, cross-reference rules
 //!
 //! [`load`] runs the whole pipeline and never fails: every problem is a
@@ -13,6 +14,7 @@
 //! Version 1 files (the `config:` section only) are still read by
 //! `commands::build::scaffold_yml` until `build` moves to this module.
 
+pub mod cli_args;
 pub mod diagnostic;
 pub mod interpolate;
 pub mod lint;
@@ -34,9 +36,11 @@ pub const CONFIG_FILE: &str = "scaffold.yml";
 pub const SCHEMA_VERSION: u32 = 2;
 
 /// Environment variable selecting the network when `--network` is absent.
-pub const NETWORK_ENV: &str = "STELLAR_SCAFFOLD_NETWORK";
+/// Shared with stellar-cli, which also sets it from `stellar network use`.
+pub const NETWORK_ENV: &str = "STELLAR_NETWORK";
 
-/// Network used when neither `--network` nor [`NETWORK_ENV`] is set.
+/// Network used when neither `--network`, [`NETWORK_ENV`], nor stellar-cli's
+/// default picks one.
 pub const DEFAULT_NETWORK: &str = "local";
 
 /// Names of networks and accounts: ASCII letters, digits, `-`, `_`, starting
@@ -215,22 +219,26 @@ pub fn resolved_view(
         )]);
     };
     let mut errors = Vec::new();
-    let mut resolve = |t: &resolve::Template, ctx: &interpolate::Context| {
+    let mut interp = |t: &resolve::Template, ctx: &interpolate::Context| {
         interpolate::resolve(&t.segments, ctx).unwrap_or_else(|e| {
             errors.push(Diagnostic::error(Code::Interpolation, e));
             t.raw.clone()
         })
     };
-    let net_ctx = interpolate::Context { env, network: None };
+    let net_ctx = interpolate::Context {
+        env,
+        network: None,
+        mode: interpolate::Mode::Display,
+    };
     let rpc_url = net
         .rpc_url
         .as_ref()
-        .map(|t| resolve(t, &net_ctx))
+        .map(|t| interp(t, &net_ctx))
         .unwrap_or_default();
     let passphrase = net
         .passphrase
         .as_ref()
-        .map(|t| resolve(t, &net_ctx))
+        .map(|t| interp(t, &net_ctx))
         .unwrap_or_default();
 
     let mut n = Mapping::new();
@@ -244,7 +252,7 @@ pub fn resolved_view(
         let headers: Mapping = net
             .rpc_headers
             .iter()
-            .map(|(k, t)| (k.clone().into(), resolve(t, &net_ctx).into()))
+            .map(|(k, t)| (k.clone().into(), interp(t, &net_ctx).into()))
             .collect();
         n.insert("rpc-headers".into(), headers.into());
     }
@@ -256,6 +264,7 @@ pub fn resolved_view(
     n.insert("allow-deploy".into(), net.allow_deploy().into());
 
     let args_ctx = interpolate::Context {
+        mode: interpolate::Mode::Display,
         env,
         network: Some((&net.name, &rpc_url, &passphrase)),
     };
@@ -264,7 +273,7 @@ pub fn resolved_view(
         let Some(c) = resolver.contract(name, network) else {
             continue;
         };
-        let view = contract_view(&c, &mut |s| resolve(&resolve::Template::new(s), &args_ctx));
+        let view = contract_view(&c, &mut |s| interp(&resolve::Template::new(s), &args_ctx));
         contracts.insert(name.into(), view);
     }
     let mut errors_all: Vec<Diagnostic> = resolver

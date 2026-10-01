@@ -47,7 +47,7 @@ impl SourceType {
             .iter()
             .find(|(_, t)| *t == self)
             .map(|(n, _)| *n)
-            .unwrap_or_default()
+            .expect("every SourceType is listed in ALL")
     }
 
     /// Whether `from-network` may be used: only kinds that name something
@@ -61,6 +61,16 @@ impl SourceType {
     fn is_versioned(self) -> bool {
         matches!(self, Self::Registry | Self::WasmRegistry)
     }
+}
+
+/// Whether two crate names refer to the same package. Cargo treats `-` and
+/// `_` in package names as equivalent, and older configs used the
+/// underscored form of hyphenated names.
+pub fn same_crate(a: &str, b: &str) -> bool {
+    a.len() == b.len()
+        && a.chars()
+            .zip(b.chars())
+            .all(|(x, y)| x == y || matches!((x, y), ('-', '_') | ('_', '-')))
 }
 
 /// Outcome of validating a `source` value against its `type`.
@@ -197,6 +207,17 @@ mod tests {
 
     fn check_str(ty: SourceType, s: &str) -> Check {
         check(ty, s, Path::new("/nonexistent"))
+    }
+
+    #[test]
+    fn crate_names_ignore_dash_underscore() {
+        assert!(same_crate(
+            "nft-enumerable-example",
+            "nft_enumerable_example"
+        ));
+        assert!(same_crate("guess_the-number", "guess-the_number"));
+        assert!(!same_crate("nft-enumerable", "nft-enumerable-example"));
+        assert!(!same_crate("nft.enumerable", "nft-enumerable"));
     }
 
     #[test]
