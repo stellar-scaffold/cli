@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.0.4](https://github.com/stellar-scaffold/cli/compare/stellar-scaffold-ext-types-v0.0.3...stellar-scaffold-ext-types-v0.0.4) - 2026-10-01
+
+### Other
+
+- Feat/scaffold config v2 docs ([#612](https://github.com/stellar-scaffold/cli/pull/612))
+
 ## [0.0.3](https://github.com/stellar-scaffold/cli/compare/stellar-scaffold-ext-types-v0.0.2...stellar-scaffold-ext-types-v0.0.3) - 2026-06-29
 
 ### Other

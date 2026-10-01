@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.3](https://github.com/stellar-scaffold/cli/compare/stellar-scaffold-reporter-v0.1.2...stellar-scaffold-reporter-v0.1.3) - 2026-10-01
+
+### Other
+
+- Feat/scaffold config v2 docs ([#612](https://github.com/stellar-scaffold/cli/pull/612))
+
 ## [0.1.2](https://github.com/stellar-scaffold/cli/compare/stellar-scaffold-reporter-v0.1.1...stellar-scaffold-reporter-v0.1.2) - 2026-07-21
 
 ### Other
