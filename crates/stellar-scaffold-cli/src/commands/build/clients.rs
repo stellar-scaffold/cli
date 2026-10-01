@@ -165,6 +165,8 @@ pub enum Error {
     Strkey(#[from] stellar_strkey::DecodeError),
     #[error("Missing Workspace")]
     MissingWorkspace,
+    #[error("⛔ ️failed to deploy or generate clients for: {}", .0.join(", "))]
+    ContractsFailed(Vec<String>),
     #[error(
         "⛔ ️account {0:?} does not exist; Scaffold never creates mainnet keys. Add it with `stellar keys add {0}`"
     )]
@@ -727,8 +729,10 @@ impl Builder {
 
     /// Version 2: build exactly the contracts listed in `scaffold.yml`, in the
     /// order written. Crates that aren't listed are compiled but not deployed.
+    /// Every contract is attempted; any failure fails the build afterwards.
     async fn handle_listed_contracts(&self, package_names: &[String]) -> Result<(), Error> {
         let printer = self.printer();
+        let mut failed = Vec::new();
         let Some(contracts) = self.env.contracts.as_ref() else {
             return Ok(());
         };
@@ -751,10 +755,18 @@ impl Builder {
                 .await
             {
                 Ok(()) => printer.checkln(format!("Successfully generated client for: {name}")),
-                Err(e) => printer.errorln(format!("Failed to generate client for: {name}: {e}")),
+                Err(e) => {
+                    printer.errorln(format!("Failed to generate client for: {name}: {e}"));
+                    failed.push(name.to_string());
+                }
             }
         }
-        Ok(())
+        if failed.is_empty() {
+            return Ok(());
+        }
+        // Export the clients that did succeed before failing the build.
+        self.regenerate_clients_index()?;
+        Err(Error::ContractsFailed(failed))
     }
 
     /// Whether the generated client for `name` already targets `contract_id`,
