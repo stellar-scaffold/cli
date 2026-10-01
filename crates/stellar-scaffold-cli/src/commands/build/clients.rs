@@ -1205,10 +1205,11 @@ impl Args {
     }
 }
 
-/// `snake_case` contract/package name → `PascalCase`, used as the imported
-/// binding `Client` alias (e.g. `guess_the_number` → `GuessTheNumber`).
+/// `snake_case` or `kebab-case` contract/package name → `PascalCase`, used
+/// as the imported binding `Client` alias (e.g. `guess_the_number` →
+/// `GuessTheNumber`).
 fn to_pascal_case(name: &str) -> String {
-    name.split('_')
+    name.split(['_', '-'])
         .filter(|segment| !segment.is_empty())
         .map(|segment| {
             let mut chars = segment.chars();
@@ -1332,3 +1333,19 @@ async fn fetch_contract_spec(
 //         }
 //     }
 // }
+
+#[cfg(test)]
+mod name_tests {
+    use super::{to_camel_case, to_pascal_case};
+
+    #[test]
+    fn export_names_handle_snake_and_kebab_case() {
+        assert_eq!(to_pascal_case("guess_the_number"), "GuessTheNumber");
+        assert_eq!(to_pascal_case("my-token"), "MyToken");
+        assert_eq!(to_camel_case("my-token"), "myToken");
+        assert_eq!(
+            to_camel_case("nft_enumerable-example"),
+            "nftEnumerableExample"
+        );
+    }
+}
