@@ -35,6 +35,7 @@ const sidebars: SidebarsConfig = {
     "extensions",
     "registry",
     "deploy",
+    "agent-skills",
   ],
 };
 
