@@ -215,6 +215,17 @@ impl Builder {
         }
     }
 
+    /// Like [`Self::config`], signing as `signer` instead of the default
+    /// account. stellar-cli signs with the config's source account and ignores
+    /// any `--source` in a command's own arguments.
+    fn config_signed_by(&self, signer: Option<&str>) -> Result<stellar_cli::config::Args, Error> {
+        let mut config = self.config();
+        if let Some(signer) = signer {
+            config.source_account = signer.parse()?;
+        }
+        Ok(config)
+    }
+
     fn stellar_scaffold_env(&self) -> ScaffoldEnv {
         self.scaffold_env
     }
@@ -937,11 +948,15 @@ impl Builder {
                 .expect("we do not support non-utf8 paths")
                 .to_string(),
         ];
+        // The account that signs the deploy: a `STELLAR_ACCOUNT=` prefix in
+        // `constructor_args`, else the default.
+        let mut signer: Option<String> = None;
         if let Some(constructor_script) = &settings.constructor_args {
             let (source_account, mut args) = Self::parse_script_line(constructor_script)?;
 
             if let Some(account) = source_account {
-                deploy_args.extend_from_slice(&["--source-account".to_string(), account]);
+                deploy_args.extend_from_slice(&["--source-account".to_string(), account.clone()]);
+                signer = Some(account);
             } else {
                 deploy_args.extend_from_slice(&["--source".to_string(), source]);
             }
@@ -957,12 +972,9 @@ impl Builder {
             .map(std::string::String::as_str)
             .collect();
         let deploy_cmd = cli::contract::deploy::wasm::Cmd::parse_arg_vec(&deploy_arg_refs)?;
+        let config = self.config_signed_by(signer.as_deref())?;
         let contract_id = deploy_cmd
-            .execute(
-                &self.config(),
-                self.global_args.quiet,
-                self.global_args.no_cache,
-            )
+            .execute(&config, self.global_args.quiet, self.global_args.no_cache)
             .await?
             .into_result()
             .expect("no contract id returned by 'contract deploy'");
@@ -1103,12 +1115,9 @@ impl Builder {
                 args.join(" ")
             ));
             let invoke_cmd = cli::contract::invoke::Cmd::parse_arg_vec(&args)?;
+            let config = self.config_signed_by(source_account.as_deref())?;
             let result = invoke_cmd
-                .execute(
-                    &self.config(),
-                    self.global_args.quiet,
-                    self.global_args.no_cache,
-                )
+                .execute(&config, self.global_args.quiet, self.global_args.no_cache)
                 .await?;
             printer.infoln(format!("  ↳ Result: {result:?}"));
         }
