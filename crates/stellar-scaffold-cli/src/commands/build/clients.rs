@@ -233,14 +233,21 @@ impl Builder {
     }
 
     /// Like [`Self::config`], signing as `signer` instead of the default
-    /// account. stellar-cli signs with the config's source account and ignores
-    /// any `--source` in a command's own arguments.
-    fn config_signed_by(&self, signer: Option<&str>) -> Result<stellar_cli::config::Args, Error> {
+    /// account, plus that account as a `--source-account` value.
+    ///
+    /// stellar-cli signs with the config's source account and ignores any
+    /// `--source` in a command's own arguments; its parsers still require the
+    /// flag, so the returned string fills it (and shows in printed commands).
+    fn signing_as(
+        &self,
+        signer: Option<&str>,
+    ) -> Result<(stellar_cli::config::Args, String), Error> {
         let mut config = self.config();
         if let Some(signer) = signer {
             config.source_account = signer.parse()?;
         }
-        Ok(config)
+        let source = config.source_account.to_string();
+        Ok((config, source))
     }
 
     fn stellar_scaffold_env(&self) -> ScaffoldEnv {
@@ -1054,12 +1061,8 @@ impl Builder {
         } else {
             (None, Vec::new())
         };
-        let config = self.config_signed_by(signer.as_deref())?;
-        // Required by the parser; signing uses `config`.
-        deploy_args.extend([
-            "--source-account".to_string(),
-            config.source_account.to_string(),
-        ]);
+        let (config, source) = self.signing_as(signer.as_deref())?;
+        deploy_args.extend(["--source-account".to_string(), source]);
         if !constructor_args.is_empty() {
             deploy_args.push("--".to_string());
             deploy_args.extend(constructor_args);
@@ -1101,9 +1104,7 @@ impl Builder {
         }
 
         let existing_contract_id_str = existing_contract_id.to_string();
-        let config = self.config_signed_by(signer)?;
-        // Required by the parser; signing uses `config`.
-        let source = config.source_account.to_string();
+        let (config, source) = self.signing_as(signer)?;
         let mut redeploy_args = vec![
             "--source",
             source.as_str(),
@@ -1190,12 +1191,10 @@ impl Builder {
             return Ok(());
         }
         let printer = self.printer();
-        let config = self.config_signed_by(resolved.signer.as_deref())?;
-        let signer = config.source_account.to_string();
+        let (config, signer) = self.signing_as(resolved.signer.as_deref())?;
         let contract_id = contract_id.to_string();
         for method in &resolved.after_deploy {
             printer.infoln(format!("  ↳ Calling {method} on {name:?}"));
-            // `--source-account` is required by the parser; signing uses `config`.
             let invoke_cmd = cli::contract::invoke::Cmd::parse_arg_vec(&[
                 "--id",
                 &contract_id,
@@ -1228,9 +1227,7 @@ impl Builder {
             }
 
             let (source_account, command_parts) = Self::parse_script_line(line)?;
-            let config = self.config_signed_by(source_account.as_deref())?;
-            // Required by the parser and shown below; signing uses `config`.
-            let signer = config.source_account.to_string();
+            let (config, signer) = self.signing_as(source_account.as_deref())?;
 
             let contract_id_arg = contract_id.to_string();
             let mut args = vec![
