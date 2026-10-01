@@ -119,9 +119,17 @@ fn translate(
         mode: interpolate::Mode::Final,
     };
     let mut contracts = IndexMap::new();
-    for name in config.contracts.keys() {
+    for (key, def) in config.contracts.iter() {
+        let name = key.value.as_str();
         let Some(c) = resolver.contract(name, network_name) else {
-            continue;
+            // A contract listing no networks is never built; `config check`
+            // warns about it. Listing others but not this one is an error.
+            if def.networks.as_ref().is_none_or(|n| n.value.is_empty()) {
+                continue;
+            }
+            return Err(Error::Resolve(format!(
+                "contract `{name}` has no entry for network `{network_name}`"
+            )));
         };
         contracts.insert(name.into(), contract(&c, &args_ctx)?);
     }
@@ -300,6 +308,22 @@ contracts:
         );
         assert_eq!(token.after_deploy, vec!["init"]);
         assert_eq!(contracts.get("dex").unwrap().id.as_deref(), Some(CONTRACT));
+    }
+
+    #[test]
+    fn contracts_must_list_the_selected_network() {
+        let yaml = "version: 2\nnetworks:\n  local: {}\n  testnet: {}\ncontracts:\n  c:\n    type: contract\n    source: CDLZFC3SYJYDZT7K67VZ75HPJVIEUVNIXF47ZG2FB2RMQQVU2HHGCYSC\n    networks: { testnet: }\n";
+        assert!(matches!(
+            translate_yaml(yaml, "local"),
+            Err(Error::Resolve(_))
+        ));
+    }
+
+    #[test]
+    fn contracts_listing_no_networks_are_skipped() {
+        let yaml = "version: 2\nnetworks:\n  local: {}\ncontracts:\n  c:\n    type: contract\n    source: CDLZFC3SYJYDZT7K67VZ75HPJVIEUVNIXF47ZG2FB2RMQQVU2HHGCYSC\n";
+        let env = translate_yaml(yaml, "local").unwrap();
+        assert!(env.contracts.unwrap().is_empty());
     }
 
     #[test]
