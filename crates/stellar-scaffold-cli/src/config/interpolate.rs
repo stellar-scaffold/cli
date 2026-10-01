@@ -18,6 +18,17 @@ pub enum Namespace {
     Network,
 }
 
+impl Namespace {
+    /// The namespace's spelling in the template
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Namespace::Account => "account",
+            Namespace::Env => "env",
+            Namespace::Network => "network",
+        }
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Segment {
     Lit(String),

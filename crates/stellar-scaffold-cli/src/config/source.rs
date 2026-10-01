@@ -47,7 +47,7 @@ impl SourceType {
             .iter()
             .find(|(_, t)| *t == self)
             .map(|(n, _)| *n)
-            .unwrap_or_default()
+            .expect("every SourceType is listed in ALL")
     }
 
     /// Whether `from-network` may be used: only kinds that name something

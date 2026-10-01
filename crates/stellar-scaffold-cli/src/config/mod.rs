@@ -219,7 +219,7 @@ pub fn resolved_view(
         )]);
     };
     let mut errors = Vec::new();
-    let mut resolve = |t: &resolve::Template, ctx: &interpolate::Context| {
+    let mut interp = |t: &resolve::Template, ctx: &interpolate::Context| {
         interpolate::resolve(&t.segments, ctx).unwrap_or_else(|e| {
             errors.push(Diagnostic::error(Code::Interpolation, e));
             t.raw.clone()
@@ -233,12 +233,12 @@ pub fn resolved_view(
     let rpc_url = net
         .rpc_url
         .as_ref()
-        .map(|t| resolve(t, &net_ctx))
+        .map(|t| interp(t, &net_ctx))
         .unwrap_or_default();
     let passphrase = net
         .passphrase
         .as_ref()
-        .map(|t| resolve(t, &net_ctx))
+        .map(|t| interp(t, &net_ctx))
         .unwrap_or_default();
 
     let mut n = Mapping::new();
@@ -252,7 +252,7 @@ pub fn resolved_view(
         let headers: Mapping = net
             .rpc_headers
             .iter()
-            .map(|(k, t)| (k.clone().into(), resolve(t, &net_ctx).into()))
+            .map(|(k, t)| (k.clone().into(), interp(t, &net_ctx).into()))
             .collect();
         n.insert("rpc-headers".into(), headers.into());
     }
@@ -273,7 +273,7 @@ pub fn resolved_view(
         let Some(c) = resolver.contract(name, network) else {
             continue;
         };
-        let view = contract_view(&c, &mut |s| resolve(&resolve::Template::new(s), &args_ctx));
+        let view = contract_view(&c, &mut |s| interp(&resolve::Template::new(s), &args_ctx));
         contracts.insert(name.into(), view);
     }
     let mut errors_all: Vec<Diagnostic> = resolver

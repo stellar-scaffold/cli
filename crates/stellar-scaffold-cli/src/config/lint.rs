@@ -117,11 +117,10 @@ impl Lint<'_> {
                 if let Some(ns) =
                     interpolate::namespaces(&segments).find(|ns| !allowed.contains(ns))
                 {
-                    let ns = format!("{ns:?}").to_lowercase();
                     self.diags.push(
                         Diagnostic::error(
                             Code::Interpolation,
-                            format!("`${{{ns}.…}}` cannot be used here"),
+                            format!("`${{{}.…}}` cannot be used here", ns.as_str()),
                         )
                         .at(span(s)),
                     );
