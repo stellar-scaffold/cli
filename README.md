@@ -237,6 +237,7 @@ Your repo contains the following key folders:
 * [CLI Commands](https://scaffoldstellar.com/docs/cli)
 * [Configuration](https://scaffoldstellar.com/docs/configuration)
 * [Registry Guide](https://scaffoldstellar.com/docs/registry)
+* [Agent skill](./skills/stellar-scaffold/SKILL.md): teaches AI coding agents to create and work in Scaffold projects. Point your agent at `https://raw.githubusercontent.com/stellar-scaffold/cli/main/skills/stellar-scaffold/SKILL.md`
 
 ---
 ## Additional Developer Resources
