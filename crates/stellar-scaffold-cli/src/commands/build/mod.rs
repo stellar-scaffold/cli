@@ -148,7 +148,8 @@ impl Command {
             extensions,
             env_label,
         } = if is_v2 {
-            self.v2_inputs(workspace_root, &metadata, &printer).await?
+            self.v2_inputs(workspace_root, &metadata, &packages, &printer)
+                .await?
         } else {
             self.v1_inputs(workspace_root)?
         };
@@ -245,12 +246,14 @@ impl Command {
     }
 
     /// Inputs from a version 2 `scaffold.yml`. The file is always validated;
-    /// when building clients, the selected network is also resolved and its
-    /// container started if it runs locally.
+    /// when building clients, the selected network is also resolved, its
+    /// container started if it runs locally, and any built `packages` that
+    /// no contract lists are named as not being deployed.
     async fn v2_inputs(
         &self,
         workspace_root: &Path,
         metadata: &Metadata,
+        packages: &[Package],
         printer: &Print,
     ) -> Result<Inputs, Error> {
         if std::env::var_os("STELLAR_SCAFFOLD_ENV").is_some() {
@@ -273,6 +276,14 @@ impl Command {
         let (network, source) = v2::select_network(network_flag);
         printer.infoln(format!("Building for network {network:?} (from {source})"));
         let plan = v2::plan(workspace_root, Some(&crates), &network, printer)?;
+        let unlisted = v2::unlisted_crates(packages.iter().map(|p| p.name.as_str()), &plan);
+        if !unlisted.is_empty() {
+            printer.infoln(format!(
+                "Not deploying {}: not listed under `contracts:` in {}",
+                unlisted.join(", "),
+                crate::config::CONFIG_FILE
+            ));
+        }
         if plan.network.run_locally {
             printer.infoln("Starting local Stellar Docker container...");
             start_container_if_local(&plan.network).await?;

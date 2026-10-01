@@ -720,23 +720,6 @@ impl Builder {
         let Some(contracts) = self.env.contracts.as_ref() else {
             return Ok(());
         };
-        let listed: Vec<&str> = contracts
-            .values()
-            .filter_map(env_toml::Contract::crate_name)
-            .collect();
-        let unlisted: Vec<&str> = package_names
-            .iter()
-            .map(String::as_str)
-            .filter(|p| !listed.iter().any(|c| same_crate(p, c)))
-            .collect();
-        if !unlisted.is_empty() {
-            printer.infoln(format!(
-                "Not deploying {}: not listed under `contracts:` in {}",
-                unlisted.join(", "),
-                crate::config::CONFIG_FILE
-            ));
-        }
-
         for (name, settings) in contracts {
             // Skipped when this build compiled a subset, e.g. `--package`.
             if settings

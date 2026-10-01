@@ -158,6 +158,24 @@ fn translate(
     })
 }
 
+/// Packages built this run that no contract in `environment` names as its
+/// crate. They are compiled but not deployed.
+pub fn unlisted_crates<'a>(
+    packages: impl IntoIterator<Item = &'a str>,
+    environment: &Environment,
+) -> Vec<&'a str> {
+    let listed: Vec<&str> = environment
+        .contracts
+        .iter()
+        .flat_map(|contracts| contracts.values())
+        .filter_map(env_toml::Contract::crate_name)
+        .collect();
+    packages
+        .into_iter()
+        .filter(|p| !listed.iter().any(|c| config::source::same_crate(p, c)))
+        .collect()
+}
+
 /// Extensions and the hook `env` label for a version 2 project that isn't
 /// building clients: validates `scaffold.yml` without resolving a network.
 pub fn hook_inputs(
@@ -324,6 +342,17 @@ contracts:
         let yaml = "version: 2\nnetworks:\n  local: {}\ncontracts:\n  c:\n    type: contract\n    source: CDLZFC3SYJYDZT7K67VZ75HPJVIEUVNIXF47ZG2FB2RMQQVU2HHGCYSC\n";
         let env = translate_yaml(yaml, "local").unwrap();
         assert!(env.contracts.unwrap().is_empty());
+    }
+
+    #[test]
+    fn unlisted_crates_keep_their_package_names() {
+        let yaml = "version: 2\nnetworks:\n  local: { accounts: [me] }\ncontracts:\n  token:\n    type: workspace\n    source: fungible_token\n    networks: { local: }\n";
+        let env = translate_yaml(yaml, "local").unwrap();
+        let packages = ["fungible-token", "nft-enumerable-example"];
+        assert_eq!(
+            unlisted_crates(packages, &env),
+            vec!["nft-enumerable-example"]
+        );
     }
 
     #[test]
