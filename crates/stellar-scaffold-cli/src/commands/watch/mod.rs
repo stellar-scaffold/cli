@@ -100,6 +100,12 @@ impl Watcher {
         path == self.env_toml_dir.join(ENV_FILE)
     }
 
+    /// Whether `path` is the project's `scaffold.yml`. Canonicalized like
+    /// other watched paths, since event paths may go through symlinks.
+    pub fn is_scaffold_yml(&self, path: &Path) -> bool {
+        canonicalize_path(path) == self.env_toml_dir.join(crate::config::CONFIG_FILE)
+    }
+
     pub fn handle_event(&self, event: &notify::Event, tx: &mpsc::Sender<Message>) {
         if matches!(
             event.kind,
@@ -112,7 +118,7 @@ impl Watcher {
                     return false;
                 };
                 if ext.eq_ignore_ascii_case("yml") {
-                    return path.as_path() == self.env_toml_dir.join(crate::config::CONFIG_FILE);
+                    return self.is_scaffold_yml(path);
                 } else if ext.eq_ignore_ascii_case("toml") {
                     let Some(stem) = path.file_stem().and_then(|s| s.to_str()) else {
                         return false;
@@ -331,5 +337,26 @@ impl Cmd {
             .env
             .get_or_insert(ScaffoldEnv::Development);
         Arc::new((self.build_cmd.clone(), global_args.clone()))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    #[cfg(unix)]
+    fn scaffold_yml_matches_through_symlinked_paths() {
+        let dir = tempfile::TempDir::new().unwrap();
+        let real = dir.path().join("real");
+        std::fs::create_dir(&real).unwrap();
+        std::fs::write(real.join(crate::config::CONFIG_FILE), "version: 2\n").unwrap();
+        let link = dir.path().join("link");
+        std::os::unix::fs::symlink(&real, &link).unwrap();
+
+        let watcher = Watcher::new(&real, &[]);
+        assert!(watcher.is_scaffold_yml(&link.join(crate::config::CONFIG_FILE)));
+        assert!(watcher.is_scaffold_yml(&real.join(crate::config::CONFIG_FILE)));
+        assert!(!watcher.is_scaffold_yml(&real.join("other.yml")));
     }
 }
