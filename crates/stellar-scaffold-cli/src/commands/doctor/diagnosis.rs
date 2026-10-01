@@ -176,12 +176,14 @@ pub struct Context<'a> {
     /// binaries on PATH.
     pub commands: &'a dyn CommandRunner,
     pub env: ScaffoldEnv,
-    // TODO: replace with `config` when we migrate to scaffold.yml?
     /// Parse outcome of `environments.toml`. `Ok(None)` means the file is
     /// absent; the error is kept so a check can report a malformed file.
     pub environment: Result<Option<env_toml::Environment>, env_toml::Error>,
     /// Cargo package names in the workspace, for validating contract keys.
     pub package_names: Vec<String>,
+    /// Load outcome of a version 2 `scaffold.yml`. `None` outside a
+    /// workspace, or when the file is absent or declares another version.
+    pub config: Option<crate::config::Loaded>,
     pub printer: &'a Print,
 }
 

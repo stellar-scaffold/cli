@@ -15,6 +15,7 @@ use stellar_cli::{commands::global, print::Print};
 
 use crate::commands::build::clients::ScaffoldEnv;
 use crate::commands::build::env_toml;
+use crate::config;
 use diagnosis::{Context, Severity, SystemCommands};
 
 #[derive(Parser, Debug, Clone)]
@@ -70,12 +71,25 @@ impl Cmd {
             .map(|m| m.packages.iter().map(|p| p.name.clone()).collect())
             .unwrap_or_default();
 
+        // Only version 2 files go through the new validator; version 1 is
+        // still checked by `ScaffoldYml`'s legacy path.
+        let config = workspace_root
+            .as_deref()
+            .filter(|root| {
+                config::declared_version(root) == Some(u64::from(config::SCHEMA_VERSION))
+            })
+            .map(|root| {
+                let crates = metadata.as_ref().map(config::cdylib_crates);
+                config::load(root, crates.as_deref(), None)
+            });
+
         let ctx = Context {
             workspace_root: workspace_root.as_deref(),
             commands: &SystemCommands,
             env: self.env,
             environment,
             package_names,
+            config,
             printer: &printer,
         };
 

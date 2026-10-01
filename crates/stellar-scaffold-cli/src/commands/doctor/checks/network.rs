@@ -125,6 +125,7 @@ mod tests {
                 |root| env_toml::Environment::get(root, &ScaffoldEnv::Development),
             ),
             package_names: Vec::new(),
+            config: None,
             printer,
         }
     }
