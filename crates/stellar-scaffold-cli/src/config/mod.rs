@@ -5,6 +5,7 @@
 //! - `lint.rs`        :: checks on individual values
 //! - `source.rs`      :: contract `type` kinds and `source` validation
 //! - `interpolate.rs` :: `${namespace.path}` grammar
+//! - `cli_args.rs`    :: constructor `args` as stellar-cli arguments
 //! - `resolve.rs`     :: `extends` and per-network merging, cross-reference rules
 //!
 //! [`load`] runs the whole pipeline and never fails: every problem is a
@@ -13,6 +14,7 @@
 //! Version 1 files (the `config:` section only) are still read by
 //! `commands::build::scaffold_yml` until `build` moves to this module.
 
+pub mod cli_args;
 pub mod diagnostic;
 pub mod interpolate;
 pub mod lint;
@@ -221,7 +223,11 @@ pub fn resolved_view(
             t.raw.clone()
         })
     };
-    let net_ctx = interpolate::Context { env, network: None };
+    let net_ctx = interpolate::Context {
+        env,
+        network: None,
+        mode: interpolate::Mode::Display,
+    };
     let rpc_url = net
         .rpc_url
         .as_ref()
@@ -256,6 +262,7 @@ pub fn resolved_view(
     n.insert("allow-deploy".into(), net.allow_deploy().into());
 
     let args_ctx = interpolate::Context {
+        mode: interpolate::Mode::Display,
         env,
         network: Some((&net.name, &rpc_url, &passphrase)),
     };

@@ -223,6 +223,49 @@ pub enum Value {
     Map(SpannedMap<Spanned<Value>>),
 }
 
+impl Value {
+    /// As JSON, with strings kept as written. Used for extension config.
+    pub fn to_json(&self) -> serde_json::Value {
+        let unchanged = &mut |s: &str| Ok::<_, std::convert::Infallible>(s.to_string());
+        match self.to_json_with(unchanged) {
+            Ok(json) => json,
+            Err(never) => match never {},
+        }
+    }
+
+    /// As JSON, passing every string through `map_str` (e.g. interpolation).
+    /// Integers wider than 64 bits become strings, which stellar-cli accepts
+    /// for 128- and 256-bit types.
+    pub fn to_json_with<E>(
+        &self,
+        map_str: &mut dyn FnMut(&str) -> Result<String, E>,
+    ) -> Result<serde_json::Value, E> {
+        use serde_json::Value as J;
+        Ok(match self {
+            Value::Null => J::Null,
+            Value::Bool(b) => J::Bool(*b),
+            Value::Int(n) => n
+                .parse::<i64>()
+                .map(J::from)
+                .or_else(|_| n.parse::<u64>().map(J::from))
+                .unwrap_or_else(|_| J::String(n.clone())),
+            Value::Float(f) => serde_json::Number::from_f64(*f).map_or(J::Null, J::Number),
+            Value::Str(s) => J::String(map_str(s)?),
+            Value::Seq(items) => J::Array(
+                items
+                    .iter()
+                    .map(|i| i.value.to_json_with(map_str))
+                    .collect::<Result<_, E>>()?,
+            ),
+            Value::Map(map) => J::Object(
+                map.iter()
+                    .map(|(k, v)| Ok((k.value.clone(), v.value.to_json_with(map_str)?)))
+                    .collect::<Result<_, E>>()?,
+            ),
+        })
+    }
+}
+
 impl PartialEq for SpannedMap<Spanned<Value>> {
     fn eq(&self, other: &Self) -> bool {
         self.0.len() == other.0.len()
