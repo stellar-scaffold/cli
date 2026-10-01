@@ -39,8 +39,6 @@ pub enum Error {
     Io(#[from] std::io::Error),
     #[error(transparent)]
     Env(#[from] env_toml::Error),
-    #[error(transparent)]
-    Config(#[from] build::v2::Error),
     #[error("Failed to start docker container. {hint}", hint = super::DOCTOR_HINT)]
     DockerStart,
     #[error(transparent)]
@@ -161,28 +159,16 @@ impl Cmd {
 
         // Extensions for pre/post-dev hooks, and the label they see as `env`.
         // The build pipeline hooks (compile/deploy/codegen) are handled inside
-        // build::Command::run().
-        let (extension_entries, env_label) = if build::v2::is_v2(workspace_root) {
-            let crates = crate::config::cdylib_crates(metadata);
-            build::v2::hook_inputs(
-                workspace_root,
-                Some(&crates),
-                self.build_cmd.build_clients_args.network.as_deref(),
-                &printer,
-            )?
-        } else {
-            let scaffold_env = self
-                .build_cmd
-                .build_clients_args
-                .env
-                .unwrap_or(ScaffoldEnv::Development);
-            let Some(current_env) = env_toml::Environment::get(workspace_root, &scaffold_env)?
-            else {
-                return Ok(());
-            };
-            (current_env.extensions, scaffold_env.to_string())
+        // build::Command::run(), which also resolves the network.
+        let Some(inputs) = self
+            .build_cmd
+            .inputs(workspace_root, metadata, &[], &printer, false)
+            .await?
+        else {
+            return Ok(());
         };
-        let extensions = extension::discover(&extension_entries, &printer);
+        let env_label = inputs.env_label;
+        let extensions = extension::discover(&inputs.extensions, &printer);
         let all_packages = self.build_cmd.list_packages(metadata)?;
         let packages: Vec<PathBuf> = all_packages
             .iter()

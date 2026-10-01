@@ -204,12 +204,17 @@ impl Builder {
         compile_ctx: Option<CompileContext>,
         scaffold_config: ScaffoldConfig,
     ) -> Self {
+        let env_label = if env.from_scaffold_yml {
+            env.network.name.clone().unwrap_or_default()
+        } else {
+            scaffold_env.to_string()
+        };
         Self {
             printer: Print::new(global_args.quiet),
             global_args,
             network,
             source_account,
-            env_label: scaffold_env.to_string(),
+            env_label,
             scaffold_env,
             workspace_root,
             out_dir,
@@ -1280,11 +1285,7 @@ impl Args {
         } else {
             return Err(Error::MissingWorkspace);
         };
-        let env_label = if current_env.from_scaffold_yml {
-            current_env.network.name.clone().unwrap_or_default()
-        } else {
-            env.to_string()
-        };
+
         let network = to_network(&global_args, current_env.network.clone())?;
         self.printer()
             .infoln(format!("Using network at {}\n", network.rpc_url));
@@ -1310,7 +1311,7 @@ impl Args {
 
         let scaffold_config = ScaffoldConfig::get(workspace_root);
 
-        let mut builder = Builder::new(
+        let builder = Builder::new(
             global_args,
             network,
             default_account.parse()?,
@@ -1323,7 +1324,6 @@ impl Args {
             self.compile_ctx.clone(),
             scaffold_config,
         );
-        builder.env_label = env_label;
         Ok(builder)
     }
 

@@ -75,14 +75,14 @@ pub enum Error {
     Config(#[from] v2::Error),
 }
 
-/// What a build reads from the project's config before compiling.
-struct Inputs {
+/// What `build` and `watch` read from the project's config before compiling.
+pub struct Inputs {
     /// The resolved version 2 config, when building clients from one.
-    plan: Option<env_toml::Environment>,
+    pub plan: Option<env_toml::Environment>,
     /// Extensions to run, in order.
-    extensions: Vec<env_toml::ExtensionEntry>,
+    pub extensions: Vec<env_toml::ExtensionEntry>,
     /// What hooks see as `env`: the environment or network name.
-    env_label: String,
+    pub env_label: String,
 }
 
 /// Start the local quickstart container if `network` runs locally.
@@ -120,16 +120,9 @@ impl Command {
         let metadata = self.metadata()?;
         let packages = self.list_packages(&metadata)?;
         let workspace_root = metadata.workspace_root.as_std_path();
-        let is_v2 = v2::is_v2(workspace_root);
-
-        if !is_v2
-            && let Some(env) = &self.build_clients_args.env
-            && env == &ScaffoldEnv::Development
-        {
-            printer.infoln("Starting local Stellar Docker container...");
-            self.start_local_docker_if_needed(workspace_root, env)
+        if !v2::is_v2(workspace_root) {
+            self.start_development_container(workspace_root, &printer)
                 .await?;
-            printer.checkln("Local Stellar network is healthy and running.");
         }
 
         if self.list {
@@ -147,12 +140,16 @@ impl Command {
             plan,
             extensions,
             env_label,
-        } = if is_v2 {
-            self.v2_inputs(workspace_root, &metadata, &packages, &printer)
-                .await?
-        } else {
-            self.v1_inputs(workspace_root)?
-        };
+        } = self
+            .inputs(
+                workspace_root,
+                &metadata,
+                &packages,
+                &printer,
+                self.build_clients,
+            )
+            .await?
+            .unwrap_or_else(|| self.empty_inputs());
         let extensions = extension::discover(&extensions, &printer);
         // Build pre-compile context (wasm_paths is empty before compilation).
         let wasm_out_dir =
@@ -228,25 +225,71 @@ impl Command {
         Ok(())
     }
 
-    /// Inputs from `environments.toml`: the selected environment's extensions,
-    /// and its name as the label hooks see as `env`.
-    fn v1_inputs(&self, workspace_root: &Path) -> Result<Inputs, Error> {
-        let scaffold_env = self
-            .build_clients_args
-            .env
-            .unwrap_or(ScaffoldEnv::Development);
-        let extensions = env_toml::Environment::get(workspace_root, &scaffold_env)?
-            .map(|env| env.extensions)
-            .unwrap_or_default();
-        Ok(Inputs {
+    /// For environments.toml projects building `development`, start the local
+    /// container if that environment runs locally. Version 2 projects start
+    /// theirs while resolving the network.
+    async fn start_development_container(
+        &self,
+        workspace_root: &Path,
+        printer: &Print,
+    ) -> Result<(), Error> {
+        if self.build_clients_args.env == Some(ScaffoldEnv::Development) {
+            printer.infoln("Starting local Stellar Docker container...");
+            self.start_local_docker_if_needed(workspace_root, &ScaffoldEnv::Development)
+                .await?;
+            printer.checkln("Local Stellar network is healthy and running.");
+        }
+        Ok(())
+    }
+
+    /// Inputs for an environments.toml project with no entry for the selected
+    /// environment: no extensions to run.
+    fn empty_inputs(&self) -> Inputs {
+        Inputs {
             plan: None,
-            extensions,
-            env_label: scaffold_env.to_string(),
-        })
+            extensions: vec![],
+            env_label: self.scaffold_env().to_string(),
+        }
+    }
+
+    /// The environments.toml environment this build targets.
+    fn scaffold_env(&self) -> ScaffoldEnv {
+        self.build_clients_args
+            .env
+            .unwrap_or(ScaffoldEnv::Development)
+    }
+
+    /// The project's config inputs, from a version 2 `scaffold.yml` or from
+    /// `environments.toml`. With `resolve_network`, a version 2 project also
+    /// resolves the selected network for deploying (see `v2_inputs`).
+    /// `None` when an environments.toml project has no entry for the
+    /// selected environment.
+    pub async fn inputs(
+        &self,
+        workspace_root: &Path,
+        metadata: &Metadata,
+        packages: &[Package],
+        printer: &Print,
+        resolve_network: bool,
+    ) -> Result<Option<Inputs>, Error> {
+        if v2::is_v2(workspace_root) {
+            let inputs = self
+                .v2_inputs(workspace_root, metadata, packages, printer, resolve_network)
+                .await?;
+            return Ok(Some(inputs));
+        }
+        let scaffold_env = self.scaffold_env();
+        Ok(
+            env_toml::Environment::get(workspace_root, &scaffold_env)?.map(|env| Inputs {
+                plan: None,
+                extensions: env.extensions,
+                env_label: scaffold_env.to_string(),
+            }),
+        )
     }
 
     /// Inputs from a version 2 `scaffold.yml`. The file is always validated;
-    /// when building clients, the selected network is also resolved, its
+    /// with `resolve_network`, the selected network is also resolved, its
     /// container started if it runs locally, and any built `packages` that
     /// no contract lists are named as not being deployed.
     async fn v2_inputs(
@@ -255,6 +298,7 @@ impl Command {
         metadata: &Metadata,
         packages: &[Package],
         printer: &Print,
+        resolve_network: bool,
     ) -> Result<Inputs, Error> {
         if std::env::var_os("STELLAR_SCAFFOLD_ENV").is_some() {
             printer.warnln(
@@ -263,7 +307,7 @@ impl Command {
         }
         let crates = crate::config::cdylib_crates(metadata);
         let network_flag = self.build_clients_args.network.as_deref();
-        if !self.build_clients {
+        if !resolve_network {
             let (extensions, env_label) =
                 v2::hook_inputs(workspace_root, Some(&crates), network_flag, printer)?;
             return Ok(Inputs {
