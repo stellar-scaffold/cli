@@ -93,7 +93,7 @@ contracts:
           admin: ${account.testnet-user}
 ```
 
-Validate it with `stellar scaffold config check`, and print the resolved config for one network with `stellar scaffold config show --network <name>`. See the [Configuration Guide](https://scaffoldstellar.com/docs/environments) for every option.
+Validate it with `stellar scaffold config check`, and print the resolved config for one network with `stellar scaffold config show --network <name>`. See the [Configuration Guide](https://scaffoldstellar.com/docs/configuration) for every option.
 
 Projects created before version 2 keep this configuration in `environments.toml`, selected with `STELLAR_SCAFFOLD_ENV`. `build` and `watch` still read it.
 
@@ -136,5 +136,5 @@ repository = "https://github.com/your-org/your-project"
 
 See the full documentation:
 - [CLI Commands Guide](https://scaffoldstellar.com/docs/cli)
-- [Configuration](https://scaffoldstellar.com/docs/environments)
+- [Configuration](https://scaffoldstellar.com/docs/configuration)
 - [Deployment Guide](https://scaffoldstellar.com/docs/deploy)

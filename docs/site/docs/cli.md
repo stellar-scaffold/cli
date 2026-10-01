@@ -30,7 +30,7 @@ The init command creates:
 
 Official templates come from the [Stellar Scaffold templates repo](https://github.com/stellar-scaffold/ui).
 
-With `--no-template` (or `--template none`), the frontend layer is omitted entirely: no `app/`, no `app-lib/`, no JS workspaces, no dependency install. Use plain `stellar scaffold build` to compile the contracts. Adding `--build-clients` still deploys and generates a client for every contract listed in [`scaffold.yml`](./environments.md), even though there is no app to consume them.
+With `--no-template` (or `--template none`), the frontend layer is omitted entirely: no `app/`, no `app-lib/`, no JS workspaces, no dependency install. Use plain `stellar scaffold build` to compile the contracts. Adding `--build-clients` still deploys and generates a client for every contract listed in [`scaffold.yml`](./configuration.md), even though there is no app to consume them.
 
 ## Generate Command
 
@@ -52,7 +52,7 @@ Options:
 
 The generate command downloads the example, caches it locally, writes it to `contracts/<example-name>/`, and merges the dependencies it needs into your workspace `Cargo.toml`. Each example set is pinned to a supported release rather than tracking upstream `main`, so the version you get is the one this CLI release was tested against.
 
-`generate` does not add the contract to `scaffold.yml`. Add an entry under `contracts:` yourself, with `type: workspace`, the crate's package name as `source`, its constructor `args`, and the networks it belongs on. See [Configuration](./environments.md#contracts).
+`generate` does not add the contract to `scaffold.yml`. Add an entry under `contracts:` yourself, with `type: workspace`, the crate's package name as `source`, its constructor `args`, and the networks it belongs on. See [Configuration](./configuration.md#contracts).
 
 ## Upgrade Command
 
@@ -70,7 +70,7 @@ The upgrade command:
 
 - Validates the existing workspace (requires `Cargo.toml` and `contracts/` directory)
 - Downloads and integrates the frontend template
-- Generates `environments.toml` with discovered contracts. This is the legacy config format; see [Configuration](./environments.md#legacy-environmentstoml) to move it to `scaffold.yml` version 2
+- Generates `environments.toml` with discovered contracts. This is the legacy config format; see [Configuration](./configuration.md#legacy-environmentstoml) to move it to `scaffold.yml` version 2
 - Analyzes contracts for constructor arguments and prompts for configuration
 - Preserves all existing contract code and project structure
 - Adds development tools and configurations
@@ -91,7 +91,7 @@ stellar scaffold build [options]
 
 Options:
 
-- `--build-clients`: Deploy contracts and generate TypeScript client packages for them, as configured in [`scaffold.yml`](./environments.md)
+- `--build-clients`: Deploy contracts and generate TypeScript client packages for them, as configured in [`scaffold.yml`](./configuration.md)
 - `--network <name>`: Network from `scaffold.yml` to build for. Defaults to `STELLAR_NETWORK`, then the network set with `stellar network use`, then `local`
 - `--list` or `--ls`: List package names in order of build
 - [Standard Soroban contract build options also supported]
@@ -221,7 +221,7 @@ The JSON holds a `checks` array — each entry with `name`, `category`, `severit
 
 ## Config Command
 
-Validate and inspect [`scaffold.yml`](./environments.md):
+Validate and inspect [`scaffold.yml`](./configuration.md):
 
 ```bash
 stellar scaffold config check [options]

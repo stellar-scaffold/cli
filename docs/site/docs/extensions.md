@@ -32,7 +32,7 @@ You only need to handle the hooks relevant to your extension. Hooks you do not l
 
 ## Registering an extension
 
-List your extension under `extensions:` in [`scaffold.yml`](./environments.md). Extensions run in the order listed, on every network:
+List your extension under `extensions:` in [`scaffold.yml`](./configuration.md). Extensions run in the order listed, on every network:
 
 ```yaml
 extensions:

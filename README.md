@@ -117,7 +117,7 @@ my-project/
 
 This template provides a ready-to-use frontend application with example smart contracts and their TypeScript clients. You can use these as reference while building your own contracts and UI. The frontend is set up with `Vite`, `React`, and includes basic components for interacting with the contracts.
 
-See the [CLI Documentation](https://scaffoldstellar.com/docs/cli) for detailed command information and the [Configuration Guide](https://scaffoldstellar.com/docs/environments) for configuration details.
+See the [CLI Documentation](https://scaffoldstellar.com/docs/cli) for detailed command information and the [Configuration Guide](https://scaffoldstellar.com/docs/configuration) for configuration details.
 
 ---
 
@@ -235,7 +235,7 @@ Your repo contains the following key folders:
 
 ## Documentation
 * [CLI Commands](https://scaffoldstellar.com/docs/cli)
-* [Configuration](https://scaffoldstellar.com/docs/environments)
+* [Configuration](https://scaffoldstellar.com/docs/configuration)
 * [Registry Guide](https://scaffoldstellar.com/docs/registry)
 
 ---

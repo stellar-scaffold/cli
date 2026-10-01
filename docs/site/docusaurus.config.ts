@@ -50,6 +50,13 @@ const config: Config = {
         disableInDev: false,
       },
     ],
+    [
+      '@docusaurus/plugin-client-redirects',
+      {
+        // Keep links to renamed pages working.
+        redirects: [{ from: '/docs/environments', to: '/docs/configuration' }],
+      },
+    ],
   ],
 
   presets: [
