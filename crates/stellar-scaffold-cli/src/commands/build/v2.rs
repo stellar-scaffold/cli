@@ -131,7 +131,7 @@ fn translate(
                 "contract `{name}` has no entry for network `{network_name}`"
             )));
         };
-        contracts.insert(name.into(), contract(&c, &args_ctx)?);
+        contracts.insert(name.into(), pipeline_entry(&c, &args_ctx)?);
     }
 
     let default_account = net.default_account().map(str::to_string);
@@ -203,7 +203,7 @@ pub fn extension_entries(config: &config::Config) -> Vec<ExtensionEntry> {
 
 /// A resolved contract as a pipeline entry: `workspace` sources deploy their
 /// crate; `contract` sources reuse the pinned-`id` path.
-fn contract(
+fn pipeline_entry(
     c: &resolve::Contract,
     ctx: &interpolate::Context,
 ) -> Result<env_toml::Contract, Error> {
