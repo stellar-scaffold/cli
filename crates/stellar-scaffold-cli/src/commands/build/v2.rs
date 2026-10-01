@@ -119,17 +119,11 @@ fn translate(
         mode: interpolate::Mode::Final,
     };
     let mut contracts = IndexMap::new();
-    for (key, def) in config.contracts.iter() {
-        let name = key.value.as_str();
+    for name in config.contracts.keys() {
+        // A contract only exists on the networks it lists; elsewhere it is
+        // neither built nor exported.
         let Some(c) = resolver.contract(name, network_name) else {
-            // A contract listing no networks is never built; `config check`
-            // warns about it. Listing others but not this one is an error.
-            if def.networks.as_ref().is_none_or(|n| n.value.is_empty()) {
-                continue;
-            }
-            return Err(Error::Resolve(format!(
-                "contract `{name}` has no entry for network `{network_name}`"
-            )));
+            continue;
         };
         contracts.insert(name.into(), pipeline_entry(&c, &args_ctx)?);
     }
@@ -329,12 +323,12 @@ contracts:
     }
 
     #[test]
-    fn contracts_must_list_the_selected_network() {
-        let yaml = "version: 2\nnetworks:\n  local: {}\n  testnet: {}\ncontracts:\n  c:\n    type: contract\n    source: CDLZFC3SYJYDZT7K67VZ75HPJVIEUVNIXF47ZG2FB2RMQQVU2HHGCYSC\n    networks: { testnet: }\n";
-        assert!(matches!(
-            translate_yaml(yaml, "local"),
-            Err(Error::Resolve(_))
-        ));
+    fn contracts_not_listing_the_selected_network_are_skipped() {
+        let yaml = format!(
+            "version: 2\nnetworks:\n  local: {{}}\n  testnet: {{}}\ncontracts:\n  a:\n    type: contract\n    source: {CONTRACT}\n    networks: {{ local:, testnet: }}\n  b:\n    type: contract\n    source: {CONTRACT}\n    networks: {{ testnet: }}\n"
+        );
+        let contracts = translate_yaml(&yaml, "local").unwrap().contracts.unwrap();
+        assert_eq!(contracts.keys().map(|k| &**k).collect::<Vec<_>>(), ["a"]);
     }
 
     #[test]

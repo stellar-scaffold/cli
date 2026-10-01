@@ -174,11 +174,9 @@ fn workspace_contract_on_public_network_is_an_error() {
 }
 
 #[test]
-fn selected_network_must_be_covered_by_every_contract() {
+fn contracts_may_omit_the_selected_network() {
     let yaml = "version: 2\nnetworks:\n  local: { accounts: [me] }\n  testnet: {}\ncontracts:\n  c:\n    type: workspace\n    source: fungible_token\n    networks: { local: }\n";
     let (_dir, loaded) = load_str(yaml, Some("testnet"));
-    assert_eq!(codes(&loaded), vec![Code::MissingContractNetwork]);
-    let (_dir, loaded) = load_str(yaml, None);
     assert!(loaded.diagnostics.is_empty());
 }
 

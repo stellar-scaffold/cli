@@ -195,21 +195,6 @@ impl<'c> Resolver<'c> {
             for net in networks.value.keys() {
                 self.contract(name, net);
             }
-            if let Some(sel) = selected
-                && config.networks.contains_key(sel)
-                && !networks.value.contains_key(sel)
-            {
-                self.diagnostics.push(
-                    Diagnostic::error(
-                        Code::MissingContractNetwork,
-                        format!("contract `{name}` has no entry for network `{sel}`"),
-                    )
-                    .at(span(key))
-                    .help(format!(
-                        "add `{sel}: {{}}` under its `networks:`, or remove the contract"
-                    )),
-                );
-            }
         }
     }
 

@@ -81,8 +81,6 @@ pub enum Code {
     UnknownAccount,
     /// A network, contract, account, or method name is not valid.
     InvalidName,
-    /// A contract has no entry for the selected network.
-    MissingContractNetwork,
     /// Deploys are enabled on a mainnet-passphrase network.
     DeployToMainnet,
     /// A third-party source has no pinned version.
@@ -120,7 +118,6 @@ impl Code {
             Self::Interpolation => "interpolation",
             Self::UnknownAccount => "unknown-account",
             Self::InvalidName => "invalid-name",
-            Self::MissingContractNetwork => "missing-contract-network",
             Self::DeployToMainnet => "deploy-to-mainnet",
             Self::UnpinnedVersion => "unpinned-version",
             Self::StartContainerNonLocal => "start-container-non-local",
