@@ -753,7 +753,7 @@ impl Builder {
             .join(&self.scaffold_config.clients_dir)
             .join(name)
             .join("src/index.ts");
-        std::fs::read_to_string(index).is_ok_and(|s| s.contains(contract_id))
+        std::fs::read_to_string(index).is_ok_and(|s| binding_targets(&s, contract_id))
     }
 
     async fn handle_production_contracts(
@@ -1350,6 +1350,13 @@ impl Args {
     }
 }
 
+/// Whether generated binding source is bound to `contract_id`. Matches the
+/// `contractId: "C…"` field the bindings generator writes, not the address
+/// appearing anywhere in the file.
+fn binding_targets(source: &str, contract_id: &str) -> bool {
+    source.contains(&format!("contractId: \"{contract_id}\""))
+}
+
 /// `snake_case` or `kebab-case` contract/package name → `PascalCase`, used
 /// as the imported binding `Client` alias (e.g. `guess_the_number` →
 /// `GuessTheNumber`).
@@ -1480,8 +1487,20 @@ async fn fetch_contract_spec(
 // }
 
 #[cfg(test)]
-mod name_tests {
-    use super::{to_camel_case, to_pascal_case};
+mod tests {
+    use super::{binding_targets, to_camel_case, to_pascal_case};
+
+    #[test]
+    fn binding_target_matches_the_contract_id_field() {
+        let id = "CBXH2G4SOWFSN5HUUJHKG34MZKMPQNL3QGZEBJLMEDINSZYJ5V3P64LH";
+        let source = format!("  local: {{\n    contractId: \"{id}\",\n  }}");
+        assert!(binding_targets(&source, id));
+        assert!(!binding_targets(&format!("// see {id}"), id));
+        assert!(!binding_targets(
+            &source,
+            "CDLZFC3SYJYDZT7K67VZ75HPJVIEUVNIXF47ZG2FB2RMQQVU2HHGCYSC"
+        ));
+    }
 
     #[test]
     fn export_names_handle_snake_and_kebab_case() {
