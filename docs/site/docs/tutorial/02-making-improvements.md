@@ -17,23 +17,25 @@ By the end of this step, you'll have:
 
 ## 🪲 Let's break the app!
 
-To understand the bug in our code, let's trigger it. We'll do this by making a small change in `environments.toml`. On our way to finding the line we need to change, we'll learn more about how `environments.toml` works.
+To understand the bug in our code, let's trigger it. We'll do this by making a small change in `scaffold.yml`. On our way to finding the line we need to change, we'll learn more about how `scaffold.yml` works.
 
-Open up `environments.toml` in your editor. Put it side-by-side with the output from `npm run dev`. We'll walk through it bit by bit.
+Open up `scaffold.yml` in your editor. Put it side-by-side with the output from `npm run dev`. We'll walk through it bit by bit.
 
 ### 1. The Network
 
-At the top, you'll see settings for the development network:
+Under `networks:`, you'll see settings for the local network:
 
-````toml
-```toml
-[development.network]
-rpc-url = "http://localhost:8000/rpc"
-network-passphrase = "Standalone Network ; February 2017"
-run-locally = true
-````
+```yaml
+networks:
+  local:
+    accounts: [me]
+```
 
-Every Stellar network is identified by a `network-passphrase`; it's like the fingerprint of the network and helps keep transactions cryptographically secure between networks. And you connect to any given Stellar network via a configurable `rpc-url`. If you look at the rest of `environments.toml`, every environment's network requires these settings. For our development environment, we also want to run the network locally. `run-locally` tells Scaffold CLI to use _Stellar_ CLI to run a local network container (`stellar container start`) and wait for it to finish startup before moving on to parse the rest of the `development` settings.
+That doesn't look like much! Every Stellar network is identified by a _network passphrase_; it's like the fingerprint of the network and helps keep transactions cryptographically secure between networks. And you connect to any given Stellar network via an _RPC URL_. Because `local` is one of the network names Stellar CLI already knows (along with `testnet`, `futurenet` and `mainnet`), Scaffold fills in both for us. For a network with a name of your own, you'd set them yourself with `rpc-url` and `network-passphrase`.
+
+Scaffold also notices that `local` uses the local (standalone) passphrase, so it uses _Stellar_ CLI to run a local network container (`stellar container start`) and waits for it to finish startup before moving on.
+
+Which network does `npm run dev` use? Look in `.env`: `STELLAR_NETWORK=local`. You could also pass `--network <name>` to `stellar scaffold watch`.
 
 These settings correspond to the following `npm run dev` output:
 
@@ -45,21 +47,12 @@ These settings correspond to the following `npm run dev` output:
 
 ### 2. The Accounts
 
-Next you'll see this:
+That `accounts: [me]` line is a [YAML list](https://yaml.org/spec/1.2.2/#flow-sequences) with one entry. It tells Scaffold CLI to use Stellar CLI to generate a keypair for an account named "me" (`stellar keys generate me`) and fund it. Because it's the first account in the list, it also signs every deploy that doesn't say otherwise.
 
-```toml
-[[development.accounts]]
-name = "me"
-default = true
-```
+If you wanted another named account/keypair to use throughout the rest of `scaffold.yml`, you could add it to the list:
 
-The double brackets, `[[ ... ]]`, are one way to [make an array in toml](https://toml.io/en/v1.0.0-rc.2#array-of-tables). The snippet above tells Scaffold CLI to use Stellar CLI to generate a keypair for an account named "me" (`stellar keys generate me`) and set this account as the default for all transactions to follow.
-
-If you wanted to create another named account/keypair to use throughout the rest of `environments.toml`, you could do so by adding another `[[development.accounts]]` block:
-
-```toml
-[[development.accounts]]
-name = "alice"
+```yaml
+accounts: [me, alice]
 ```
 
 If you look at the `npm run dev` output again, this is the corresponding output:
@@ -74,43 +67,46 @@ On subsequent runs, the key will already exist and the account will already be f
 
 ### 3. The Contracts (aka "The Contract Clients")
 
-This is what it's all about! You can think of everything in `environments.toml` as existing to configure contract clients.
+This is what it's all about! You can think of everything in `scaffold.yml` as existing to configure contract clients.
 
-Here's what that means: your frontend app relies on contracts. Depending on which version of your frontend you are using, those contracts will live on different networks. When you're working in your development environment, you probably want to use the local network (as configured in Stellar Scaffold by default). When you are ready to share an early, staging build of your app with others, you will probably use contracts deployed on Stellar's testnet. When you deploy your production app, you will make calls to mainnet contracts.
+Here's what that means: your frontend app relies on contracts. Depending on which version of your frontend you are using, those contracts will live on different networks. When you're developing, you probably want to use the local network (as configured in Stellar Scaffold by default). When you are ready to share an early build of your app with others, you will probably use contracts deployed on Stellar's testnet. When you deploy your production app, you will make calls to mainnet contracts.
 
-Stellar Scaffold encourages you to build separate versions of your frontend for each of these environments. And for each, you specify the contracts you rely on.
+Stellar Scaffold encourages you to build separate versions of your frontend for each of these networks. And for each, you specify the contracts you rely on.
 
 :::tip But wait. Isn't the behavior of a given contract the same across different networks? 🤔🤔🤔
 
-If you think about the lifecycle of a contract like our Guess The Number game, you might imagine finalizing the contract, then deploying the exact same contract to your local network, to testnet, and even eventually to mainnet. Why does Stellar Scaffold and `environments.toml` make you specify the contract for each? Why does it rebuild the contract clients for each, as if they might be entirely different? Couldn't we just generate the contract client once, and then change the RPC URL and Network Passphrase that the client gets instantiated with? Same _behavior_, different networks & contracts?
+If you think about the lifecycle of a contract like our Guess The Number game, you might imagine finalizing the contract, then deploying the exact same contract to your local network, to testnet, and even eventually to mainnet. Why does Stellar Scaffold make you list the networks for each contract? Why does it rebuild the contract clients for each, as if they might be entirely different? Couldn't we just generate the contract client once, and then change the RPC URL and Network Passphrase that the client gets instantiated with? Same _behavior_, different networks & contracts?
 
-In theory, this sounds reasonable. In practice, contracts rarely have the same exact implementation across different networks. Your local contract will have all the latest changes; it will be like your `main` branch or a nightly build. Messy, fast-paced, experimental. Your staging contract will be like a `beta` release—it will have stuff you haven't yet pushed to your main app. And even more, you could add feature flags to permanently ship different versions of your contract to staging and mainnet. Imagine a contract that adds admin backdoors in staging, but strips them out in production.
+In theory, this sounds reasonable. In practice, contracts rarely have the same exact implementation across different networks. Your local contract will have all the latest changes; it will be like your `main` branch or a nightly build. Messy, fast-paced, experimental. Your testnet contract will be like a `beta` release—it will have stuff you haven't yet pushed to your main app. And even more, you could add feature flags to permanently ship different versions of your contract to testnet and mainnet. Imagine a contract that adds admin backdoors on testnet, but strips them out on mainnet.
 
-Stellar Scaffold wants to help you avoid bugs in all these situations. The contract clients are rebuilt for each environment, and they're built _in strict TypeScript_. So if you worked locally on a cool new feature with a smart contract method `my_cool_new_method`, and your frontend makes unguarded calls to this, then your frontend build for staging and production will fail, because those contracts don't implement `my_cool_new_method`.
+Stellar Scaffold wants to help you avoid bugs in all these situations. The contract clients are rebuilt for each network, and they're built _in strict TypeScript_. So if you worked locally on a cool new feature with a smart contract method `my_cool_new_method`, and your frontend makes unguarded calls to this, then your frontend build for testnet and mainnet will fail, because those contracts don't implement `my_cool_new_method`.
 
 :::
 
-For staging and production, these must be live, deployed contracts. But in development, you are likely working on your contracts at the same time as your frontend! So the `development.contracts` handling has some allowances, some superpowers, that `staging.contracts` and `production.contracts` lack. Let's see:
+On public networks like mainnet, these will usually be live contracts you deployed and reviewed separately. But locally, you are likely working on your contracts at the same time as your frontend! So Scaffold will build and deploy them for you, with some extra settings for doing so. Let's see:
 
-```toml
-[development.contracts.guess_the_number]
-client = true
-
-constructor_args = """
---admin me
-"""
-
-after_deploy = """
-reset
-"""
+```yaml
+contracts:
+  guess-the-number:
+    type: workspace
+    source: guess-the-number
+    args:
+      admin: ${account.me}
+    after-deploy: [reset]
+    networks:
+      local:
+      testnet:
+        args:
+          admin: ${account.testnet-user}
 ```
-
-This is a [Toml table](https://toml.io/en/v1.0.0-rc.2#table). See the TOML spec for other ways you could specify the same information.
 
 Let's walk through this line by line:
 
-- `[development.contracts.guess_the_number]`: this project only has one contract, so we can specify the settings for its contract clients here. You could also have a `[development.contracts]` with a more JSON-like specification for `guess_the_number` (`guess_the_number = { client = true, … }`).
-- `guess_the_number`: this name must match the name of the contract specified in its `Cargo.toml` file, but in underscore-case. Compare it to the `name` field in `contracts/guess-the-number/Cargo.toml` and the generated Wasm files (`ls target/wasm32v1-none/release/*.wasm`).
+- `guess-the-number:`: the name of the contract _client_. It's what you'll import in your frontend, converted to camelCase: `guessTheNumber`. It can be anything you like.
+
+- `type: workspace`: says this contract lives in our own `contracts/` directory, so Scaffold should build it, deploy it, and generate a client for it. Other types point at contracts that are already deployed, like `type: contract` with a contract ID.
+
+- `source: guess-the-number`: which crate to build. This must match the `name` field in `contracts/guess-the-number/Cargo.toml`.
 
   The `npm run dev` output that corresponds to this came out right at the top:
 
@@ -118,18 +114,16 @@ Let's walk through this line by line:
   [0] ℹ️ Watching …/guessing-game-tutorial/contracts/guess-the-number
   ```
 
-- `client = true`: this tells Scaffold CLI to generate a contract client for this contract.
-
-  This results in the `npm run dev` output:
+  Scaffold always generates a client for every contract listed here. This results in the `npm run dev` output:
 
   ```
-  [0] ℹ️ Binding "guess_the_number" contract
-  [0] ✅ 'npm run build' succeeded in …/guessing-game-tutorial/target/packages/guess_the_number
+  [0] ℹ️ Binding "guess-the-number" contract
+  [0] ✅ 'npm run build' succeeded in …/guessing-game-tutorial/app-lib/clients/guess-the-number
   ```
 
   The contract _client_ also gets called the "TS (or TypeScript) Bindings" for the contract, because they are generated with the Stellar CLI command `stellar contract bindings typescript`.
 
-- `constructor_args`: the contract has a `constructor`, as we saw in the previous step. This `constructor_args` setting specifies the arguments to use when deploying & initializing the contract. You could deploy the contract yourself with:
+- `args`: the contract has a `constructor`, as we saw in the previous step. This `args` setting specifies the arguments to use when deploying & initializing the contract, by parameter name. `${account.me}` means "the address of the `me` account". You could deploy the contract yourself with:
 
   ```bash
   stellar contract deploy \
@@ -139,14 +133,14 @@ Let's walk through this line by line:
       --admin me
   ```
 
-  As you can see, the `constructor_args` get passed directly along to this `stellar contract deploy` command.
+  As you can see, each entry in `args` becomes a `--name value` pair after the `--` of this `stellar contract deploy` command.
 
-  `client = true` and the `constructor_args` settings together resulted in this `npm run dev` output:
+  The `args` settings resulted in this `npm run dev` output:
 
   ```
-  [0] ℹ️ Installing "guess_the_number" wasm bytecode on-chain...
+  [0] ℹ️ Installing "guess-the-number" wasm bytecode on-chain...
   [0] ℹ️   ↳ hash: d801a98511519b2e9d4f2fadffc4215fc81f91426381dbdb328d10252e8298ac
-  [0] ℹ️ Instantiating "guess_the_number" smart contract
+  [0] ℹ️ Instantiating "guess-the-number" smart contract
   [0] ℹ️   ↳ contract_id: CCMMU6UYIPGSBR7ZP4DTQEEOQDHL3PJ52ZD7FJIFG4O46Q3QPVGVHAAV
   ```
 
@@ -154,36 +148,36 @@ Let's walk through this line by line:
   1.  The Wasm gets uploaded to the blockchain, so that many contracts could use it.
   2.  A contract gets deployed (aka "instantiated", in the current parlance of this output) so that there is an actual smart contract that refers to, or points to, that Wasm.
 
-- `after_deploy`: method calls to make to the contract after it gets deployed. Kind of like the `constructor_args`, but, these are specified using _only_ the part that comes after the `--`. The setting above tells Scaffold CLI to make call the `reset` method, after deploying the contract:
+- `after-deploy`: a list of contract methods to call, with no arguments, right after the contract gets deployed. The setting above tells Scaffold CLI to call the `reset` method, after deploying the contract:
 
   ```bash
-  stellar contract deploy \
-      --id guess_the_number
-      --source me
+  stellar contract invoke \
+      --id guess-the-number \
+      --source me \
       -- \
       reset
   ```
 
-  This `after_deploy` script produces this `npm run dev` output:
+  This `after-deploy` setting produces this `npm run dev` output:
 
   ```
-  [0] ℹ️ Running after_deploy script for "guess_the_number"
-  [0] ℹ️   ↳ Executing: stellar contract invoke --id CCMMU6UYIPGSBR7ZP4DTQEEOQDHL3PJ52ZD7FJIFG4O46Q3QPVGVHAAV --config-dir /Users/chadoh/code/scast/frontend -- reset
-  [0] ℹ️   ↳ Result: Res("")
+  [0] ℹ️   ↳ Calling reset on "guess-the-number"
+  [0] ✅ After deploy calls for "guess-the-number" completed
   ```
+
+- `networks`: the networks this contract exists on. A contract only exists on the networks it lists, so if you built for a network that isn't here, Scaffold would skip it and your frontend wouldn't get a `guessTheNumber` client at all. Entries here can also override the settings above for one network: on `testnet`, the `admin` is a testnet account instead, because accounts belong to a network.
+
+Want to see exactly what Scaffold will use for a network, with all the defaults filled in? Run `stellar scaffold config show --network local`.
 
 ### Let's break it already!
 
-That's it! That last line! That's how we break things. Go ahead and remove the `after_deploy` script entirely.
+That's it! That `after-deploy` line! That's how we break things. Go ahead and remove it entirely.
 
 ```diff
- constructor_args = """
- --admin me
- """
--
--after_deploy = """
--reset
--"""
+     args:
+       admin: ${account.me}
+-    after-deploy: [reset]
+     networks:
 ```
 
 Can you guess what will happen?
@@ -200,7 +194,7 @@ To get a fresh deployment, clear the artifacts Stellar Scaffold is tracking — 
 stellar scaffold clean
 ```
 
-Re-run `npm run dev` and you'll see it churn through re-deploying the contract. This time you won't see the output about running the `after_deploy` script.
+Re-run `npm run dev` and you'll see it churn through re-deploying the contract. This time you won't see the output about the after-deploy calls.
 
 Now you can trigger the bug in two exciting ways!
 
@@ -291,12 +285,12 @@ Much cleaner! The logic is now centralized in our helper function. Note that thi
 $ npm run dev
 ```
 
-Click over to the Debugger if you're not there already and select the `guess_the_number` contract. You'll see that `reset` is listed here, but `set_random_number` is not.
+Click over to the Debugger if you're not there already and select the `guess-the-number` contract. You'll see that `reset` is listed here, but `set_random_number` is not.
 
 Our `reset` method is available to be called by code _outside_ our contract because we opted in to it being a public method with the `pub` keyword. Our `set_random_number` is private by default, it's not visible to the outside world. It's not listed in the Contract Explorer. It's not listed in the CLI help either:
 
 ```bash
-$ stellar contract invoke --id guess_the_number --source me --network local -- help
+$ stellar contract invoke --id guess-the-number --source me --network local -- help
 Commands:
   reset    Update the number. Only callable by admin.
   guess    Guess a number between 1 and 10
@@ -307,7 +301,7 @@ Commands:
 It would error if you tried to invoke it:
 
 ```bash
-$ stellar contract invoke --id guess_the_number --source me --network local -- set_random_number
+$ stellar contract invoke --id guess-the-number --source me --network local -- set_random_number
 error: unrecognized subcommand 'set_random_number'
 ```
 
@@ -324,7 +318,7 @@ $ stellar keys generate bob --network local --fund
 ✅ Key saved with alias bob in ".config/stellar/identity/bob.toml"
 ✅ Account bob funded on "Standalone Network ; February 2017"
 
-$ stellar contract invoke --id guess_the_number --source bob --network local -- reset
+$ stellar contract invoke --id guess-the-number --source bob --network local -- reset
 ❌ error: Missing signing key for account GDAQWVA6REGN47BBCFY6SGQ4YTIGMDZZFHDOVUZXMVRAAT6OEZGCACGH
 ```
 
@@ -472,11 +466,11 @@ _🏗️✨ Coming soon._
 
 In this step, we covered several important concepts:
 
-1. `environments.toml` structure
+1. `scaffold.yml` structure
 
-- **network**: Configure which network each enviroment connects to, and automatically run a local node
-- **accounts**: Create account keypairs for an environment
-- **contracts**: Specify "contract dependencies," for which to build contract clients, for each environment. In `development`, Scaffold CLI will also automatically build & deploy the contracts, too, with an optional `after_deploy` script
+- **networks**: Configure the networks your app runs on, and automatically run a local node
+- **accounts**: Create account keypairs for each network
+- **contracts**: Specify "contract dependencies," for which to build contract clients, and which networks each one exists on. For `type: workspace` contracts, Scaffold CLI will also automatically build & deploy them, with constructor `args` and optional `after-deploy` calls
 
 2. Code Organization
    - **Private functions**: Help organize code and prevent external access to internal logic

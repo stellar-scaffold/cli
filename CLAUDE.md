@@ -65,7 +65,8 @@ Clippy and warning flags are configured in `.cargo/config.toml` `rustflags` and 
 `init` → `build` → `generate` → `watch`
 - `init` — scaffolds a new project; fetches the frontend template from `stellar-scaffold/ui` via degit
 - `upgrade` — converts an existing Soroban workspace into a full scaffold project
-- `build` — builds contracts and generates TypeScript clients based on `environments.toml`
+- `build` — builds contracts and generates TypeScript clients based on `scaffold.yml` (version 2: networks, accounts, contracts); version 1 projects still fall back to `environments.toml`
+- `config check` / `config show` — validate `scaffold.yml` and print the resolved config for one network
 - `generate contract` — adds a new contract to an existing project
 - `watch` — rebuilds on changes
 

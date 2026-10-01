@@ -105,21 +105,19 @@ After scaffolding a project, your folder structure will look like this:
 ```
 my-project/
 ├── contracts/            # Rust smart contracts (compiled to WASM)
-├── packages/             # Auto-generated TypeScript contract clients
-├── src/                  # React frontend code
-│   ├── components/       # Reusable UI pieces
-│   ├── contracts/        # Contract interaction logic
-│   ├── App.tsx           # Main app component
-│   └── main.tsx          # Entry point
-├── environments.toml     # Configuration per environment (dev/test/prod)
+├── app/                  # Your frontend
+│   └── src/              # Components, pages, hooks, entry point
+├── app-lib/              # Utility code, ready to use from your app
+│   └── clients/          # Generated contract clients — regenerated, don't edit
+├── scaffold.yml          # Networks, accounts, and contracts
 ├── .env                  # Local environment variables
-├── package.json          # Frontend packages
+├── package.json          # npm workspace root
 ├── target/               # Build outputs
 ```
 
 This template provides a ready-to-use frontend application with example smart contracts and their TypeScript clients. You can use these as reference while building your own contracts and UI. The frontend is set up with `Vite`, `React`, and includes basic components for interacting with the contracts.
 
-See the [CLI Documentation](https://scaffoldstellar.com/docs/cli) for detailed command information and the [Environments Guide](https://scaffoldstellar.com/docs/environments) for configuration details.
+See the [CLI Documentation](https://scaffoldstellar.com/docs/cli) for detailed command information and the [Configuration Guide](https://scaffoldstellar.com/docs/environments) for configuration details.
 
 ---
 
@@ -150,15 +148,13 @@ Scaffold Stellar's build pipeline supports extensions by calling binaries on you
 
 The built-in **[Scaffold Reporter](./crates/stellar-scaffold-reporter/)** extension is included in every new project. It logs compile times, WASM sizes, deploy durations, and total build cycle time directly to your console.
 
-Register extensions in `environments.toml`:
+Register extensions in `scaffold.yml`:
 
-```toml
-[development]
-extensions = ["reporter"]
-
-# Optional per-extension config:
-[development.ext.reporter]
-warn_size_kb = 128
+```yaml
+extensions:
+  reporter:
+    # Optional per-extension config
+    warn_size_kb: 128
 ```
 
 See the [Extensions Guide](https://scaffoldstellar.com/docs/extensions) to learn how the hook system works and how to build your own extension.
@@ -207,7 +203,7 @@ After installation, you can interact with the contract using `stellar-cli`:
 stellar contract invoke --id my-contract-instance -- --help
 ```
 
-> You can deploy to testnet or mainnet depending on your `.env` and `environments.toml`.
+> You can deploy to testnet or mainnet depending on the network you select in `.env` (`STELLAR_NETWORK`) and `scaffold.yml`.
 
 ---
 ## Concept: What Is the Contract Registry?
@@ -239,7 +235,7 @@ Your repo contains the following key folders:
 
 ## Documentation
 * [CLI Commands](https://scaffoldstellar.com/docs/cli)
-* [Environment Setup](https://scaffoldstellar.com/docs/environments)
+* [Configuration](https://scaffoldstellar.com/docs/environments)
 * [Registry Guide](https://scaffoldstellar.com/docs/registry)
 
 ---

@@ -72,7 +72,7 @@ ProjectContext  ──  pre-dev, post-dev  (aggregates all contracts)
 
 #### `config` field
 
-Every context type carries the extension's own configuration from `environments.toml`. Where it lives depends on the hook:
+Every context type carries the extension's own configuration from the `extensions:` section of `scaffold.yml` (or from `environments.toml` in projects that still use it). Where it lives depends on the hook:
 
 | Hook group | Access path |
 |---|---|
@@ -81,7 +81,7 @@ Every context type carries the extension's own configuration from `environments.
 | pre/post-codegen | `ctx.deploy.compile.config` |
 | pre/post-dev | `ctx.config` |
 
-The field is typed `Option<serde_json::Value>`. When no config is provided it is `None` and is absent from the JSON entirely (`#[serde(skip_serializing_if = "Option::is_none")]`). Scaffold always injects the real value from `environments.toml` when config is present.
+The field is typed `Option<serde_json::Value>`. When no config is provided it is `None` and is absent from the JSON entirely (`#[serde(skip_serializing_if = "Option::is_none")]`). Scaffold always injects the real value from the project's config when it is present.
 
 ---
 

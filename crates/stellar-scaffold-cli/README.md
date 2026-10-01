@@ -4,7 +4,7 @@ CLI toolkit for Stellar smart contract development, providing project scaffoldin
 
 Stellar Scaffold CLI comes with four main commands:
 
-* `stellar scaffold init` - Creates a new Stellar smart contract project with best practices and configurations in place, including an `environments.toml` file for managing network settings, accounts, and contracts across different environments.
+* `stellar scaffold init` - Creates a new Stellar smart contract project with best practices and configurations in place, including a `scaffold.yml` file for managing networks, accounts, and contracts.
 
 * `stellar scaffold upgrade` - Transforms an existing Soroban workspace into a full scaffold project by adding frontend components, environment configurations, and project structure. Preserves existing contracts while adding the complete development toolkit.
 
@@ -12,9 +12,9 @@ Stellar Scaffold CLI comes with four main commands:
   * Build smart contracts with metadata and handle dependencies
   * Generate TypeScript client packages for frontend integration
   
-  The build process respects environment configurations from `environments.toml` and handles contract deployment states based on the current environment (controlled via `STELLAR_SCAFFOLD_ENV`).
+  The build process follows the configuration in `scaffold.yml` and handles contract deployment states for the selected network (chosen with `--network` or `STELLAR_NETWORK`).
 
-* `stellar scaffold watch` - Development mode that monitors contract source files and `environments.toml` for changes, automatically rebuilding as needed. Defaults to using the `development` environment.
+* `stellar scaffold watch` - Development mode that monitors contract source files and `scaffold.yml` for changes, automatically rebuilding as needed. Uses the same network selection as `build`, falling back to `local`.
 
 ## Getting Started
 
@@ -52,7 +52,7 @@ stellar scaffold upgrade
 
 This will:
 - Add the frontend application and development tools
-- Generate `environments.toml` with your existing contracts
+- Generate `environments.toml` (the legacy config format) with your existing contracts
 - Set up environment files and configurations
 - Preserve all your existing contract code and structure
 
@@ -66,40 +66,49 @@ cp .env.example .env
 stellar scaffold watch --build-clients
 ```
 
-## Environment Configuration
+## Configuration
 
-Projects use `environments.toml` to define network settings, accounts, and contract configurations for different environments. Example:
-```toml
-[development]
-network = { 
-    name = "local",
-    run_locally = true
-}
-accounts = ["account1", "account2"]
+Projects use `scaffold.yml` to define networks, accounts, and the contracts to deploy or connect to on each network. Example:
+```yaml
+version: 2
 
-[staging]
-network = { 
-    name = "testnet"
-}
+networks:
+  local:
+    accounts: [me]
+  testnet:
+    accounts: [testnet-user]
+    allow-deploy: true
 
-[production]
-network = { 
-    name = "mainnet"
-}
+contracts:
+  guess-the-number:
+    type: workspace
+    source: guess-the-number
+    args:
+      admin: ${account.me}
+    after-deploy: [reset]
+    networks:
+      local:
+      testnet:
+        args:
+          admin: ${account.testnet-user}
 ```
+
+Validate it with `stellar scaffold config check`, and print the resolved config for one network with `stellar scaffold config show --network <name>`. See the [Configuration Guide](https://scaffoldstellar.com/docs/environments) for every option.
+
+Projects created before version 2 keep this configuration in `environments.toml`, selected with `STELLAR_SCAFFOLD_ENV`. `build` and `watch` still read it.
 
 ## Build Process Details
 
 `stellar scaffold build` and `stellar scaffold watch` manage:
 
-1. Smart contract compilation and deployment based on environment
+1. Smart contract compilation and deployment to the selected network
 2. TypeScript client package generation for frontend integration
 3. Network and account management (create/fund accounts in development)
-4. Contract initialization via constructor args and post-deploy scripts
+4. Contract initialization via constructor `args` and `after-deploy` calls
 
 The build process ensures:
 - Correct dependency resolution and build order
-- Environment-specific contract deployments
+- Network-specific contract deployments
 - TypeScript client generation for frontend integration
 - Contract state verification and updates
 
@@ -120,14 +129,12 @@ repository = "https://github.com/your-org/your-project"
 
 ## Environment Variables
 
-- `STELLAR_SCAFFOLD_ENV`: Sets current environment (development/staging/production)
-- `STELLAR_ACCOUNT`: Default account for transactions
-- `STELLAR_RPC_URL`: RPC endpoint URL
-- `STELLAR_NETWORK_PASSPHRASE`: Network passphrase
+- `STELLAR_NETWORK`: Network from `scaffold.yml` to build for, same as `--network`
+- `STELLAR_SCAFFOLD_ENV`: Environment to build for in projects still on `environments.toml` (development/testing/staging/production). Ignored with a version 2 `scaffold.yml`
 
 ## For More Information
 
 See the full documentation:
 - [CLI Commands Guide](https://scaffoldstellar.com/docs/cli)
-- [Environment Configuration](https://scaffoldstellar.com/docs/environments)
+- [Configuration](https://scaffoldstellar.com/docs/environments)
 - [Deployment Guide](https://scaffoldstellar.com/docs/deploy)

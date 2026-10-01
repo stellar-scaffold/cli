@@ -91,8 +91,7 @@ my-project/
 │   ├── wallet.ts         # Wallet connection
 │   └── ...               # Network config, storage, formatting helpers
 ├── e2e/                  # End-to-end tests
-├── environments.toml     # Networks, accounts, and contracts per environment
-├── scaffold.yml          # CLI configuration
+├── scaffold.yml          # Networks, accounts, and contracts
 ├── .env                  # Local environment variables
 ├── Cargo.toml            # Rust workspace
 ├── package.json          # npm workspace root
@@ -110,7 +109,7 @@ The one exception is `app-lib/clients/`, which is generated.
 Every time your contracts build or redeploy, Stellar Scaffold rewrites `app-lib/clients/` to match them. Treat it as build output:
 
 - `app-lib/clients/<name>/` — one package per contract: a type-safe interface with every method, argument, and return type taken from the contract itself.
-- `app-lib/clients/index.ts` — connects each of those to your current environment's network and deployed address, and exports one ready-to-call object per contract.
+- `app-lib/clients/index.ts` — connects each of those to the selected network and its deployed address, and exports one ready-to-call object per contract.
 
 That means your components never hold a contract address or an RPC URL. They import a name and call a method:
 
@@ -120,11 +119,11 @@ import { guessTheNumber } from "@stellar-scaffold/app-lib/clients";
 const { result } = await guessTheNumber.get_prize();
 ```
 
-Switching environments — local to testnet, say — changes what those objects point at, with no change to your code.
+Switching networks — local to testnet, say — changes what those objects point at, with no change to your code.
 
 Because the directory is rewritten on every build, edits inside it are lost. To customize how a contract is called, wrap it in your own module under `app/` and import that instead.
 
-See the [CLI Documentation](./cli.md) for detailed command information and the [Environments Guide](./environments.md) for configuration details.
+See the [CLI Documentation](./cli.md) for detailed command information and the [Configuration Guide](./environments.md) for configuring networks, accounts, and contracts in `scaffold.yml`.
 
 ---
 
@@ -204,6 +203,6 @@ After installation, you can interact with the contract using `stellar-cli`:
 stellar contract invoke --id my-contract-instance -- --help
 ```
 
-> You can deploy to testnet or mainnet depending on your `.env` and `environments.toml`. Names are normalized (underscores → hyphens, lowercase).
+> You can deploy to testnet or mainnet depending on the network you select in `.env` (`STELLAR_NETWORK`) and `scaffold.yml`. Names are normalized (underscores → hyphens, lowercase).
 
 Happy hacking!
