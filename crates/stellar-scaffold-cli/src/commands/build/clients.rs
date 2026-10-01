@@ -6,6 +6,7 @@ use crate::commands::build::clients::Error::UpgradeArgsError;
 use crate::commands::build::env_toml::{self, Environment};
 use crate::commands::build::scaffold_yml::ScaffoldConfig;
 use crate::commands::{PackageManager, PackageManagerSpec};
+use crate::config::source::same_crate;
 use crate::extension::{self, ResolvedExtension};
 use indexmap::IndexMap;
 use regex::Regex;
@@ -69,6 +70,14 @@ impl std::fmt::Display for ScaffoldEnv {
 pub struct Args {
     #[arg(env = "STELLAR_SCAFFOLD_ENV", value_enum)]
     pub env: Option<ScaffoldEnv>,
+    /// Network to build for, as named under `networks:` in a version 2
+    /// scaffold.yml. Defaults to stellar-cli's `stellar network use`
+    /// setting, then `local`. Ignored by projects using environments.toml.
+    #[arg(long, env = crate::config::NETWORK_ENV)]
+    pub network: Option<String>,
+    /// Resolved version 2 config, prepared by `build` before compiling.
+    #[arg(skip)]
+    pub plan: Option<Environment>,
     #[arg(skip)]
     pub workspace_root: Option<std::path::PathBuf>,
     /// Directory where wasm files are located
@@ -156,6 +165,10 @@ pub enum Error {
     Strkey(#[from] stellar_strkey::DecodeError),
     #[error("Missing Workspace")]
     MissingWorkspace,
+    #[error(
+        "⛔ ️account {0:?} does not exist; Scaffold never creates mainnet keys. Add it with `stellar keys add {0}`"
+    )]
+    MissingMainnetAccount(String),
 }
 
 pub struct Builder {
@@ -171,6 +184,9 @@ pub struct Builder {
     extensions: Vec<ResolvedExtension>,
     compile_ctx: Option<CompileContext>,
     scaffold_config: ScaffoldConfig,
+    /// Name reported to extensions as the environment: the `ScaffoldEnv`
+    /// for environments.toml projects, the network name for version 2.
+    env_label: String,
 }
 
 impl Builder {
@@ -193,6 +209,7 @@ impl Builder {
             global_args,
             network,
             source_account,
+            env_label: scaffold_env.to_string(),
             scaffold_env,
             workspace_root,
             out_dir,
@@ -256,7 +273,7 @@ impl Builder {
             CompileContext {
                 config: None,
                 project_root: self.workspace_root.clone(),
-                env: self.scaffold_env.to_string(),
+                env: self.env_label.clone(),
                 wasm_out_dir: stellar_build::deps::stellar_wasm_out_dir(&target),
                 source_dirs: vec![],
                 wasm_paths: std::collections::BTreeMap::new(),
@@ -401,6 +418,17 @@ impl Builder {
             if let Some(contracts) = self.env.contracts.as_ref()
                 && let Some(contract) = contracts.get(name.as_str())
                 && !contract.client
+            {
+                continue;
+            }
+            // Version 2 exports exactly the contracts listed for this network;
+            // a client left on disk by an earlier config is ignored.
+            if self.env.from_scaffold_yml
+                && !self
+                    .env
+                    .contracts
+                    .as_ref()
+                    .is_some_and(|contracts| contracts.contains_key(name.as_str()))
             {
                 continue;
             }
@@ -600,6 +628,17 @@ impl Builder {
 
         let config = self.get_config_locator();
         let args = &self.global_args;
+        // Never create keys for mainnet: a generated key would hold nothing
+        // and nobody would have backed it up.
+        if self.env.from_scaffold_yml && network.network_passphrase == network::passphrase::MAINNET
+        {
+            for account in accounts {
+                if config.read_identity(&account.name).is_err() {
+                    return Err(Error::MissingMainnetAccount(account.name.clone()));
+                }
+            }
+            return Ok(());
+        }
         for account in accounts {
             printer.infoln(format!("Creating keys for {:?}", account.name));
             // Use provided global args or create default
@@ -674,6 +713,66 @@ impl Builder {
         )
     }
 
+    /// Version 2: build exactly the contracts listed in `scaffold.yml`, in the
+    /// order written. Crates that aren't listed are compiled but not deployed.
+    async fn handle_listed_contracts(&self, package_names: &[String]) -> Result<(), Error> {
+        let printer = self.printer();
+        let Some(contracts) = self.env.contracts.as_ref() else {
+            return Ok(());
+        };
+        let listed: Vec<&str> = contracts
+            .values()
+            .filter_map(env_toml::Contract::crate_name)
+            .collect();
+        let unlisted: Vec<&str> = package_names
+            .iter()
+            .map(String::as_str)
+            .filter(|p| !listed.iter().any(|c| same_crate(p, c)))
+            .collect();
+        if !unlisted.is_empty() {
+            printer.infoln(format!(
+                "Not deploying {}: not listed under `contracts:` in {}",
+                unlisted.join(", "),
+                crate::config::CONFIG_FILE
+            ));
+        }
+
+        for (name, settings) in contracts {
+            // Skipped when this build compiled a subset, e.g. `--package`.
+            if settings
+                .crate_name()
+                .is_some_and(|c| !package_names.iter().any(|p| same_crate(p, c)))
+            {
+                continue;
+            }
+            if let Some(id) = &settings.id
+                && self.client_has_contract_id(name, id)
+            {
+                printer.checkln(format!("Client {name:?} is up to date"));
+                continue;
+            }
+            match self
+                .process_single_contract(name, settings.clone(), &self.network, self.scaffold_env)
+                .await
+            {
+                Ok(()) => printer.checkln(format!("Successfully generated client for: {name}")),
+                Err(e) => printer.errorln(format!("Failed to generate client for: {name}: {e}")),
+            }
+        }
+        Ok(())
+    }
+
+    /// Whether the generated client for `name` already targets `contract_id`,
+    /// so a referenced contract's client isn't regenerated on every build.
+    fn client_has_contract_id(&self, name: &str, contract_id: &str) -> bool {
+        let index = self
+            .workspace_root
+            .join(&self.scaffold_config.clients_dir)
+            .join(name)
+            .join("src/index.ts");
+        std::fs::read_to_string(index).is_ok_and(|s| s.contains(contract_id))
+    }
+
     async fn handle_production_contracts(
         &self,
         contracts: &IndexMap<Box<str>, env_toml::Contract>,
@@ -696,6 +795,9 @@ impl Builder {
         let printer = self.printer();
         if package_names.is_empty() {
             return Ok(());
+        }
+        if self.env.from_scaffold_yml {
+            return self.handle_listed_contracts(&package_names).await;
         }
         let contracts = self.env.contracts.as_ref();
         let network = &self.network;
@@ -738,7 +840,16 @@ impl Builder {
         Ok(())
     }
 
-    fn get_wasm_path(&self, contract_name: &str) -> std::path::PathBuf {
+    /// The built Wasm for a contract. Version 2 contracts name their crate;
+    /// Wasm files use the crate name with `-` replaced by `_`.
+    fn get_wasm_path(&self, name: &str) -> std::path::PathBuf {
+        let crate_name = self
+            .env
+            .contracts
+            .as_ref()
+            .and_then(|contracts| contracts.get(name)?.crate_name())
+            .map(|c| c.replace('-', "_"));
+        let contract_name = crate_name.as_deref().unwrap_or(name);
         // Check if out_dir was specified and use it, otherwise fall back to target directory
         if let Some(out_dir) = &self.out_dir {
             out_dir.join(format!("{contract_name}.wasm"))
@@ -801,6 +912,7 @@ impl Builder {
                                 &current_hash,
                                 &new_hash,
                                 network,
+                                settings.signer(),
                             )
                             .await?
                         {
@@ -834,7 +946,10 @@ impl Builder {
 
             // Run after_deploy script and save alias only when something changed on-chain.
             if deploy_kind != DeployKind::Unchanged {
-                if let Some(after_deploy) = settings.after_deploy.as_deref()
+                if let Some(resolved) = &settings.resolved {
+                    self.run_after_deploy_methods(name, &contract_id, resolved)
+                        .await?;
+                } else if let Some(after_deploy) = settings.after_deploy.as_deref()
                     && (env == ScaffoldEnv::Development || env == ScaffoldEnv::Testing)
                 {
                     printer.infoln(format!("Running after_deploy script for {name:?}"));
@@ -938,7 +1053,6 @@ impl Builder {
         hash: &str,
         settings: &env_toml::Contract,
     ) -> Result<Contract, Error> {
-        let source = self.source_account.to_string();
         let mut deploy_args = vec![
             format!("--alias={name}"),
             format!("--wasm-hash={hash}"),
@@ -948,23 +1062,24 @@ impl Builder {
                 .expect("we do not support non-utf8 paths")
                 .to_string(),
         ];
-        // The account that signs the deploy: a `STELLAR_ACCOUNT=` prefix in
-        // `constructor_args`, else the default.
-        let mut signer: Option<String> = None;
-        if let Some(constructor_script) = &settings.constructor_args {
-            let (source_account, mut args) = Self::parse_script_line(constructor_script)?;
-
-            if let Some(account) = source_account {
-                deploy_args.extend_from_slice(&["--source-account".to_string(), account.clone()]);
-                signer = Some(account);
-            } else {
-                deploy_args.extend_from_slice(&["--source".to_string(), source]);
-            }
-
-            deploy_args.push("--".to_string());
-            deploy_args.append(&mut args);
+        // The account that signs the deploy: a version 2 `signer`, or a
+        // `STELLAR_ACCOUNT=` prefix in `constructor_args`; else the default.
+        let (signer, constructor_args) = if let Some(resolved) = &settings.resolved {
+            (resolved.signer.clone(), resolved.constructor_args.clone())
+        } else if let Some(constructor_script) = &settings.constructor_args {
+            Self::parse_script_line(constructor_script)?
         } else {
-            deploy_args.extend_from_slice(&["--source".to_string(), source]);
+            (None, Vec::new())
+        };
+        let config = self.config_signed_by(signer.as_deref())?;
+        // Required by the parser; signing uses `config`.
+        deploy_args.extend([
+            "--source-account".to_string(),
+            config.source_account.to_string(),
+        ]);
+        if !constructor_args.is_empty() {
+            deploy_args.push("--".to_string());
+            deploy_args.extend(constructor_args);
         }
 
         let deploy_arg_refs: Vec<&str> = deploy_args
@@ -972,7 +1087,6 @@ impl Builder {
             .map(std::string::String::as_str)
             .collect();
         let deploy_cmd = cli::contract::deploy::wasm::Cmd::parse_arg_vec(&deploy_arg_refs)?;
-        let config = self.config_signed_by(signer.as_deref())?;
         let contract_id = deploy_cmd
             .execute(&config, self.global_args.quiet, self.global_args.no_cache)
             .await?
@@ -989,6 +1103,7 @@ impl Builder {
         existing_hash: &str,
         hash: &str,
         network: &network::Network,
+        signer: Option<&str>,
     ) -> Result<Option<Contract>, Error> {
         let printer = self.printer();
         let existing_spec = fetch_contract_spec(existing_hash, network).await?;
@@ -1003,7 +1118,9 @@ impl Builder {
         }
 
         let existing_contract_id_str = existing_contract_id.to_string();
-        let source = self.source_account.to_string();
+        let config = self.config_signed_by(signer)?;
+        // Required by the parser; signing uses `config`.
+        let source = config.source_account.to_string();
         let mut redeploy_args = vec![
             "--source",
             source.as_str(),
@@ -1023,11 +1140,7 @@ impl Builder {
             cli::contract::invoke::Cmd::parse_arg_vec(&redeploy_args)
         }?;
         invoke_cmd
-            .execute(
-                &self.config(),
-                self.global_args.quiet,
-                self.global_args.no_cache,
-            )
+            .execute(&config, self.global_args.quiet, self.global_args.no_cache)
             .await?
             .into_result()
             .expect("no result returned by 'contract invoke'");
@@ -1082,6 +1195,40 @@ impl Builder {
         }
     }
 
+    /// Version 2 `after-deploy`: invoke each method, with no arguments, as the
+    /// contract's signer.
+    async fn run_after_deploy_methods(
+        &self,
+        name: &str,
+        contract_id: &Contract,
+        resolved: &env_toml::ResolvedDeploy,
+    ) -> Result<(), Error> {
+        if resolved.after_deploy.is_empty() {
+            return Ok(());
+        }
+        let printer = self.printer();
+        let config = self.config_signed_by(resolved.signer.as_deref())?;
+        let signer = config.source_account.to_string();
+        let contract_id = contract_id.to_string();
+        for method in &resolved.after_deploy {
+            printer.infoln(format!("  ↳ Calling {method} on {name:?}"));
+            // `--source-account` is required by the parser; signing uses `config`.
+            let invoke_cmd = cli::contract::invoke::Cmd::parse_arg_vec(&[
+                "--id",
+                &contract_id,
+                "--source-account",
+                &signer,
+                "--",
+                method,
+            ])?;
+            invoke_cmd
+                .execute(&config, self.global_args.quiet, self.global_args.no_cache)
+                .await?;
+        }
+        printer.checkln(format!("After deploy calls for {name:?} completed"));
+        Ok(())
+    }
+
     async fn run_after_deploy_script(
         &self,
         name: &str,
@@ -1091,7 +1238,6 @@ impl Builder {
         let printer = self.printer();
         let config_dir_path = self.get_config_dir()?;
         let config_dir = config_dir_path.to_str().unwrap();
-        let source = self.source_account.to_string();
         for line in after_deploy_script.lines() {
             let line = line.trim();
             if line.is_empty() {
@@ -1099,15 +1245,20 @@ impl Builder {
             }
 
             let (source_account, command_parts) = Self::parse_script_line(line)?;
+            let config = self.config_signed_by(source_account.as_deref())?;
+            // Required by the parser and shown below; signing uses `config`.
+            let signer = config.source_account.to_string();
 
             let contract_id_arg = contract_id.to_string();
-            let mut args = vec!["--id", &contract_id_arg, "--config-dir", config_dir];
-            if let Some(account) = source_account.as_ref() {
-                args.extend_from_slice(&["--source-account", account]);
-            } else {
-                args.extend_from_slice(&["--source-account", source.as_str()]);
-            }
-            args.extend_from_slice(&["--"]);
+            let mut args = vec![
+                "--id",
+                &contract_id_arg,
+                "--config-dir",
+                config_dir,
+                "--source-account",
+                &signer,
+                "--",
+            ];
             args.extend(command_parts.iter().map(std::string::String::as_str));
 
             printer.infoln(format!(
@@ -1115,7 +1266,6 @@ impl Builder {
                 args.join(" ")
             ));
             let invoke_cmd = cli::contract::invoke::Cmd::parse_arg_vec(&args)?;
-            let config = self.config_signed_by(source_account.as_deref())?;
             let result = invoke_cmd
                 .execute(&config, self.global_args.quiet, self.global_args.no_cache)
                 .await?;
@@ -1138,11 +1288,22 @@ impl Args {
             .workspace_root
             .as_ref()
             .expect("workspace_root must be set before running");
-        let env = self.env.unwrap_or(ScaffoldEnv::Development);
         let global_args = self.global_args.clone().unwrap_or_default();
 
-        let Some(current_env) = env_toml::Environment::get(workspace_root, &env)? else {
+        // A version 2 plan is already the resolved environment; `env` only
+        // selects among environments.toml environments.
+        let env = self.env.unwrap_or(ScaffoldEnv::Development);
+        let current_env = if let Some(plan) = &self.plan {
+            plan.clone()
+        } else if let Some(current_env) = env_toml::Environment::get(workspace_root, &env)? {
+            current_env
+        } else {
             return Err(Error::MissingWorkspace);
+        };
+        let env_label = if current_env.from_scaffold_yml {
+            current_env.network.name.clone().unwrap_or_default()
+        } else {
+            env.to_string()
         };
         let network = to_network(&global_args, current_env.network.clone())?;
         self.printer()
@@ -1169,7 +1330,7 @@ impl Args {
 
         let scaffold_config = ScaffoldConfig::get(workspace_root);
 
-        let builder = Builder::new(
+        let mut builder = Builder::new(
             global_args,
             network,
             default_account.parse()?,
@@ -1182,6 +1343,7 @@ impl Args {
             self.compile_ctx.clone(),
             scaffold_config,
         );
+        builder.env_label = env_label;
         Ok(builder)
     }
 

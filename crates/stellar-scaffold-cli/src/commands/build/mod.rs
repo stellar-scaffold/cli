@@ -18,6 +18,7 @@ pub mod clients;
 pub mod docker;
 pub mod env_toml;
 pub mod scaffold_yml;
+pub mod v2;
 
 /// Build a contract from source
 ///
@@ -70,6 +71,31 @@ pub enum Error {
     DockerStart,
     #[error("package name is empty: {0}")]
     EmptyPackageName(Utf8PathBuf),
+    #[error(transparent)]
+    Config(#[from] v2::Error),
+}
+
+/// What a build reads from the project's config before compiling.
+struct Inputs {
+    /// The resolved version 2 config, when building clients from one.
+    plan: Option<env_toml::Environment>,
+    /// Extensions to run, in order.
+    extensions: Vec<env_toml::ExtensionEntry>,
+    /// What hooks see as `env`: the environment or network name.
+    env_label: String,
+}
+
+/// Start the local quickstart container if `network` runs locally.
+async fn start_container_if_local(network: &env_toml::Network) -> Result<(), Error> {
+    if !network.run_locally {
+        return Ok(());
+    }
+    docker::start_local_stellar(network.rpc_url.as_deref())
+        .await
+        .map_err(|e| {
+            eprintln!("Failed to start Stellar Docker container: {e:?}");
+            Error::DockerStart
+        })
 }
 
 impl Command {
@@ -83,15 +109,8 @@ impl Command {
         workspace_root: &Path,
         env: &ScaffoldEnv,
     ) -> Result<(), Error> {
-        if let Some(current_env) = env_toml::Environment::get(workspace_root, env)?
-            && current_env.network.run_locally
-        {
-            docker::start_local_stellar(current_env.network.rpc_url.as_deref())
-                .await
-                .map_err(|e| {
-                    eprintln!("Failed to start Stellar Docker container: {e:?}");
-                    Error::DockerStart
-                })?;
+        if let Some(current_env) = env_toml::Environment::get(workspace_root, env)? {
+            start_container_if_local(&current_env.network).await?;
         }
         Ok(())
     }
@@ -101,8 +120,10 @@ impl Command {
         let metadata = self.metadata()?;
         let packages = self.list_packages(&metadata)?;
         let workspace_root = metadata.workspace_root.as_std_path();
+        let is_v2 = v2::is_v2(workspace_root);
 
-        if let Some(env) = &self.build_clients_args.env
+        if !is_v2
+            && let Some(env) = &self.build_clients_args.env
             && env == &ScaffoldEnv::Development
         {
             printer.infoln("Starting local Stellar Docker container...");
@@ -120,17 +141,18 @@ impl Command {
 
         let target_dir = &metadata.target_directory;
 
-        // Discover extensions for the active environment
-        let scaffold_env = self
-            .build_clients_args
-            .env
-            .unwrap_or(ScaffoldEnv::Development);
-        let extensions = match env_toml::Environment::get(workspace_root, &scaffold_env)? {
-            Some(env_config) if !env_config.extensions.is_empty() => {
-                extension::discover(&env_config.extensions, &printer)
-            }
-            _ => vec![],
+        // Configuration for this build: a resolved plan for version 2
+        // projects, otherwise the selected environments.toml environment.
+        let Inputs {
+            plan,
+            extensions,
+            env_label,
+        } = if is_v2 {
+            self.v2_inputs(workspace_root, &metadata, &printer).await?
+        } else {
+            self.v1_inputs(workspace_root)?
         };
+        let extensions = extension::discover(&extensions, &printer);
         // Build pre-compile context (wasm_paths is empty before compilation).
         let wasm_out_dir =
             self.build.out_dir.clone().unwrap_or_else(|| {
@@ -144,7 +166,7 @@ impl Command {
         let pre_compile_ctx = CompileContext {
             config: None,
             project_root: workspace_root.to_path_buf(),
-            env: scaffold_env.to_string(),
+            env: env_label.clone(),
             wasm_out_dir: wasm_out_dir.clone(),
             source_dirs: source_dirs.clone(),
             wasm_paths: BTreeMap::new(),
@@ -174,7 +196,7 @@ impl Command {
         let post_compile_ctx = CompileContext {
             config: None,
             project_root: workspace_root.to_path_buf(),
-            env: scaffold_env.to_string(),
+            env: env_label,
             wasm_out_dir,
             source_dirs,
             wasm_paths,
@@ -196,12 +218,71 @@ impl Command {
             build_clients_args.global_args = Some(global_args.clone());
             build_clients_args.extensions = extensions;
             build_clients_args.compile_ctx = Some(post_compile_ctx);
+            build_clients_args.plan = plan;
             build_clients_args
                 .run(packages.iter().map(|p| p.name.replace('-', "_")).collect())
                 .await?;
         }
 
         Ok(())
+    }
+
+    /// Inputs from `environments.toml`: the selected environment's extensions,
+    /// and its name as the label hooks see as `env`.
+    fn v1_inputs(&self, workspace_root: &Path) -> Result<Inputs, Error> {
+        let scaffold_env = self
+            .build_clients_args
+            .env
+            .unwrap_or(ScaffoldEnv::Development);
+        let extensions = env_toml::Environment::get(workspace_root, &scaffold_env)?
+            .map(|env| env.extensions)
+            .unwrap_or_default();
+        Ok(Inputs {
+            plan: None,
+            extensions,
+            env_label: scaffold_env.to_string(),
+        })
+    }
+
+    /// Inputs from a version 2 `scaffold.yml`. The file is always validated;
+    /// when building clients, the selected network is also resolved and its
+    /// container started if it runs locally.
+    async fn v2_inputs(
+        &self,
+        workspace_root: &Path,
+        metadata: &Metadata,
+        printer: &Print,
+    ) -> Result<Inputs, Error> {
+        if std::env::var_os("STELLAR_SCAFFOLD_ENV").is_some() {
+            printer.warnln(
+                "STELLAR_SCAFFOLD_ENV is ignored with a version 2 scaffold.yml; use --network or STELLAR_NETWORK",
+            );
+        }
+        let crates = crate::config::cdylib_crates(metadata);
+        let network_flag = self.build_clients_args.network.as_deref();
+        if !self.build_clients {
+            let (extensions, env_label) =
+                v2::hook_inputs(workspace_root, Some(&crates), network_flag, printer)?;
+            return Ok(Inputs {
+                plan: None,
+                extensions,
+                env_label,
+            });
+        }
+
+        let (network, source) = v2::select_network(network_flag);
+        printer.infoln(format!("Building for network {network:?} (from {source})"));
+        let plan = v2::plan(workspace_root, Some(&crates), &network, printer)?;
+        if plan.network.run_locally {
+            printer.infoln("Starting local Stellar Docker container...");
+            start_container_if_local(&plan.network).await?;
+            printer.checkln("Local Stellar network is healthy and running.");
+        }
+        Ok(Inputs {
+            extensions: plan.extensions.clone(),
+            env_label: network,
+            plan: Some(plan),
+        })
     }
 
     fn packages(&self, metadata: &Metadata) -> Result<Vec<Package>, Error> {

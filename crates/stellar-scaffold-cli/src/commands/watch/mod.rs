@@ -39,6 +39,8 @@ pub enum Error {
     Io(#[from] std::io::Error),
     #[error(transparent)]
     Env(#[from] env_toml::Error),
+    #[error(transparent)]
+    Config(#[from] build::v2::Error),
     #[error("Failed to start docker container. {hint}", hint = super::DOCTOR_HINT)]
     DockerStart,
     #[error(transparent)]
@@ -109,7 +111,9 @@ impl Watcher {
                 let Some(ext) = path.extension().and_then(|e| e.to_str()) else {
                     return false;
                 };
-                if ext.eq_ignore_ascii_case("toml") {
+                if ext.eq_ignore_ascii_case("yml") {
+                    return path.as_path() == self.env_toml_dir.join(crate::config::CONFIG_FILE);
+                } else if ext.eq_ignore_ascii_case("toml") {
                     let Some(stem) = path.file_stem().and_then(|s| s.to_str()) else {
                         return false;
                     };
@@ -149,23 +153,30 @@ impl Cmd {
         build::scaffold_yml::check_version(workspace_root)?;
         super::check_engine_constraint(workspace_root)?;
 
-        let scaffold_env = self
-            .build_cmd
-            .build_clients_args
-            .env
-            .unwrap_or(ScaffoldEnv::Development);
-
-        let Some(current_env) = env_toml::Environment::get(workspace_root, &scaffold_env)? else {
-            return Ok(());
-        };
-
-        // Discover extensions for pre/post-dev hooks. The build pipeline hooks
-        // (compile/deploy/codegen) are handled inside build::Command::run().
-        let extensions = if current_env.extensions.is_empty() {
-            vec![]
+        // Extensions for pre/post-dev hooks, and the label they see as `env`.
+        // The build pipeline hooks (compile/deploy/codegen) are handled inside
+        // build::Command::run().
+        let (extension_entries, env_label) = if build::v2::is_v2(workspace_root) {
+            let crates = crate::config::cdylib_crates(metadata);
+            build::v2::hook_inputs(
+                workspace_root,
+                Some(&crates),
+                self.build_cmd.build_clients_args.network.as_deref(),
+                &printer,
+            )?
         } else {
-            extension::discover(&current_env.extensions, &printer)
+            let scaffold_env = self
+                .build_cmd
+                .build_clients_args
+                .env
+                .unwrap_or(ScaffoldEnv::Development);
+            let Some(current_env) = env_toml::Environment::get(workspace_root, &scaffold_env)?
+            else {
+                return Ok(());
+            };
+            (current_env.extensions, scaffold_env.to_string())
         };
+        let extensions = extension::discover(&extension_entries, &printer);
         let all_packages = self.build_cmd.list_packages(metadata)?;
         let packages: Vec<PathBuf> = all_packages
             .iter()
@@ -211,7 +222,7 @@ impl Cmd {
         let project_ctx = ProjectContext {
             config: None,
             project_root: workspace_root.to_path_buf(),
-            env: scaffold_env.to_string(),
+            env: env_label,
             wasm_out_dir: stellar_build::deps::stellar_wasm_out_dir(target_dir),
             source_dirs: packages.clone(),
             network: None,
