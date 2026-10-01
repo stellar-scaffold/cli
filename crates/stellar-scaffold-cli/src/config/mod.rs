@@ -36,9 +36,11 @@ pub const CONFIG_FILE: &str = "scaffold.yml";
 pub const SCHEMA_VERSION: u32 = 2;
 
 /// Environment variable selecting the network when `--network` is absent.
-pub const NETWORK_ENV: &str = "STELLAR_SCAFFOLD_NETWORK";
+/// Shared with stellar-cli, which also sets it from `stellar network use`.
+pub const NETWORK_ENV: &str = "STELLAR_NETWORK";
 
-/// Network used when neither `--network` nor [`NETWORK_ENV`] is set.
+/// Network used when neither `--network`, [`NETWORK_ENV`], nor stellar-cli's
+/// default picks one.
 pub const DEFAULT_NETWORK: &str = "local";
 
 /// Names of networks and accounts: ASCII letters, digits, `-`, `_`, starting
