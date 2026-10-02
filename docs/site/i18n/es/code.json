@@ -331,8 +331,7 @@
     "description": "The homepage message"
   },
   "homepage.tagline": {
-    "message": "Pasa de un directorio vacío a una dApp de Stellar desplegada sin conectar las piezas tú mismo.",
-    "description": "The homepage tagline"
+    "message": "Pasa de un directorio vacío a una dApp de Stellar desplegada sin conectar las piezas tú mismo."
   },
   "homepage.quickstart": {
     "message": "Inicio Rápido"
@@ -558,5 +557,8 @@
   "theme.IdealImageMessage.error": {
     "message": "Error. Click para recargar",
     "description": "When the image fails to load for unknown error"
+  },
+  "List of dApps people are building with Stellar Scaffold": {
+    "message": "List of dApps people are building with Stellar Scaffold"
   }
 }
