@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.0.28](https://github.com/stellar-scaffold/cli/compare/stellar-scaffold-cli-v0.0.27...stellar-scaffold-cli-v0.0.28) - 2026-10-06
+
+### Other
+
+- Feat/scaffold config v2 docs ([#612](https://github.com/stellar-scaffold/cli/pull/612))
+- Feat/scaffold config v2 build ([#611](https://github.com/stellar-scaffold/cli/pull/611))
+- Feat/scaffold config v2 ([#610](https://github.com/stellar-scaffold/cli/pull/610))
+- Feat/doctor command ([#593](https://github.com/stellar-scaffold/cli/pull/593))
+
 ## [0.0.27](https://github.com/stellar-scaffold/cli/compare/stellar-scaffold-cli-v0.0.26...stellar-scaffold-cli-v0.0.27) - 2026-08-11
 
 ### Other
