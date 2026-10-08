@@ -210,11 +210,8 @@ impl Check for NodeToolchain {
     }
 
     async fn run(&self, ctx: &Context<'_>) -> Vec<Diagnosis> {
-        // A contracts-only project has no package.json and needs no JS tooling.
-        let Some(spec) = ctx
-            .workspace_root
-            .and_then(PackageManagerSpec::from_package_json)
-        else {
+        // A project that declares no package manager needs no JS tooling.
+        let Some(spec) = ctx.workspace_root.and_then(PackageManagerSpec::declared) else {
             return vec![Diagnosis::skipped(
                 self.name(),
                 Category::Toolchain,

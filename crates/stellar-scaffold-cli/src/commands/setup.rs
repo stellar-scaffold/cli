@@ -64,7 +64,10 @@ pub async fn prepare(
     ensure_extensions_installed(project_path, &printer, yes);
 
     if let Some(pkg_manager) = pkg_manager {
-        run_install(pkg_manager.kind.command(), project_path, &printer);
+        // A frontend without a JS manifest has no dependencies to install.
+        if has_js_manifest(project_path) {
+            run_install(pkg_manager.kind.command(), project_path, &printer);
+        }
         printer.infoln("Compiling contracts and generating client packages...");
     } else {
         printer.infoln("Compiling contracts...");
@@ -304,6 +307,13 @@ fn ensure_extensions_installed(project_path: &Path, printer: &Print, yes: bool) 
             }
         }
     }
+}
+
+/// Whether `root` has a manifest a JS package manager installs from.
+fn has_js_manifest(root: &Path) -> bool {
+    ["package.json", "deno.json", "deno.jsonc"]
+        .iter()
+        .any(|m| root.join(m).is_file())
 }
 
 fn git_exists() -> bool {

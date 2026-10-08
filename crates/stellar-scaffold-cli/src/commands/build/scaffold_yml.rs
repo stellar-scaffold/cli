@@ -45,6 +45,9 @@ pub struct ScaffoldConfig {
     /// by app code as `@stellar-scaffold/app-lib/clients`. CLI-owned. (The
     /// former separate `bindings_dir` was folded into this one directory.)
     pub clients_dir: std::path::PathBuf,
+    /// Package manager that installs and builds the generated clients. `None`
+    /// when unset; callers fall back to npm.
+    pub package_manager: Option<crate::commands::PackageManager>,
 }
 
 impl Default for ScaffoldConfig {
@@ -52,6 +55,7 @@ impl Default for ScaffoldConfig {
         Self {
             contracts_dir: "contracts".into(),
             clients_dir: "app-lib/clients".into(),
+            package_manager: None,
         }
     }
 }
@@ -73,6 +77,7 @@ struct ScaffoldFile {
 struct ProjectDirs {
     contracts_dir: Option<std::path::PathBuf>,
     clients_dir: Option<std::path::PathBuf>,
+    package_manager: Option<crate::commands::PackageManager>,
 }
 
 impl ScaffoldConfig {
@@ -94,6 +99,7 @@ impl ScaffoldConfig {
                 ScaffoldConfig {
                     contracts_dir: project.contracts_dir.unwrap_or(defaults.contracts_dir),
                     clients_dir: project.clients_dir.unwrap_or(defaults.clients_dir),
+                    package_manager: project.package_manager,
                 }
             }
             _ => file.config,

@@ -7,7 +7,6 @@ use std::{
 };
 
 use clap::{CommandFactory, FromArgMatches, Parser};
-use regex::Regex;
 use stellar_cli;
 
 pub mod build;
@@ -160,21 +159,25 @@ pub struct PackageManagerSpec {
 }
 
 impl PackageManagerSpec {
-    pub fn write_to_package_json(&self, workspace_root: &Path) -> io::Result<()> {
-        let pkg_path = workspace_root.join("package.json");
-        let contents =
-            read_to_string(&pkg_path).map_err(|e| io::Error::new(io::ErrorKind::InvalidData, e))?;
+    /// The package manager a project declares: `project.package-manager` in
+    /// `scaffold.yml`, else the legacy `packageManager` field in
+    /// `package.json`. `None` when the project names neither.
+    pub fn declared(workspace_root: &Path) -> Option<Self> {
+        build::scaffold_yml::ScaffoldConfig::get(workspace_root)
+            .package_manager
+            .map(|kind| Self {
+                kind,
+                version: None,
+            })
+            .or_else(|| Self::from_package_json(workspace_root))
+    }
 
-        let pm_field_value = match &self.version {
-            Some(version) => format!("{}@{}", self.kind.as_str(), version),
-            None => self.kind.as_str().to_string(),
-        };
-
-        let updated = set_package_manager_field(&contents, &pm_field_value)
-            .ok_or_else(|| io::Error::new(io::ErrorKind::InvalidData, "malformed package.json"))?;
-
-        std::fs::write(&pkg_path, updated)?;
-        Ok(())
+    /// The package manager to run for a project: its declared one, else npm.
+    pub fn for_project(workspace_root: &Path) -> Self {
+        Self::declared(workspace_root).unwrap_or(Self {
+            kind: PackageManager::Npm,
+            version: None,
+        })
     }
 
     pub fn from_package_json(workspace_root: &Path) -> Option<Self> {
@@ -202,29 +205,6 @@ impl PackageManagerSpec {
         };
 
         Self { kind, version }
-    }
-}
-
-/// Replace or insert the `packageManager` field in a package.json string,
-/// preserving the original formatting of the rest of the file.
-fn set_package_manager_field(json: &str, value: &str) -> Option<String> {
-    let re = Regex::new(r#""packageManager"\s*:\s*"[^"]*""#).ok()?;
-    let replacement = format!(r#""packageManager": "{value}""#);
-
-    if re.is_match(json) {
-        Some(re.replace(json, replacement.as_str()).into_owned())
-    } else {
-        // Field absent — insert before the final closing brace
-        let insert_pos = json.rfind('}')?;
-        let before = &json[..insert_pos];
-        let after = &json[insert_pos..];
-        let before_trimmed = before.trim_end();
-        let comma = if before_trimmed.ends_with(',') {
-            ""
-        } else {
-            ","
-        };
-        Some(format!("{before_trimmed}{comma}\n  {replacement}\n{after}"))
     }
 }
 
@@ -285,7 +265,8 @@ pub fn check_engine_constraint(workspace_root: &Path) -> Result<(), EngineConstr
     Ok(())
 }
 
-#[derive(Debug, Clone, PartialEq, clap::ValueEnum)]
+#[derive(Debug, Clone, PartialEq, clap::ValueEnum, serde::Deserialize)]
+#[serde(rename_all = "lowercase")]
 pub enum PackageManager {
     Npm,
     Pnpm,
@@ -412,38 +393,34 @@ mod tests {
     }
 
     #[test]
-    fn set_package_manager_field_replaces_existing() {
-        let json = r#"{"name": "foo", "packageManager": "npm@10.0.0", "version": "1.0.0"}"#;
-        let result = set_package_manager_field(json, "pnpm@9.6.0").unwrap();
-        assert!(result.contains(r#""packageManager": "pnpm@9.6.0""#));
-        assert!(result.contains(r#""name": "foo""#));
-        assert!(result.contains(r#""version": "1.0.0""#));
+    fn declared_prefers_scaffold_yml_over_package_json() {
+        let dir = tempfile::tempdir().unwrap();
+        std::fs::write(
+            dir.path().join("package.json"),
+            r#"{"packageManager": "yarn@1.22.19"}"#,
+        )
+        .unwrap();
+        let legacy = PackageManagerSpec::declared(dir.path()).unwrap();
+        assert_eq!(legacy.kind, PackageManager::Yarn);
+        assert_eq!(legacy.version, Some("1.22.19".to_string()));
+
+        std::fs::write(
+            dir.path().join("scaffold.yml"),
+            "version: 2\nproject:\n  package-manager: pnpm\n",
+        )
+        .unwrap();
+        let declared = PackageManagerSpec::declared(dir.path()).unwrap();
+        assert_eq!(declared.kind, PackageManager::Pnpm);
     }
 
     #[test]
-    fn set_package_manager_field_inserts_when_absent() {
-        let json = "{\n  \"name\": \"foo\"\n}";
-        let result = set_package_manager_field(json, "npm@11.0.0").unwrap();
-        assert!(result.contains(r#""packageManager": "npm@11.0.0""#));
-        assert!(result.contains(r#""name": "foo""#));
-        assert!(serde_json::from_str::<serde_json::Value>(&result).is_ok());
-    }
-
-    #[test]
-    fn set_package_manager_field_inserts_produces_valid_json() {
-        // real-world multi-line package.json with trailing newline before closing brace
-        let json = "{\n  \"name\": \"my-app\",\n  \"version\": \"1.0.0\"\n}";
-        let result = set_package_manager_field(json, "pnpm@9.6.0").unwrap();
-        assert!(serde_json::from_str::<serde_json::Value>(&result).is_ok());
-        assert!(result.contains("\"packageManager\": \"pnpm@9.6.0\""));
-    }
-
-    #[test]
-    fn set_package_manager_field_preserves_surrounding_content() {
-        let json = r#"{"scripts": {"start": "vite"}, "packageManager": "npm@10.0.0"}"#;
-        let result = set_package_manager_field(json, "bun@1.0.0").unwrap();
-        assert!(result.contains(r#""scripts""#));
-        assert!(result.contains(r#""packageManager": "bun@1.0.0""#));
+    fn for_project_defaults_to_npm() {
+        let dir = tempfile::tempdir().unwrap();
+        assert!(PackageManagerSpec::declared(dir.path()).is_none());
+        assert_eq!(
+            PackageManagerSpec::for_project(dir.path()).kind,
+            PackageManager::Npm
+        );
     }
 
     mod engine_constraint {
@@ -534,27 +511,6 @@ mod tests {
         #[case(PackageManager::Deno)]
         fn command_contains_name(#[case] pm: PackageManager) {
             assert!(pm.command().contains(pm.as_str()));
-        }
-
-        #[rstest]
-        #[case(PackageManager::Npm, Some("11.0.0".to_string()))]
-        #[case(PackageManager::Pnpm, Some("9.6.0".to_string()))]
-        #[case(PackageManager::Yarn, None)]
-        #[case(PackageManager::Bun, Some("1.1.0".to_string()))]
-        fn package_json_round_trip(#[case] pm: PackageManager, #[case] version: Option<String>) {
-            let dir = tempfile::tempdir().unwrap();
-            let pkg_path = dir.path().join("package.json");
-            std::fs::write(&pkg_path, "{\n  \"name\": \"test-app\"\n}").unwrap();
-
-            let spec = PackageManagerSpec { kind: pm, version };
-            spec.write_to_package_json(dir.path()).unwrap();
-
-            let contents = std::fs::read_to_string(&pkg_path).unwrap();
-            assert!(serde_json::from_str::<serde_json::Value>(&contents).is_ok());
-
-            let recovered = PackageManagerSpec::from_package_json(dir.path()).unwrap();
-            assert_eq!(recovered.kind, spec.kind);
-            assert_eq!(recovered.version, spec.version);
         }
     }
 }

@@ -16,6 +16,7 @@
 
 pub mod cli_args;
 pub mod diagnostic;
+pub mod edit;
 pub mod interpolate;
 pub mod lint;
 pub mod resolve;
@@ -262,6 +263,7 @@ pub fn resolved_view(
     }
     n.insert("start-container".into(), net.start_container().into());
     n.insert("allow-deploy".into(), net.allow_deploy().into());
+    n.insert("allow-http".into(), net.allow_http().into());
 
     let args_ctx = interpolate::Context {
         mode: interpolate::Mode::Display,
@@ -304,6 +306,7 @@ fn contract_view(
         m.insert("from-network".into(), f.clone().into());
     }
     m.insert("deploy".into(), c.deploys.into());
+    m.insert("client".into(), c.client.into());
     if let Some(s) = &c.signer {
         m.insert("signer".into(), s.clone().into());
     }

@@ -8,7 +8,7 @@ use std::path::{Path, PathBuf};
 use std::{env, io};
 
 use super::setup;
-use crate::commands::PackageManager;
+use crate::commands::{PackageManager, PackageManagerSpec};
 use stellar_cli::{commands::global, print::Print};
 
 pub mod instantiate;
@@ -162,16 +162,24 @@ impl Cmd {
             return Ok(());
         }
 
-        // Gather the package-manager choice up front (both paths need it).
-        // `--template` signals non-interactive intent (the framework is already
-        // chosen), so default the package manager to npm rather than prompting;
-        // `init` is only fully interactive when no template is given.
-        let pkg_manager = setup::resolve_pkg_manager(
-            self.package_manager.as_ref(),
-            &printer,
-            self.yes || self.template.is_some(),
-        )
-        .ok_or(Error::NoPackageManager)?;
+        // Gather the package-manager choice up front (both paths need it). A
+        // community repo's declared manager wins unless `-p` overrides it.
+        // Otherwise `--template` signals non-interactive intent (the framework
+        // is already chosen), so default to npm rather than prompting; `init`
+        // is only fully interactive when no template is given.
+        let declared = match (&source, &self.package_manager) {
+            (Source::Community(_), None) => PackageManagerSpec::declared(&absolute_project_path),
+            _ => None,
+        };
+        let pkg_manager = declared
+            .or_else(|| {
+                setup::resolve_pkg_manager(
+                    self.package_manager.as_ref(),
+                    &printer,
+                    self.yes || self.template.is_some(),
+                )
+            })
+            .ok_or(Error::NoPackageManager)?;
 
         // instantiate: official templates promote one framework + apply pkg-mgr fs.
         match &source {
@@ -180,8 +188,10 @@ impl Cmd {
                 instantiate::apply_package_manager(&absolute_project_path, &pkg_manager)?;
             }
             Source::Community(_) => {
-                // Community repos own their own layout; just record the manager.
-                let _ = pkg_manager.write_to_package_json(&absolute_project_path);
+                // Community repos own their own layout; only record an explicit `-p`.
+                if self.package_manager.is_some() {
+                    instantiate::write_package_manager(&absolute_project_path, &pkg_manager.kind)?;
+                }
             }
             // Both settled above.
             Source::Official(None) | Source::NoFrontend => unreachable!(),

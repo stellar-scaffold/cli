@@ -152,6 +152,10 @@ pub struct Network {
     pub rpc_headers: Option<Vec<(String, String)>>,
     #[serde(skip_serializing_if = "is_false", default)]
     pub run_locally: bool,
+    /// Whether generated clients may use a plain `http://` RPC URL. `None`
+    /// allows it only for the local (standalone) passphrase.
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub allow_http: Option<bool>,
 }
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]

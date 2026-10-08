@@ -254,6 +254,7 @@ impl Cmd {
                 network_passphrase: Some("Standalone Network ; February 2017".to_string()),
                 rpc_headers: None,
                 run_locally: true,
+                allow_http: None,
             },
             contracts: (!contract_configs.is_empty()).then_some(contract_configs),
             extensions: vec![],

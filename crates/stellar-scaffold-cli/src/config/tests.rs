@@ -96,6 +96,57 @@ fn extends_inherits_builtin_defaults_and_policy() {
 }
 
 #[test]
+fn client_defaults_to_true_and_can_be_disabled() {
+    let yaml = "version: 2\nnetworks:\n  local: {}\ncontracts:\n  on:\n    type: contract\n    source: CDLZFC3SYJYDZT7K67VZ75HPJVIEUVNIXF47ZG2FB2RMQQVU2HHGCYSC\n    networks: { local: }\n  off:\n    type: contract\n    source: CDLZFC3SYJYDZT7K67VZ75HPJVIEUVNIXF47ZG2FB2RMQQVU2HHGCYSC\n    client: false\n    networks: { local: }\n";
+    let view = show(yaml, "local", &no_env);
+    assert_eq!(view["contracts"]["on"]["client"], true);
+    assert_eq!(view["contracts"]["off"]["client"], false);
+}
+
+#[test]
+fn client_per_network_is_an_error() {
+    let yaml = "version: 2\nnetworks:\n  local: {}\ncontracts:\n  c:\n    type: contract\n    source: CDLZFC3SYJYDZT7K67VZ75HPJVIEUVNIXF47ZG2FB2RMQQVU2HHGCYSC\n    networks:\n      local:\n        client: false\n";
+    let (_dir, loaded) = load_str(yaml, None);
+    assert!(loaded.has_errors());
+    assert!(codes(&loaded).contains(&Code::UnknownKey));
+}
+
+#[test]
+fn package_manager_must_be_known() {
+    let (_dir, ok) = load_str("version: 2\nproject:\n  package-manager: pnpm\n", None);
+    assert!(!ok.has_errors(), "{}", ok.render());
+    let (_dir, bad) = load_str("version: 2\nproject:\n  package-manager: cargo\n", None);
+    assert!(bad.has_errors());
+}
+
+#[test]
+fn allow_http_defaults_to_local_only() {
+    let yaml = "version: 2\nnetworks:\n  local: {}\n  testnet: {}\n";
+    assert_eq!(show(yaml, "local", &no_env)["network"]["allow-http"], true);
+    assert_eq!(
+        show(yaml, "testnet", &no_env)["network"]["allow-http"],
+        false
+    );
+}
+
+#[test]
+fn allow_http_is_recomputed_for_a_public_child() {
+    let yaml = "version: 2\nnetworks:\n  local: {}\n  remote:\n    extends: local\n    rpc-url: https://rpc.example\n    network-passphrase: Test SDF Network ; September 2015\n";
+    assert_eq!(
+        show(yaml, "remote", &no_env)["network"]["allow-http"],
+        false
+    );
+}
+
+#[test]
+fn allow_http_on_public_network_warns() {
+    let yaml = "version: 2\nnetworks:\n  testnet:\n    allow-http: true\n";
+    let (_dir, loaded) = load_str(yaml, None);
+    assert_eq!(codes(&loaded), vec![Code::AllowHttpOnPublic]);
+    assert!(!loaded.has_errors());
+}
+
+#[test]
 fn derived_defaults_follow_the_childs_passphrase() {
     // Inheriting `local`'s derived start-container/allow-deploy would be
     // wrong once the child points at mainnet.
