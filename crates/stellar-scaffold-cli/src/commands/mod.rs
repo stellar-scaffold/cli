@@ -163,7 +163,7 @@ impl PackageManagerSpec {
     /// `scaffold.yml`, else the legacy `packageManager` field in
     /// `package.json`. `None` when the project names neither.
     pub fn declared(workspace_root: &Path) -> Option<Self> {
-        build::scaffold_yml::ScaffoldConfig::get(workspace_root)
+        crate::config::project(workspace_root)
             .package_manager
             .map(|kind| Self {
                 kind,

@@ -7,12 +7,13 @@
 //! - `interpolate.rs` :: `${namespace.path}` grammar
 //! - `cli_args.rs`    :: constructor `args` as stellar-cli arguments
 //! - `resolve.rs`     :: `extends` and per-network merging, cross-reference rules
+//! - `edit.rs`        :: line-based edits that keep comments and layout
 //!
 //! [`load`] runs the whole pipeline and never fails: every problem is a
 //! [`Diagnostic`]. Callers decide what to do with errors.
 //!
-//! Version 1 files (the `config:` section only) are still read by
-//! `commands::build::scaffold_yml` until `build` moves to this module.
+//! Projects still configured by the deprecated `environments.toml` are
+//! recognized by that file alone; their `scaffold.yml`, if any, isn't read.
 
 pub mod cli_args;
 pub mod diagnostic;
@@ -35,6 +36,21 @@ pub const CONFIG_FILE: &str = "scaffold.yml";
 
 /// Schema version this module reads.
 pub const SCHEMA_VERSION: u32 = 2;
+
+#[derive(thiserror::Error, Debug)]
+pub enum VersionError {
+    #[error(
+        "scaffold.yml is missing or has no 'version' field. \
+         Add 'version: {SCHEMA_VERSION}' at the top. \
+         See https://github.com/stellar-scaffold/cli/blob/main/CHANGELOG.md for details."
+    )]
+    MissingVersion,
+    #[error(
+        "scaffold.yml uses schema version {found}, but this CLI supports version {SCHEMA_VERSION}. \
+         See https://github.com/stellar-scaffold/cli/blob/main/CHANGELOG.md for migration instructions."
+    )]
+    UnsupportedVersion { found: u64 },
+}
 
 /// Environment variable selecting the network when `--network` is absent.
 /// Shared with stellar-cli, which also sets it from `stellar network use`.
@@ -192,6 +208,7 @@ pub fn load(root: &Path, crates: Option<&[(String, PathBuf)]>, selected: Option<
 }
 
 /// The fully resolved config for one network, as printed by `config show`.
+/// Keys keep their insertion order, which `config show` prints as YAML or JSON.
 ///
 /// `env` and `network` references are substituted; `account` references stay
 /// symbolic because addresses may not exist until `build` creates the keys.
@@ -199,8 +216,8 @@ pub fn resolved_view(
     config: &Config,
     network: &str,
     env: &dyn Fn(&str) -> Option<String>,
-) -> Result<serde_yaml::Value, Vec<Diagnostic>> {
-    use serde_yaml::{Mapping, Value};
+) -> Result<serde_json::Value, Vec<Diagnostic>> {
+    use serde_json::{Map, Value};
 
     if !config.networks.contains_key(network) {
         let mut d = Diagnostic::error(
@@ -242,7 +259,7 @@ pub fn resolved_view(
         .map(|t| interp(t, &net_ctx))
         .unwrap_or_default();
 
-    let mut n = Mapping::new();
+    let mut n = Map::new();
     n.insert("name".into(), net.name.clone().into());
     if !net.extends.is_empty() {
         n.insert("extends".into(), net.extends.clone().into());
@@ -250,10 +267,10 @@ pub fn resolved_view(
     n.insert("rpc-url".into(), rpc_url.clone().into());
     n.insert("network-passphrase".into(), passphrase.clone().into());
     if !net.rpc_headers.is_empty() {
-        let headers: Mapping = net
+        let headers: Map<String, Value> = net
             .rpc_headers
             .iter()
-            .map(|(k, t)| (k.clone().into(), interp(t, &net_ctx).into()))
+            .map(|(k, t)| (k.clone(), interp(t, &net_ctx).into()))
             .collect();
         n.insert("rpc-headers".into(), headers.into());
     }
@@ -270,7 +287,7 @@ pub fn resolved_view(
         env,
         network: Some((&net.name, &rpc_url, &passphrase)),
     };
-    let mut contracts = Mapping::new();
+    let mut contracts = Map::new();
     for name in config.contracts.keys() {
         let Some(c) = resolver.contract(name, network) else {
             continue;
@@ -288,18 +305,18 @@ pub fn resolved_view(
         return Err(errors_all);
     }
 
-    let mut out = Mapping::new();
+    let mut out = Map::new();
     out.insert("network".into(), n.into());
     out.insert("contracts".into(), contracts.into());
-    Ok(Value::Mapping(out))
+    Ok(Value::Object(out))
 }
 
 fn contract_view(
     c: &resolve::Contract,
     resolve: &mut dyn FnMut(&str) -> String,
-) -> serde_yaml::Value {
-    use serde_yaml::Mapping;
-    let mut m = Mapping::new();
+) -> serde_json::Value {
+    use serde_json::{Map, Value};
+    let mut m = Map::new();
     m.insert("type".into(), c.ty.as_str().into());
     m.insert("source".into(), c.source.clone().into());
     if let Some(f) = &c.from_network {
@@ -311,10 +328,10 @@ fn contract_view(
         m.insert("signer".into(), s.clone().into());
     }
     if !c.args.is_empty() {
-        let args: Mapping = c
+        let args: Map<String, Value> = c
             .args
             .iter()
-            .map(|(k, v)| (k.value.clone().into(), value_view(&v.value, resolve)))
+            .map(|(k, v)| (k.value.clone(), value_view(&v.value, resolve)))
             .collect();
         m.insert("args".into(), args.into());
     }
@@ -329,9 +346,9 @@ fn contract_view(
 
 /// Convert a value for display, interpolating strings. Integers that don't
 /// fit 64 bits are shown as strings rather than lossy floats.
-fn value_view(value: &schema::Value, resolve: &mut dyn FnMut(&str) -> String) -> serde_yaml::Value {
+fn value_view(value: &schema::Value, resolve: &mut dyn FnMut(&str) -> String) -> serde_json::Value {
     use schema::Value as V;
-    use serde_yaml::Value;
+    use serde_json::Value;
     match value {
         V::Null => Value::Null,
         V::Bool(b) => (*b).into(),
@@ -347,9 +364,9 @@ fn value_view(value: &schema::Value, resolve: &mut dyn FnMut(&str) -> String) ->
             .map(|i| value_view(&i.value, resolve))
             .collect::<Vec<_>>()
             .into(),
-        V::Map(map) => Value::Mapping(
+        V::Map(map) => Value::Object(
             map.iter()
-                .map(|(k, v)| (k.value.clone().into(), value_view(&v.value, resolve)))
+                .map(|(k, v)| (k.value.clone(), value_view(&v.value, resolve)))
                 .collect(),
         ),
     }
@@ -359,4 +376,34 @@ fn value_view(value: &schema::Value, resolve: &mut dyn FnMut(&str) -> String) ->
 pub fn declared_version(root: &Path) -> Option<u64> {
     let source = std::fs::read_to_string(root.join(CONFIG_FILE)).ok()?;
     schema::declared_version(&source)
+}
+
+/// Check that `scaffold.yml` in `root` declares [`SCHEMA_VERSION`]. A project
+/// configured by the deprecated `environments.toml` passes whatever its
+/// `scaffold.yml` says, or without one.
+pub fn check_version(root: &Path) -> Result<(), VersionError> {
+    match declared_version(root) {
+        Some(v) if v == u64::from(SCHEMA_VERSION) => Ok(()),
+        _ if uses_env_toml(root) => Ok(()),
+        None => Err(VersionError::MissingVersion),
+        Some(found) => Err(VersionError::UnsupportedVersion { found }),
+    }
+}
+
+/// Whether `root` has the deprecated `environments.toml`. A version 2
+/// `scaffold.yml` takes precedence when both exist.
+pub fn uses_env_toml(root: &Path) -> bool {
+    root.join(crate::commands::build::env_toml::ENV_FILE)
+        .is_file()
+}
+
+/// The `project:` section of `scaffold.yml` in `root`. Defaults when the file
+/// is absent, not version 2, or doesn't parse; commands that need a valid
+/// file report those through [`load`].
+pub fn project(root: &Path) -> schema::Project {
+    std::fs::read_to_string(root.join(CONFIG_FILE))
+        .ok()
+        .and_then(|source| schema::parse(&source).ok())
+        .map(|config| config.project)
+        .unwrap_or_default()
 }

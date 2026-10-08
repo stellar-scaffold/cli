@@ -2,7 +2,7 @@
 
 use std::path::PathBuf;
 
-use super::{Code, Loaded, load, resolved_view};
+use super::{Code, Loaded, VersionError, check_version, load, project, resolved_view};
 
 const CONTRACT: &str = "CDLZFC3SYJYDZT7K67VZ75HPJVIEUVNIXF47ZG2FB2RMQQVU2HHGCYSC";
 
@@ -21,7 +21,7 @@ fn codes(loaded: &Loaded) -> Vec<Code> {
     loaded.diagnostics.iter().map(|d| d.code).collect()
 }
 
-fn show(yaml: &str, network: &str, env: &dyn Fn(&str) -> Option<String>) -> serde_yaml::Value {
+fn show(yaml: &str, network: &str, env: &dyn Fn(&str) -> Option<String>) -> serde_json::Value {
     let (_dir, loaded) = load_str(yaml, None);
     assert!(!loaded.has_errors(), "{}", loaded.render());
     resolved_view(loaded.config.as_ref().unwrap(), network, env).unwrap()
@@ -274,4 +274,60 @@ fn missing_file_is_a_single_error() {
     let dir = tempfile::TempDir::new().unwrap();
     let loaded = load(dir.path(), Some(&Vec::<(String, PathBuf)>::new()), None);
     assert_eq!(codes(&loaded), vec![Code::SchemaVersion]);
+}
+
+fn write_config(yaml: &str) -> tempfile::TempDir {
+    let dir = tempfile::TempDir::new().unwrap();
+    std::fs::write(dir.path().join(super::CONFIG_FILE), yaml).unwrap();
+    dir
+}
+
+#[test]
+fn check_version_accepts_version_2() {
+    assert!(check_version(write_config("version: 2\n").path()).is_ok());
+    assert!(matches!(
+        check_version(write_config("version: 1\n").path()),
+        Err(VersionError::UnsupportedVersion { found: 1 })
+    ));
+    assert!(matches!(
+        check_version(write_config("networks: {}\n").path()),
+        Err(VersionError::MissingVersion)
+    ));
+    let empty = tempfile::TempDir::new().unwrap();
+    assert!(matches!(
+        check_version(empty.path()),
+        Err(VersionError::MissingVersion)
+    ));
+}
+
+#[test]
+fn check_version_accepts_any_environments_toml_project() {
+    let with_v1 = write_config("version: 1\n");
+    std::fs::write(with_v1.path().join("environments.toml"), "").unwrap();
+    assert!(check_version(with_v1.path()).is_ok());
+
+    let without_yml = tempfile::TempDir::new().unwrap();
+    std::fs::write(without_yml.path().join("environments.toml"), "").unwrap();
+    assert!(check_version(without_yml.path()).is_ok());
+}
+
+#[test]
+fn project_reads_version_2_and_defaults_otherwise() {
+    let v2 =
+        write_config("version: 2\nproject:\n  contracts-dir: rust\n  clients-dir: web/clients\n");
+    let p = project(v2.path());
+    assert_eq!(p.contracts_dir, PathBuf::from("rust"));
+    assert_eq!(p.clients_dir, PathBuf::from("web/clients"));
+
+    let legacy = write_config("version: 1\nconfig:\n  contracts_dir: rust\n");
+    assert_eq!(
+        project(legacy.path()).contracts_dir,
+        PathBuf::from("contracts")
+    );
+
+    let empty = tempfile::TempDir::new().unwrap();
+    assert_eq!(
+        project(empty.path()).clients_dir,
+        PathBuf::from("app-lib/clients")
+    );
 }

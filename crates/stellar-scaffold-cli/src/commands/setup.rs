@@ -20,7 +20,7 @@ pub enum Error {
     #[error(transparent)]
     BuildError(Box<build::Error>),
     #[error(transparent)]
-    SchemaVersion(#[from] build::scaffold_yml::Error),
+    SchemaVersion(#[from] crate::config::VersionError),
     #[error(transparent)]
     EngineConstraint(#[from] EngineConstraintError),
 }
@@ -39,7 +39,7 @@ pub async fn prepare(
 ) -> Result<(), Error> {
     let printer = Print::new(global_args.quiet);
 
-    build::scaffold_yml::check_version(project_path)?;
+    crate::config::check_version(project_path)?;
     check_engine_constraint(project_path)?;
 
     let env_path = project_path.join(".env");

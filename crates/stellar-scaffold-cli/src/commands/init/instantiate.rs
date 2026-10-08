@@ -9,8 +9,8 @@
 use std::fs;
 use std::path::Path;
 
-use crate::commands::build::scaffold_yml::CONFIG_FILE;
 use crate::commands::{PackageManager, PackageManagerSpec};
+use crate::config::CONFIG_FILE;
 
 /// The directory inside the UI monorepo that holds per-framework templates
 pub const TEMPLATES_DIR: &str = "templates";

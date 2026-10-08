@@ -4,8 +4,8 @@ use crate::arg_parsing;
 use crate::arg_parsing::ArgParser;
 use crate::commands::build::clients::Error::UpgradeArgsError;
 use crate::commands::build::env_toml::{self, Environment};
-use crate::commands::build::scaffold_yml::ScaffoldConfig;
 use crate::commands::{PackageManager, PackageManagerSpec};
+use crate::config::schema::Project;
 use crate::config::source::same_crate;
 use crate::extension::{self, ResolvedExtension};
 use indexmap::IndexMap;
@@ -185,7 +185,7 @@ pub struct Builder {
     pkg_manager: PackageManager,
     extensions: Vec<ResolvedExtension>,
     compile_ctx: Option<CompileContext>,
-    scaffold_config: ScaffoldConfig,
+    project: Project,
     /// Name reported to extensions as the environment: the `ScaffoldEnv`
     /// for environments.toml projects, the network name for version 2.
     env_label: String,
@@ -204,7 +204,7 @@ impl Builder {
         pkg_manager: PackageManager,
         extensions: Vec<ResolvedExtension>,
         compile_ctx: Option<CompileContext>,
-        scaffold_config: ScaffoldConfig,
+        project: Project,
     ) -> Self {
         let env_label = if env.from_scaffold_yml {
             env.network.name.clone().unwrap_or_default()
@@ -224,7 +224,7 @@ impl Builder {
             pkg_manager,
             extensions,
             compile_ctx,
-            scaffold_config,
+            project,
         }
     }
 
@@ -408,7 +408,7 @@ impl Builder {
     /// a `contractId` per contract. Idempotent, safe to call after every build,
     /// including incremental `watch` rebuilds of a single contract.
     fn regenerate_clients_index(&self) -> Result<(), Error> {
-        let clients_dir = self.workspace_root.join(&self.scaffold_config.clients_dir);
+        let clients_dir = self.workspace_root.join(&self.project.clients_dir);
         if !clients_dir.exists() {
             return Ok(());
         }
@@ -479,13 +479,11 @@ impl Builder {
         let network = &self.network;
         let printer = self.printer();
         let workspace_root = &self.workspace_root;
-        let final_output_dir = workspace_root
-            .join(&self.scaffold_config.clients_dir)
-            .join(name);
+        let final_output_dir = workspace_root.join(&self.project.clients_dir).join(name);
         // The generated Client now lives in the shared flattened index, not a
         // per-contract file; hooks see the index path as the codegen target.
         let src_template_path = workspace_root
-            .join(&self.scaffold_config.clients_dir)
+            .join(&self.project.clients_dir)
             .join("index.ts");
 
         extension::run_hook(
@@ -512,7 +510,7 @@ impl Builder {
             if rebuild {
                 let temp_dir = workspace_root
                     .join("target")
-                    .join(&self.scaffold_config.clients_dir)
+                    .join(&self.project.clients_dir)
                     .join(name);
                 let temp_dir_display = temp_dir.display();
                 let config_dir = self.get_config_dir()?;
@@ -778,7 +776,7 @@ impl Builder {
     fn client_has_contract_id(&self, name: &str, contract_id: &str) -> bool {
         let index = self
             .workspace_root
-            .join(&self.scaffold_config.clients_dir)
+            .join(&self.project.clients_dir)
             .join(name)
             .join("src/index.ts");
         std::fs::read_to_string(index).is_ok_and(|s| binding_targets(&s, contract_id))
@@ -987,7 +985,7 @@ impl Builder {
             let needs_rebuild = deploy_kind != DeployKind::Unchanged
                 || !self
                     .workspace_root
-                    .join(&self.scaffold_config.clients_dir)
+                    .join(&self.project.clients_dir)
                     .join(name)
                     .exists();
             (contract_id, Some(new_hash), needs_rebuild)
@@ -1324,7 +1322,7 @@ impl Args {
 
         let pkg_manager_spec = PackageManagerSpec::for_project(workspace_root);
 
-        let scaffold_config = ScaffoldConfig::get(workspace_root);
+        let project = crate::config::project(workspace_root);
 
         let builder = Builder::new(
             global_args,
@@ -1337,7 +1335,7 @@ impl Args {
             pkg_manager_spec.kind,
             self.extensions.clone(),
             self.compile_ctx.clone(),
-            scaffold_config,
+            project,
         );
         Ok(builder)
     }

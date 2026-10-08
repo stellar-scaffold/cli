@@ -1,18 +1,17 @@
 use std::path::Path;
 
 use crate::commands::build::env_toml::{self, ENV_FILE};
-use crate::commands::build::scaffold_yml::{self, CONFIG_FILE, ScaffoldConfig};
 use crate::commands::check_engine_constraint;
 use crate::commands::doctor::diagnosis::{Category, Check, Context, Diagnosis};
 use crate::commands::{EngineConstraintError, version};
-use crate::config;
+use crate::config::{self, CONFIG_FILE};
 use crate::extension::{ExtensionListStatus, list as list_extensions};
 
 /// Where the schema-version fixes point for migration instructions.
 const MIGRATION_URL: &str = "https://github.com/stellar-scaffold/cli/blob/main/CHANGELOG.md";
 
-/// Validates `scaffold.yml`: schema version first, then the directories its
-/// `config:` section points at.
+/// Validates `scaffold.yml`: the full config for version 2, otherwise whether
+/// the project falls back to `environments.toml`, and the default directories.
 pub struct ScaffoldYml;
 
 #[async_trait::async_trait]
@@ -40,22 +39,27 @@ impl Check for ScaffoldYml {
 
         // Matched per variant rather than reusing the error text, which is too
         // long for one report line. The fix carries the migration link instead.
-        let current = scaffold_yml::CURRENT_SCHEMA_VERSION;
-        let version = match scaffold_yml::check_version(root) {
-            Ok(()) => Diagnosis::ok(
+        // Version 2 files are loaded and reported above, so passing here means
+        // the project is configured by environments.toml.
+        let current = config::SCHEMA_VERSION;
+        let version = match config::check_version(root) {
+            Ok(()) => Diagnosis::warn(
                 self.name(),
                 Category::Project,
-                format!("{CONFIG_FILE} schema version {current}"),
-            ),
-            Err(scaffold_yml::Error::MissingVersion) => Diagnosis::error(
+                format!("configured by the deprecated {ENV_FILE}"),
+            )
+            .with_fix(format!(
+                "migrate to schema version {current}; see {MIGRATION_URL}"
+            )),
+            Err(config::VersionError::MissingVersion) => Diagnosis::error(
                 self.name(),
                 Category::Project,
                 format!("{CONFIG_FILE} is missing or has no 'version' field"),
             )
             .with_fix(format!(
-                "add 'version: {current}' to {CONFIG_FILE} (renaming environments.toml if migrating); see {MIGRATION_URL}"
+                "add 'version: {current}' to {CONFIG_FILE}; see {MIGRATION_URL}"
             )),
-            Err(scaffold_yml::Error::UnsupportedVersion { found }) => Diagnosis::error(
+            Err(config::VersionError::UnsupportedVersion { found }) => Diagnosis::error(
                 self.name(),
                 Category::Project,
                 format!("{CONFIG_FILE} uses schema version {found}, this CLI supports {current}"),
@@ -63,19 +67,19 @@ impl Check for ScaffoldYml {
             .with_fix(format!("see {MIGRATION_URL}")),
         };
 
-        let config = ScaffoldConfig::get(root);
+        let project = config::schema::Project::default();
         vec![
             version,
             dir_exists(
                 "contracts-dir",
                 root,
-                &config.contracts_dir,
-                "create it, or point config.contracts_dir at the right path",
+                &project.contracts_dir,
+                "create it, or migrate to schema version 2 and set project.contracts-dir",
             ),
             dir_exists(
                 "clients-dir",
                 root,
-                &config.clients_dir,
+                &project.clients_dir,
                 "stellar scaffold build --build-clients",
             ),
         ]
@@ -453,16 +457,16 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn scaffold_yml_ok_with_current_version() {
+    async fn scaffold_yml_warns_on_environments_toml() {
         let dir = tempfile::TempDir::new().unwrap();
-        std::fs::write(dir.path().join(CONFIG_FILE), "version: 1\n").unwrap();
+        std::fs::write(dir.path().join(ENV_FILE), "").unwrap();
         std::fs::create_dir_all(dir.path().join("contracts")).unwrap();
         std::fs::create_dir_all(dir.path().join("app-lib/clients")).unwrap();
 
         let printer = Print::new(true);
         let findings = ScaffoldYml.run(&context(Some(dir.path()), &printer)).await;
 
-        assert_eq!(severity_of(&findings, "scaffold-yml"), Severity::Ok);
+        assert_eq!(severity_of(&findings, "scaffold-yml"), Severity::Warn);
         assert_eq!(severity_of(&findings, "contracts-dir"), Severity::Ok);
         assert_eq!(severity_of(&findings, "clients-dir"), Severity::Ok);
     }
