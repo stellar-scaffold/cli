@@ -13,7 +13,8 @@
 //! [`Diagnostic`]. Callers decide what to do with errors.
 //!
 //! Projects still configured by the deprecated `environments.toml` are
-//! recognized by that file alone; their `scaffold.yml`, if any, isn't read.
+//! recognized by that file alone; from their `scaffold.yml`, only a version 1
+//! `config:` section's directories are read.
 
 pub mod cli_args;
 pub mod diagnostic;
@@ -397,13 +398,45 @@ pub fn uses_env_toml(root: &Path) -> bool {
         .is_file()
 }
 
-/// The `project:` section of `scaffold.yml` in `root`. Defaults when the file
-/// is absent, not version 2, or doesn't parse; commands that need a valid
-/// file report those through [`load`].
+/// The `project:` section of `scaffold.yml` in `root`. Beside the deprecated
+/// `environments.toml`, a version 1 file's `config:` directories are read
+/// instead. Defaults when the file is absent or doesn't parse; commands that
+/// need a valid file report that through [`load`].
 pub fn project(root: &Path) -> schema::Project {
-    std::fs::read_to_string(root.join(CONFIG_FILE))
-        .ok()
-        .and_then(|source| schema::parse(&source).ok())
-        .map(|config| config.project)
-        .unwrap_or_default()
+    let Ok(source) = std::fs::read_to_string(root.join(CONFIG_FILE)) else {
+        return schema::Project::default();
+    };
+    if let Ok(config) = schema::parse(&source) {
+        return config.project;
+    }
+    // A version 1 file only counts beside environments.toml, matching check_version
+    if uses_env_toml(root) {
+        let dirs = serde_saphyr::from_str::<LegacyFile>(&source)
+            .map(|file| file.config)
+            .unwrap_or_default();
+        let defaults = schema::Project::default();
+        return schema::Project {
+            contracts_dir: dirs.contracts_dir.unwrap_or(defaults.contracts_dir),
+            clients_dir: dirs.clients_dir.unwrap_or(defaults.clients_dir),
+            package_manager: None,
+        };
+    }
+    schema::Project::default()
+}
+
+/// A version 1 `scaffold.yml`, read only beside the deprecated
+/// `environments.toml` so its custom directories keep working. Other keys,
+/// including `version`, are ignored.
+#[derive(serde::Deserialize, Default)]
+#[serde(default)]
+struct LegacyFile {
+    config: LegacyDirs,
+}
+
+/// The directories a version 1 `config:` section may override.
+#[derive(serde::Deserialize, Default)]
+#[serde(default)]
+struct LegacyDirs {
+    contracts_dir: Option<PathBuf>,
+    clients_dir: Option<PathBuf>,
 }

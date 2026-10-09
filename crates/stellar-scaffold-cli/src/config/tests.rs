@@ -342,3 +342,23 @@ fn project_reads_version_2_and_defaults_otherwise() {
         PathBuf::from("app-lib/clients")
     );
 }
+
+#[test]
+fn project_reads_version_1_dirs_beside_environments_toml() {
+    let legacy =
+        write_config("version: 1\nconfig:\n  contracts_dir: rust\n  clients_dir: web/clients\n");
+    std::fs::write(legacy.path().join("environments.toml"), "").unwrap();
+    let p = project(legacy.path());
+    assert_eq!(p.contracts_dir, PathBuf::from("rust"));
+    assert_eq!(p.clients_dir, PathBuf::from("web/clients"));
+
+    let partial = write_config("version: 1\nconfig:\n  clients_dir: web/clients\n");
+    std::fs::write(partial.path().join("environments.toml"), "").unwrap();
+    let p = project(partial.path());
+    assert_eq!(p.contracts_dir, PathBuf::from("contracts"));
+    assert_eq!(p.clients_dir, PathBuf::from("web/clients"));
+
+    let v2 = write_config("version: 2\nproject:\n  clients-dir: v2/clients\n");
+    std::fs::write(v2.path().join("environments.toml"), "").unwrap();
+    assert_eq!(project(v2.path()).clients_dir, PathBuf::from("v2/clients"));
+}

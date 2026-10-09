@@ -67,7 +67,7 @@ impl Check for ScaffoldYml {
             .with_fix(format!("see {MIGRATION_URL}")),
         };
 
-        let project = config::schema::Project::default();
+        let project = config::project(root);
         vec![
             version,
             dir_exists(
@@ -469,6 +469,24 @@ mod tests {
         assert_eq!(severity_of(&findings, "scaffold-yml"), Severity::Warn);
         assert_eq!(severity_of(&findings, "contracts-dir"), Severity::Ok);
         assert_eq!(severity_of(&findings, "clients-dir"), Severity::Ok);
+    }
+
+    #[tokio::test]
+    async fn scaffold_yml_checks_version_1_dirs_beside_environments_toml() {
+        let dir = tempfile::TempDir::new().unwrap();
+        std::fs::write(dir.path().join(ENV_FILE), "").unwrap();
+        std::fs::write(
+            dir.path().join(CONFIG_FILE),
+            "version: 1\nconfig:\n  contracts_dir: rust\n",
+        )
+        .unwrap();
+        // Only the custom directory exists, not the default `contracts/`.
+        std::fs::create_dir_all(dir.path().join("rust")).unwrap();
+
+        let printer = Print::new(true);
+        let findings = ScaffoldYml.run(&context(Some(dir.path()), &printer)).await;
+
+        assert_eq!(severity_of(&findings, "contracts-dir"), Severity::Ok);
     }
 
     /// A context carrying a version 2 `scaffold.yml` loaded from `root`.
