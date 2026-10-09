@@ -79,5 +79,5 @@ fn init_copies_frontend_template() {
     assert!(project_path.join("app/tsconfig.json").exists());
     // The chosen package manager is recorded in scaffold.yml, not package.json.
     let config = std::fs::read_to_string(project_path.join("scaffold.yml")).unwrap();
-    assert!(config.contains("\n  package-manager: npm\n"));
+    assert!(config.contains("\n  package-manager: npm@"));
 }
