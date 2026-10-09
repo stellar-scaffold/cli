@@ -38,8 +38,9 @@ pub struct Config {
 pub struct Project {
     pub contracts_dir: PathBuf,
     pub clients_dir: PathBuf,
-    /// Installs and builds the generated clients. Defaults to npm.
-    pub package_manager: Option<crate::commands::PackageManager>,
+    /// Installs and builds the generated clients, optionally pinned to a
+    /// version (`pnpm@9.6.0`). Defaults to npm.
+    pub package_manager: Option<crate::commands::PackageManagerSpec>,
 }
 
 impl Default for Project {

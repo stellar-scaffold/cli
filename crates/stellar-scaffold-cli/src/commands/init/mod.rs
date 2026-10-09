@@ -190,7 +190,7 @@ impl Cmd {
             Source::Community(_) => {
                 // Community repos own their own layout; only record an explicit `-p`.
                 if self.package_manager.is_some() {
-                    instantiate::write_package_manager(&absolute_project_path, &pkg_manager.kind)?;
+                    instantiate::write_package_manager(&absolute_project_path, &pkg_manager)?;
                 }
             }
             // Both settled above.

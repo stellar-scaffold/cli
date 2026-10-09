@@ -120,6 +120,17 @@ fn package_manager_must_be_known() {
 }
 
 #[test]
+fn package_manager_may_pin_a_version() {
+    let (_dir, ok) = load_str(
+        "version: 2\nproject:\n  package-manager: pnpm@9.6.0\n",
+        None,
+    );
+    assert!(!ok.has_errors(), "{}", ok.render());
+    let (_dir, bad) = load_str("version: 2\nproject:\n  package-manager: pnpm@\n", None);
+    assert!(bad.has_errors());
+}
+
+#[test]
 fn allow_http_defaults_to_local_only() {
     let yaml = "version: 2\nnetworks:\n  local: {}\n  testnet: {}\n";
     assert_eq!(show(yaml, "local", &no_env)["network"]["allow-http"], true);

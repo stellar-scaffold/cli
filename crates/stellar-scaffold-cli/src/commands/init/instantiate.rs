@@ -167,15 +167,17 @@ fn disable_clients_in_scaffold_yml(root: &Path) -> Result<(), Error> {
     Ok(())
 }
 
-/// Record `kind` as `project.package-manager` in `scaffold.yml`, preserving
-/// its comments and layout. A missing file is left for `prepare` to report.
-pub fn write_package_manager(root: &Path, kind: &PackageManager) -> Result<(), Error> {
+/// Record `spec` as `project.package-manager` in `scaffold.yml`, with its
+/// version when known, preserving comments and layout. A missing file is left
+/// for `prepare` to report.
+pub fn write_package_manager(root: &Path, spec: &PackageManagerSpec) -> Result<(), Error> {
     let path = root.join(CONFIG_FILE);
     let Ok(contents) = fs::read_to_string(&path) else {
         return Ok(());
     };
-    let updated = crate::config::edit::set_project_key(&contents, "package-manager", kind.as_str())
-        .ok_or(Error::ScaffoldYmlEdit("`project.package-manager`"))?;
+    let updated =
+        crate::config::edit::set_project_key(&contents, "package-manager", &spec.to_string())
+            .ok_or(Error::ScaffoldYmlEdit("`project.package-manager`"))?;
     fs::write(&path, updated)?;
     Ok(())
 }
@@ -255,7 +257,7 @@ fn pnpm_workspace_yaml() -> String {
 /// in `scaffold.yml`, emit any manager-specific workspace/config file, and
 /// drop the npm lockfile when switching away from npm. Pure filesystem work.
 pub fn apply_package_manager(root: &Path, spec: &PackageManagerSpec) -> Result<(), Error> {
-    write_package_manager(root, &spec.kind)?;
+    write_package_manager(root, spec)?;
 
     match spec.kind {
         PackageManager::Pnpm => {
@@ -553,7 +555,7 @@ mod tests {
         assert!(yaml.contains("- \"app-lib/clients/*\""));
 
         let config = fs::read_to_string(root.join("scaffold.yml")).unwrap();
-        assert!(config.contains("  contracts-dir: contracts\n  package-manager: pnpm\n"));
+        assert!(config.contains("  contracts-dir: contracts\n  package-manager: pnpm@1.2.3\n"));
         assert!(config.contains("# Comment kept"));
 
         let pkg = fs::read_to_string(root.join("package.json")).unwrap();

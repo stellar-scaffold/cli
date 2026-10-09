@@ -165,10 +165,6 @@ impl PackageManagerSpec {
     pub fn declared(workspace_root: &Path) -> Option<Self> {
         crate::config::project(workspace_root)
             .package_manager
-            .map(|kind| Self {
-                kind,
-                version: None,
-            })
             .or_else(|| Self::from_package_json(workspace_root))
     }
 
@@ -205,6 +201,42 @@ impl PackageManagerSpec {
         };
 
         Self { kind, version }
+    }
+}
+
+/// Parses `project.package-manager`: a name, optionally pinned to a version,
+/// e.g. `pnpm` or `pnpm@9.6.0`. Unlike `packageManager` in `package.json`, an
+/// unknown name is an error rather than falling back to npm.
+impl FromStr for PackageManagerSpec {
+    type Err = String;
+
+    fn from_str(value: &str) -> Result<Self, Self::Err> {
+        let (name, version) = match value.split_once('@') {
+            Some((name, version)) if !version.is_empty() => (name, Some(version.to_string())),
+            Some(_) => return Err(format!("`{value}` has no version after `@`")),
+            None => (value, None),
+        };
+        let kind = <PackageManager as clap::ValueEnum>::from_str(name, false).map_err(|_| {
+            format!("unknown package manager `{name}`; expected npm, pnpm, yarn, bun or deno")
+        })?;
+        Ok(Self { kind, version })
+    }
+}
+
+impl std::fmt::Display for PackageManagerSpec {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match &self.version {
+            Some(version) => write!(f, "{}@{version}", self.kind.as_str()),
+            None => f.write_str(self.kind.as_str()),
+        }
+    }
+}
+
+impl<'de> serde::Deserialize<'de> for PackageManagerSpec {
+    fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
+        String::deserialize(deserializer)?
+            .parse()
+            .map_err(serde::de::Error::custom)
     }
 }
 
@@ -265,8 +297,7 @@ pub fn check_engine_constraint(workspace_root: &Path) -> Result<(), EngineConstr
     Ok(())
 }
 
-#[derive(Debug, Clone, PartialEq, clap::ValueEnum, serde::Deserialize)]
-#[serde(rename_all = "lowercase")]
+#[derive(Debug, Clone, PartialEq, clap::ValueEnum)]
 pub enum PackageManager {
     Npm,
     Pnpm,
@@ -406,11 +437,28 @@ mod tests {
 
         std::fs::write(
             dir.path().join("scaffold.yml"),
-            "version: 2\nproject:\n  package-manager: pnpm\n",
+            "version: 2\nproject:\n  package-manager: pnpm@9.6.0\n",
         )
         .unwrap();
         let declared = PackageManagerSpec::declared(dir.path()).unwrap();
         assert_eq!(declared.kind, PackageManager::Pnpm);
+        assert_eq!(declared.version, Some("9.6.0".to_string()));
+    }
+
+    #[test]
+    fn package_manager_spec_parses_name_and_optional_version() {
+        let bare: PackageManagerSpec = "deno".parse().unwrap();
+        assert_eq!(bare.kind, PackageManager::Deno);
+        assert_eq!(bare.version, None);
+        assert_eq!(bare.to_string(), "deno");
+
+        let pinned: PackageManagerSpec = "pnpm@9.6.0".parse().unwrap();
+        assert_eq!(pinned.kind, PackageManager::Pnpm);
+        assert_eq!(pinned.version, Some("9.6.0".to_string()));
+        assert_eq!(pinned.to_string(), "pnpm@9.6.0");
+
+        assert!("cargo".parse::<PackageManagerSpec>().is_err());
+        assert!("pnpm@".parse::<PackageManagerSpec>().is_err());
     }
 
     #[test]
