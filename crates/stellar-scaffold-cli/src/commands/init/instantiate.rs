@@ -10,6 +10,7 @@ use std::fs;
 use std::path::Path;
 
 use crate::commands::{PackageManager, PackageManagerSpec};
+use crate::config::CONFIG_FILE;
 
 /// The directory inside the UI monorepo that holds per-framework templates
 pub const TEMPLATES_DIR: &str = "templates";
@@ -59,6 +60,8 @@ pub enum Error {
     PackageJson(#[from] serde_json::Error),
     #[error("malformed environments.toml: {0}")]
     EnvToml(#[from] toml_edit::TomlError),
+    #[error("couldn't update scaffold.yml automatically; set {0} by hand")]
+    ScaffoldYmlEdit(&'static str),
 }
 
 /// How `--template` (or the interactive prompt) selected a source.
@@ -132,8 +135,9 @@ pub fn instantiate(root: &Path, framework: &str) -> Result<(), Error> {
 
 /// Assemble the no-frontend layout: strip every JS workspace and node config
 /// from the acquired monorepo, leaving only the Cargo/contracts side, and set
-/// `client = false` on every contract in `environments.toml` so `build`/`watch`
-/// never generate (or deploy for) client packages there is no app to consume.
+/// `client: false` on every contract in `scaffold.yml` (or `client = false` in
+/// a legacy `environments.toml`) so `build`/`watch` never generate client
+/// packages there is no app to consume.
 pub fn instantiate_no_frontend(root: &Path) -> Result<(), Error> {
     if !root.join(TEMPLATES_DIR).is_dir() {
         return Err(Error::NoTemplatesDir);
@@ -146,7 +150,36 @@ pub fn instantiate_no_frontend(root: &Path) -> Result<(), Error> {
             fs::remove_file(&path)?;
         }
     }
+    disable_clients_in_scaffold_yml(root)?;
     disable_clients_in_env_toml(root)
+}
+
+/// Set `client: false` on every contract in `scaffold.yml`, preserving its
+/// comments and layout. A missing file is left for `prepare` to report.
+fn disable_clients_in_scaffold_yml(root: &Path) -> Result<(), Error> {
+    let path = root.join(CONFIG_FILE);
+    let Ok(contents) = fs::read_to_string(&path) else {
+        return Ok(());
+    };
+    let updated = crate::config::edit::disable_clients(&contents)
+        .ok_or(Error::ScaffoldYmlEdit("`client: false` on each contract"))?;
+    fs::write(&path, updated)?;
+    Ok(())
+}
+
+/// Record `spec` as `project.package-manager` in `scaffold.yml`, with its
+/// version when known, preserving comments and layout. A missing file is left
+/// for `prepare` to report.
+pub fn write_package_manager(root: &Path, spec: &PackageManagerSpec) -> Result<(), Error> {
+    let path = root.join(CONFIG_FILE);
+    let Ok(contents) = fs::read_to_string(&path) else {
+        return Ok(());
+    };
+    let updated =
+        crate::config::edit::set_project_key(&contents, "package-manager", &spec.to_string())
+            .ok_or(Error::ScaffoldYmlEdit("`project.package-manager`"))?;
+    fs::write(&path, updated)?;
+    Ok(())
 }
 
 /// Set `client = false` on every contract entry in every environment of
@@ -220,11 +253,11 @@ fn pnpm_workspace_yaml() -> String {
     out
 }
 
-/// Apply the selected package manager to the instantiated project: write the
-/// `packageManager` field, emit any manager-specific workspace/config file, and
+/// Apply the selected package manager to the instantiated project: record it
+/// in `scaffold.yml`, emit any manager-specific workspace/config file, and
 /// drop the npm lockfile when switching away from npm. Pure filesystem work.
 pub fn apply_package_manager(root: &Path, spec: &PackageManagerSpec) -> Result<(), Error> {
-    spec.write_to_package_json(root)?;
+    write_package_manager(root, spec)?;
 
     match spec.kind {
         PackageManager::Pnpm => {
@@ -272,6 +305,10 @@ mod tests {
             "{\"name\":\"@stellar-scaffold/app-lib\"}",
         );
         write(&root.join("contracts/.gitkeep"), "");
+        write(
+            &root.join("scaffold.yml"),
+            "version: 2\n\n# Comment kept\nproject:\n  contracts-dir: contracts\n\ncontracts:\n  guess:\n    type: workspace\n    source: guess\n    networks:\n      local:\n",
+        );
         // e2e is kept post-init; its per-framework snapshot baselines are not.
         write(&root.join("e2e/tests/smoke.spec.ts"), "// smoke");
         write(
@@ -473,6 +510,17 @@ mod tests {
     }
 
     #[test]
+    fn no_frontend_disables_clients_in_scaffold_yml() {
+        let dir = fixture();
+        let root = dir.path();
+        instantiate_no_frontend(root).unwrap();
+
+        let contents = fs::read_to_string(root.join("scaffold.yml")).unwrap();
+        assert!(contents.contains("# Comment kept"), "comments preserved");
+        assert!(contents.contains("  guess:\n    client: false\n    type: workspace\n"));
+    }
+
+    #[test]
     fn no_frontend_errors_without_templates_dir() {
         let dir = tempfile::tempdir().unwrap();
         assert!(matches!(
@@ -506,8 +554,12 @@ mod tests {
         assert!(yaml.contains("- \"app-lib\""));
         assert!(yaml.contains("- \"app-lib/clients/*\""));
 
+        let config = fs::read_to_string(root.join("scaffold.yml")).unwrap();
+        assert!(config.contains("  contracts-dir: contracts\n  package-manager: pnpm@1.2.3\n"));
+        assert!(config.contains("# Comment kept"));
+
         let pkg = fs::read_to_string(root.join("package.json")).unwrap();
-        assert!(pkg.contains("\"packageManager\": \"pnpm@1.2.3\""));
+        assert!(!pkg.contains("packageManager"));
     }
 
     #[test]

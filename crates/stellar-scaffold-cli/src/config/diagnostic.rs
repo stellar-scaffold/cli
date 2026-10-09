@@ -87,6 +87,8 @@ pub enum Code {
     UnpinnedVersion,
     /// `start-container: true` on a non-local passphrase.
     StartContainerNonLocal,
+    /// `allow-http: true` on a public passphrase.
+    AllowHttpOnPublic,
     /// A contract has no network entries, so it is never built.
     ContractWithoutNetworks,
     /// A `wasm-file` source does not exist yet.
@@ -121,6 +123,7 @@ impl Code {
             Self::DeployToMainnet => "deploy-to-mainnet",
             Self::UnpinnedVersion => "unpinned-version",
             Self::StartContainerNonLocal => "start-container-non-local",
+            Self::AllowHttpOnPublic => "allow-http-public",
             Self::ContractWithoutNetworks => "contract-without-networks",
             Self::WasmFileMissing => "wasm-file-missing",
             Self::WorkspaceUnavailable => "workspace-unavailable",

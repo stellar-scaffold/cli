@@ -38,6 +38,9 @@ pub struct Config {
 pub struct Project {
     pub contracts_dir: PathBuf,
     pub clients_dir: PathBuf,
+    /// Installs and builds the generated clients, optionally pinned to a
+    /// version (`pnpm@9.6.0`). Defaults to npm.
+    pub package_manager: Option<crate::commands::PackageManagerSpec>,
 }
 
 impl Default for Project {
@@ -45,6 +48,7 @@ impl Default for Project {
         Self {
             contracts_dir: "contracts".into(),
             clients_dir: "app-lib/clients".into(),
+            package_manager: None,
         }
     }
 }
@@ -78,6 +82,11 @@ pub struct NetworkDef {
     /// value is inherited through `extends`; an unset one is recomputed from
     /// each network's own passphrase.
     pub allow_deploy: Option<Spanned<bool>>,
+    /// Whether generated clients may talk to a plain `http://` RPC URL. When
+    /// unset, true only if the resolved passphrase is the standalone (local)
+    /// one. An explicit value is inherited through `extends`; an unset one is
+    /// recomputed from each network's own passphrase.
+    pub allow_http: Option<Spanned<bool>>,
 }
 
 /// A contract entry. At the top level its keys are defaults for every
@@ -94,6 +103,10 @@ pub struct ContractSettings {
     pub args: Option<Spanned<SpannedMap<Spanned<Value>>>>,
     pub after_deploy: Option<Spanned<Vec<Spanned<String>>>>,
     pub after_deploy_script: Option<Spanned<String>>,
+    /// Whether to generate a TypeScript client. Defaults to true. Only valid
+    /// at the top level of a contract, so a client's types match on every
+    /// network.
+    pub client: Option<Spanned<bool>>,
     /// Per-network overrides. Only valid at the top level of a contract.
     pub networks: Option<Spanned<SpannedMap<ContractSettings>>>,
 }

@@ -2,7 +2,7 @@
 
 use std::path::PathBuf;
 
-use super::{Code, Loaded, load, resolved_view};
+use super::{Code, Loaded, VersionError, check_version, load, project, resolved_view};
 
 const CONTRACT: &str = "CDLZFC3SYJYDZT7K67VZ75HPJVIEUVNIXF47ZG2FB2RMQQVU2HHGCYSC";
 
@@ -21,7 +21,7 @@ fn codes(loaded: &Loaded) -> Vec<Code> {
     loaded.diagnostics.iter().map(|d| d.code).collect()
 }
 
-fn show(yaml: &str, network: &str, env: &dyn Fn(&str) -> Option<String>) -> serde_yaml::Value {
+fn show(yaml: &str, network: &str, env: &dyn Fn(&str) -> Option<String>) -> serde_json::Value {
     let (_dir, loaded) = load_str(yaml, None);
     assert!(!loaded.has_errors(), "{}", loaded.render());
     resolved_view(loaded.config.as_ref().unwrap(), network, env).unwrap()
@@ -93,6 +93,68 @@ fn extends_inherits_builtin_defaults_and_policy() {
     assert_eq!(net["rpc-url"], "https://soroban-testnet.stellar.org");
     assert_eq!(net["allow-deploy"], false);
     assert_eq!(net["extends"][0], "testnet");
+}
+
+#[test]
+fn client_defaults_to_true_and_can_be_disabled() {
+    let yaml = "version: 2\nnetworks:\n  local: {}\ncontracts:\n  on:\n    type: contract\n    source: CDLZFC3SYJYDZT7K67VZ75HPJVIEUVNIXF47ZG2FB2RMQQVU2HHGCYSC\n    networks: { local: }\n  off:\n    type: contract\n    source: CDLZFC3SYJYDZT7K67VZ75HPJVIEUVNIXF47ZG2FB2RMQQVU2HHGCYSC\n    client: false\n    networks: { local: }\n";
+    let view = show(yaml, "local", &no_env);
+    assert_eq!(view["contracts"]["on"]["client"], true);
+    assert_eq!(view["contracts"]["off"]["client"], false);
+}
+
+#[test]
+fn client_per_network_is_an_error() {
+    let yaml = "version: 2\nnetworks:\n  local: {}\ncontracts:\n  c:\n    type: contract\n    source: CDLZFC3SYJYDZT7K67VZ75HPJVIEUVNIXF47ZG2FB2RMQQVU2HHGCYSC\n    networks:\n      local:\n        client: false\n";
+    let (_dir, loaded) = load_str(yaml, None);
+    assert!(loaded.has_errors());
+    assert!(codes(&loaded).contains(&Code::UnknownKey));
+}
+
+#[test]
+fn package_manager_must_be_known() {
+    let (_dir, ok) = load_str("version: 2\nproject:\n  package-manager: pnpm\n", None);
+    assert!(!ok.has_errors(), "{}", ok.render());
+    let (_dir, bad) = load_str("version: 2\nproject:\n  package-manager: cargo\n", None);
+    assert!(bad.has_errors());
+}
+
+#[test]
+fn package_manager_may_pin_a_version() {
+    let (_dir, ok) = load_str(
+        "version: 2\nproject:\n  package-manager: pnpm@9.6.0\n",
+        None,
+    );
+    assert!(!ok.has_errors(), "{}", ok.render());
+    let (_dir, bad) = load_str("version: 2\nproject:\n  package-manager: pnpm@\n", None);
+    assert!(bad.has_errors());
+}
+
+#[test]
+fn allow_http_defaults_to_local_only() {
+    let yaml = "version: 2\nnetworks:\n  local: {}\n  testnet: {}\n";
+    assert_eq!(show(yaml, "local", &no_env)["network"]["allow-http"], true);
+    assert_eq!(
+        show(yaml, "testnet", &no_env)["network"]["allow-http"],
+        false
+    );
+}
+
+#[test]
+fn allow_http_is_recomputed_for_a_public_child() {
+    let yaml = "version: 2\nnetworks:\n  local: {}\n  remote:\n    extends: local\n    rpc-url: https://rpc.example\n    network-passphrase: Test SDF Network ; September 2015\n";
+    assert_eq!(
+        show(yaml, "remote", &no_env)["network"]["allow-http"],
+        false
+    );
+}
+
+#[test]
+fn allow_http_on_public_network_warns() {
+    let yaml = "version: 2\nnetworks:\n  testnet:\n    allow-http: true\n";
+    let (_dir, loaded) = load_str(yaml, None);
+    assert_eq!(codes(&loaded), vec![Code::AllowHttpOnPublic]);
+    assert!(!loaded.has_errors());
 }
 
 #[test]
@@ -223,4 +285,80 @@ fn missing_file_is_a_single_error() {
     let dir = tempfile::TempDir::new().unwrap();
     let loaded = load(dir.path(), Some(&Vec::<(String, PathBuf)>::new()), None);
     assert_eq!(codes(&loaded), vec![Code::SchemaVersion]);
+}
+
+fn write_config(yaml: &str) -> tempfile::TempDir {
+    let dir = tempfile::TempDir::new().unwrap();
+    std::fs::write(dir.path().join(super::CONFIG_FILE), yaml).unwrap();
+    dir
+}
+
+#[test]
+fn check_version_accepts_version_2() {
+    assert!(check_version(write_config("version: 2\n").path()).is_ok());
+    assert!(matches!(
+        check_version(write_config("version: 1\n").path()),
+        Err(VersionError::UnsupportedVersion { found: 1 })
+    ));
+    assert!(matches!(
+        check_version(write_config("networks: {}\n").path()),
+        Err(VersionError::MissingVersion)
+    ));
+    let empty = tempfile::TempDir::new().unwrap();
+    assert!(matches!(
+        check_version(empty.path()),
+        Err(VersionError::MissingVersion)
+    ));
+}
+
+#[test]
+fn check_version_accepts_any_environments_toml_project() {
+    let with_v1 = write_config("version: 1\n");
+    std::fs::write(with_v1.path().join("environments.toml"), "").unwrap();
+    assert!(check_version(with_v1.path()).is_ok());
+
+    let without_yml = tempfile::TempDir::new().unwrap();
+    std::fs::write(without_yml.path().join("environments.toml"), "").unwrap();
+    assert!(check_version(without_yml.path()).is_ok());
+}
+
+#[test]
+fn project_reads_version_2_and_defaults_otherwise() {
+    let v2 =
+        write_config("version: 2\nproject:\n  contracts-dir: rust\n  clients-dir: web/clients\n");
+    let p = project(v2.path());
+    assert_eq!(p.contracts_dir, PathBuf::from("rust"));
+    assert_eq!(p.clients_dir, PathBuf::from("web/clients"));
+
+    let legacy = write_config("version: 1\nconfig:\n  contracts_dir: rust\n");
+    assert_eq!(
+        project(legacy.path()).contracts_dir,
+        PathBuf::from("contracts")
+    );
+
+    let empty = tempfile::TempDir::new().unwrap();
+    assert_eq!(
+        project(empty.path()).clients_dir,
+        PathBuf::from("app-lib/clients")
+    );
+}
+
+#[test]
+fn project_reads_version_1_dirs_beside_environments_toml() {
+    let legacy =
+        write_config("version: 1\nconfig:\n  contracts_dir: rust\n  clients_dir: web/clients\n");
+    std::fs::write(legacy.path().join("environments.toml"), "").unwrap();
+    let p = project(legacy.path());
+    assert_eq!(p.contracts_dir, PathBuf::from("rust"));
+    assert_eq!(p.clients_dir, PathBuf::from("web/clients"));
+
+    let partial = write_config("version: 1\nconfig:\n  clients_dir: web/clients\n");
+    std::fs::write(partial.path().join("environments.toml"), "").unwrap();
+    let p = project(partial.path());
+    assert_eq!(p.contracts_dir, PathBuf::from("contracts"));
+    assert_eq!(p.clients_dir, PathBuf::from("web/clients"));
+
+    let v2 = write_config("version: 2\nproject:\n  clients-dir: v2/clients\n");
+    std::fs::write(v2.path().join("environments.toml"), "").unwrap();
+    assert_eq!(project(v2.path()).clients_dir, PathBuf::from("v2/clients"));
 }

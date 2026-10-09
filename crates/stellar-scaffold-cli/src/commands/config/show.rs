@@ -26,7 +26,7 @@ pub enum Error {
     #[error("{file} has errors; run `stellar scaffold config check` for details", file = config::CONFIG_FILE)]
     Invalid,
     #[error(transparent)]
-    Yaml(#[from] serde_yaml::Error),
+    Yaml(#[from] serde_saphyr::ser::Error),
     #[error(transparent)]
     Json(#[from] serde_json::Error),
 }
@@ -45,7 +45,7 @@ impl Cmd {
         let env = |name: &str| std::env::var(name).ok();
         match config::resolved_view(config, &self.network, &env) {
             Ok(view) if self.json => println!("{}", serde_json::to_string_pretty(&view)?),
-            Ok(view) => print!("{}", serde_yaml::to_string(&view)?),
+            Ok(view) => print!("{}", serde_saphyr::to_string(&view)?),
             Err(diags) => {
                 loaded.diagnostics = diags;
                 eprint!("{}", loaded.render());

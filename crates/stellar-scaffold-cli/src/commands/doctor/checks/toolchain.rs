@@ -210,11 +210,8 @@ impl Check for NodeToolchain {
     }
 
     async fn run(&self, ctx: &Context<'_>) -> Vec<Diagnosis> {
-        // A contracts-only project has no package.json and needs no JS tooling.
-        let Some(spec) = ctx
-            .workspace_root
-            .and_then(PackageManagerSpec::from_package_json)
-        else {
+        // A project that declares no package manager needs no JS tooling.
+        let Some(spec) = ctx.workspace_root.and_then(PackageManagerSpec::declared) else {
             return vec![Diagnosis::skipped(
                 self.name(),
                 Category::Toolchain,
@@ -233,7 +230,8 @@ impl Check for NodeToolchain {
     }
 }
 
-/// Compares the installed package manager against the `packageManager` field.
+/// Compares the installed package manager against the version the project
+/// pins, in `scaffold.yml` or a legacy `package.json` `packageManager` field.
 fn package_manager_diagnosis(ctx: &Context<'_>, spec: &PackageManagerSpec) -> Diagnosis {
     const NAME: &str = "package-manager";
 
@@ -248,7 +246,7 @@ fn package_manager_diagnosis(ctx: &Context<'_>, spec: &PackageManagerSpec) -> Di
         Some(pinned) if pinned != installed => Diagnosis::warn(
             NAME,
             Category::Toolchain,
-            format!("package.json pins {command}@{pinned}, found {installed}"),
+            format!("project pins {command}@{pinned}, found {installed}"),
         )
         .with_fix(format!("corepack use {command}@{pinned}")),
         _ => Diagnosis::ok(NAME, Category::Toolchain, format!("{command} {installed}")),
@@ -464,6 +462,28 @@ mod tests {
         let pm = named(&findings, "package-manager");
         assert_eq!(pm.severity, Severity::Warn);
         assert_eq!(pm.fix.as_deref(), Some("corepack use pnpm@9.6.0"));
+    }
+
+    #[tokio::test]
+    async fn node_warns_when_scaffold_yml_pin_differs() {
+        let dir = tempfile::TempDir::new().unwrap();
+        std::fs::write(
+            dir.path().join("scaffold.yml"),
+            "version: 2\nproject:\n  package-manager: pnpm@9.6.0\n",
+        )
+        .unwrap();
+
+        let commands = FakeCommands::new()
+            .succeeding("node", "v24.16.0")
+            .succeeding("pnpm", "8.15.1");
+        let printer = Print::new(true);
+        let findings = NodeToolchain
+            .run(&context(&commands, Some(dir.path()), &printer))
+            .await;
+
+        let pm = named(&findings, "package-manager");
+        assert_eq!(pm.severity, Severity::Warn);
+        assert!(pm.message.contains("pnpm@9.6.0"));
     }
 
     #[tokio::test]

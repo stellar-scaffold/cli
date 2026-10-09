@@ -1,6 +1,6 @@
 use crate::commands::build::clients::ScaffoldEnv;
 use crate::commands::build::env_toml::{self, Account, Environment};
-use crate::commands::build::scaffold_yml::ScaffoldConfig;
+use crate::config::{self, schema::Project};
 use cargo_metadata::Metadata;
 use clap::Parser;
 use std::{
@@ -60,9 +60,9 @@ impl Cmd {
         Self::clean_target_stellar(&cargo_meta, &printer)?;
 
         let workspace_root: PathBuf = cargo_meta.workspace_root.into();
-        let scaffold_config = ScaffoldConfig::get(&workspace_root);
+        let project = config::project(&workspace_root);
 
-        Self::clean_clients(&workspace_root, &scaffold_config, &printer)?;
+        Self::clean_clients(&workspace_root, &project, &printer)?;
 
         Self::clean_contract_aliases(&workspace_root, &printer)?;
 
@@ -89,11 +89,11 @@ impl Cmd {
     /// entries and `.gitkeep` are preserved.
     fn clean_clients(
         workspace_root: &Path,
-        scaffold_config: &ScaffoldConfig,
+        project: &Project,
         printer: &Print,
     ) -> Result<(), Error> {
-        let clients_path = workspace_root.join(&scaffold_config.clients_dir);
-        let clients_dir_str = scaffold_config
+        let clients_path = workspace_root.join(&project.clients_dir);
+        let clients_dir_str = project
             .clients_dir
             .to_str()
             .unwrap_or("app-lib/clients")

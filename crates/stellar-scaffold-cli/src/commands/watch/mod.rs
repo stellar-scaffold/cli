@@ -44,7 +44,7 @@ pub enum Error {
     #[error(transparent)]
     Manifest(#[from] cargo_metadata::Error),
     #[error(transparent)]
-    SchemaVersion(#[from] build::scaffold_yml::Error),
+    SchemaVersion(#[from] crate::config::VersionError),
     #[error(transparent)]
     EngineConstraint(#[from] super::EngineConstraintError),
 }
@@ -154,7 +154,7 @@ impl Cmd {
         let metadata = &self.build_cmd.metadata()?;
         let workspace_root = metadata.workspace_root.as_std_path();
 
-        build::scaffold_yml::check_version(workspace_root)?;
+        crate::config::check_version(workspace_root)?;
         super::check_engine_constraint(workspace_root)?;
 
         // Extensions for pre/post-dev hooks, and the label they see as `env`.

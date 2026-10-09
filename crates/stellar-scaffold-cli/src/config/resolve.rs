@@ -53,6 +53,7 @@ pub struct Network {
     pub explicit_default_account: Option<String>,
     pub explicit_start_container: Option<bool>,
     pub explicit_allow_deploy: Option<bool>,
+    pub explicit_allow_http: Option<bool>,
 }
 
 impl Network {
@@ -67,6 +68,7 @@ impl Network {
             explicit_default_account: None,
             explicit_start_container: None,
             explicit_allow_deploy: None,
+            explicit_allow_http: None,
         }
     }
 
@@ -130,6 +132,12 @@ impl Network {
         self.explicit_allow_deploy
             .unwrap_or_else(|| !self.is_public())
     }
+
+    /// Explicit value, else true only for the local (standalone) passphrase,
+    /// so generated clients never silently accept plain HTTP elsewhere.
+    pub fn allow_http(&self) -> bool {
+        self.explicit_allow_http.unwrap_or_else(|| self.is_local())
+    }
 }
 
 /// A contract's effective settings on one network.
@@ -146,6 +154,8 @@ pub struct Contract {
     pub after_deploy_script: Option<String>,
     /// Whether Scaffold deploys this contract on this network.
     pub deploys: bool,
+    /// Whether a TypeScript client is generated and exported.
+    pub client: bool,
 }
 
 /// Resolves networks once each, so a broken parent is reported once rather
@@ -338,6 +348,16 @@ impl<'c> Resolver<'c> {
                 .help("make sure this is intended; deploys cost real funds and cannot be undone"),
             );
         }
+        if net.explicit_allow_http == Some(true) && net.is_public() {
+            self.diagnostics.push(
+                Diagnostic::warning(
+                    Code::AllowHttpOnPublic,
+                    format!("network `{}` allows plain HTTP on a public network", net.name),
+                )
+                .at(def.allow_http.as_ref().map_or(key, span))
+                .help("make sure this is intended; requests and signed transactions are sent unencrypted"),
+            );
+        }
     }
 
     fn unknown_network(&mut self, name: &str, at: Option<Span>) {
@@ -360,7 +380,13 @@ impl<'c> Resolver<'c> {
     fn check_export_collisions(&mut self) {
         use heck::ToLowerCamelCase;
         let mut seen: HashMap<String, &str> = HashMap::new();
-        for (key, _) in self.config.contracts.iter() {
+        // Contracts without a client aren't exported, so can't collide.
+        let exported = self
+            .config
+            .contracts
+            .iter()
+            .filter(|(_, def)| def.client.as_ref().is_none_or(|c| c.value));
+        for (key, _) in exported {
             let export = key.value.to_lower_camel_case();
             if let Some(first) = seen.get(&export) {
                 self.diagnostics.push(
@@ -434,6 +460,7 @@ impl<'c> Resolver<'c> {
             after_deploy: Vec::new(),
             after_deploy_script: None,
             deploys,
+            client: def.client.as_ref().is_none_or(|c| c.value),
         };
         // Client-level deploy settings are inherited only where Scaffold
         // actually deploys; a network that references an existing contract
@@ -577,6 +604,9 @@ fn apply(name: &str, def: &NetworkDef, mut net: Network) -> Network {
     if let Some(b) = &def.allow_deploy {
         net.explicit_allow_deploy = Some(b.value);
     }
+    if let Some(b) = &def.allow_http {
+        net.explicit_allow_http = Some(b.value);
+    }
     net
 }
 
@@ -624,6 +654,7 @@ fn merge(defaults: &ContractSettings, over: &ContractSettings) -> ContractSettin
             .after_deploy_script
             .clone()
             .or_else(|| defaults.after_deploy_script.clone()),
+        client: None,
         networks: None,
     }
 }

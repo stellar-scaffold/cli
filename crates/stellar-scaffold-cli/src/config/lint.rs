@@ -57,6 +57,16 @@ pub fn lint(config: &Config, env: &Env) -> Vec<Diagnostic> {
                             .at(span(nested)),
                         );
                     }
+                    if let Some(client) = &settings.client {
+                        l.diags.push(
+                            Diagnostic::error(
+                                Code::UnknownKey,
+                                format!("{what} cannot set `client`"),
+                            )
+                            .at(span(client))
+                            .help("set it on the contract, so its client is the same on every network"),
+                        );
+                    }
                     l.settings(&what, settings);
                 }
             }

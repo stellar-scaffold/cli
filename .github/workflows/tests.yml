@@ -105,8 +105,15 @@ jobs:
             echo "Could not derive protocol version from stellar-cli pin in Cargo.toml" >&2
             exit 1
           fi
-          echo "Starting local network at protocol $PROTOCOL_VERSION"
-          stellar container start local --protocol-version "$PROTOCOL_VERSION"
+          # Same pinned image the CLI starts; the floating `testing` tag can move
+          # to an RPC that no longer simulates this protocol.
+          IMAGE_TAG=$(sed -n 's/^pub const LOCAL_IMAGE_TAG: &str = "\(.*\)";/\1/p' crates/stellar-scaffold-cli/src/commands/build/docker.rs)
+          if [ -z "$IMAGE_TAG" ]; then
+            echo "Could not read LOCAL_IMAGE_TAG from docker.rs" >&2
+            exit 1
+          fi
+          echo "Starting local network at protocol $PROTOCOL_VERSION with quickstart:$IMAGE_TAG"
+          stellar container start local --protocol-version "$PROTOCOL_VERSION" --image-tag-override "$IMAGE_TAG"
           echo "Waiting for RPC + friendbot to become healthy..."
           for _ in $(seq 1 50); do
             if curl --no-progress-meter --fail-with-body -X POST "http://localhost:8000/soroban/rpc" \

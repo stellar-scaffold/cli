@@ -145,6 +145,7 @@ fn translate(
             network_passphrase: Some(network_passphrase),
             rpc_headers: Some(rpc_headers),
             run_locally: net.start_container(),
+            allow_http: Some(net.allow_http()),
         },
         contracts: Some(contracts),
         extensions: extension_entries(config),
@@ -211,7 +212,10 @@ fn pipeline_entry(
     if c.after_deploy_script.is_some() {
         return Err(unsupported("`after-deploy-script`".to_string()));
     }
-    let mut entry = env_toml::Contract::default();
+    let mut entry = env_toml::Contract {
+        client: c.client,
+        ..env_toml::Contract::default()
+    };
     match c.ty {
         SourceType::Workspace => {
             entry.resolved = Some(ResolvedDeploy {
@@ -320,6 +324,18 @@ contracts:
         );
         assert_eq!(token.after_deploy, vec!["init"]);
         assert_eq!(contracts.get("dex").unwrap().id.as_deref(), Some(CONTRACT));
+    }
+
+    #[test]
+    fn translates_client_and_allow_http() {
+        let yaml = format!(
+            "version: 2\nnetworks:\n  local: {{}}\ncontracts:\n  a:\n    type: contract\n    source: {CONTRACT}\n    client: false\n    networks: {{ local: }}\n  b:\n    type: contract\n    source: {CONTRACT}\n    networks: {{ local: }}\n"
+        );
+        let env = translate_yaml(&yaml, "local").unwrap();
+        assert_eq!(env.network.allow_http, Some(true));
+        let contracts = env.contracts.unwrap();
+        assert!(!contracts["a"].client);
+        assert!(contracts["b"].client);
     }
 
     #[test]
