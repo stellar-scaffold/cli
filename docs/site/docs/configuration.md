@@ -32,7 +32,7 @@ contracts:
 
 Machine-local settings and secrets stay out of this file. They go in `.env`, which is gitignored and also read by your frontend.
 
-:::note Projects created before `scaffold.yml` version 2 use `environments.toml` instead. `build` and `watch` still read it as long as `scaffold.yml` says `version: 1`. See [Legacy: `environments.toml`](#legacy-environmentstoml) below. :::
+:::note Projects created before `scaffold.yml` version 2 use `environments.toml` instead. `build` and `watch` still read it as long as the project has an `environments.toml` and no version 2 `scaffold.yml`. See [Legacy: `environments.toml`](#legacy-environmentstoml) below. :::
 
 ## Choosing a network
 
@@ -44,6 +44,8 @@ Machine-local settings and secrets stay out of this file. They go in `.env`, whi
 
 The name must be declared under `networks:`. New projects set `STELLAR_NETWORK=local` in `.env`; switch it to `testnet` to build against testnet. Keep the `PUBLIC_STELLAR_*` values in `.env` pointed at the same network, since those are what your frontend connects to.
 
+Generated clients are bound to the network they were built for: its passphrase and RPC URL are written into `<clients-dir>/index.ts`. Rebuild after switching networks.
+
 `STELLAR_SCAFFOLD_ENV` is ignored with a version 2 `scaffold.yml`. The CLI warns if it is set.
 
 ## `version`
@@ -52,12 +54,13 @@ Required, and must be `2`. The CLI checks it before anything else, so a file wri
 
 ## `project`
 
-Where things live. Both keys are optional.
+Where things live and which package manager builds them. All keys are optional.
 
 | Key | Default | Meaning |
 | --- | --- | --- |
 | `contracts-dir` | `contracts` | Where your Rust contract crates live |
 | `clients-dir` | `app-lib/clients` | Where generated clients are written: one package per contract in `<clients-dir>/<name>/`, plus `<clients-dir>/index.ts`, which your app imports as `@stellar-scaffold/app-lib/clients` |
+| `package-manager` | `npm` | Installs and builds the generated clients: `npm`, `pnpm`, `yarn`, `bun` or `deno`, optionally pinned to a version (`pnpm@9.6.0`) that `doctor` checks. `init` records the one you choose, with its installed version |
 
 Everything in `clients-dir` is regenerated on each build, so hand edits are overwritten. To customize a client, import it into your own code instead.
 
@@ -98,9 +101,10 @@ A network with no settings can be written as a bare `testnet:`, which is the sam
 | `default-account` | first entry in `accounts` | Which account signs deploys when a contract sets no `signer`. Must be listed in `accounts` |
 | `start-container` | `true` only for the local (standalone) passphrase | Whether `build` starts a `stellar/quickstart` container. Set `false` if a local chain is already running at `rpc-url` |
 | `allow-deploy` | `false` for the testnet, futurenet and mainnet passphrases; `true` otherwise | Whether Scaffold may deploy `workspace` contracts here |
+| `allow-http` | `true` only for the local (standalone) passphrase | Whether generated clients may use a plain `http://` `rpc-url`. `config check` warns when it is set on a public network |
 | `extends` | none | Another declared network to inherit settings from |
 
-`allow-deploy` and `start-container` defaults come from the network's passphrase, not its name. A custom network pointed at testnet is treated like testnet, and a custom network with the standalone passphrase gets a local container.
+`allow-deploy`, `allow-http` and `start-container` defaults come from the network's passphrase, not its name. A custom network pointed at testnet is treated like testnet, and a custom network with the standalone passphrase gets a local container.
 
 ### `extends`
 
@@ -150,6 +154,7 @@ Keys directly under a contract are defaults for every network it lists. Entries 
 | `after-deploy` | List of contract methods to call, with no arguments, right after deploying |
 | `after-deploy-script` | Path to an executable to run after deploying (not yet supported by `build`) |
 | `from-network` | Copy the Wasm of a contract deployed on another network and deploy it here (not yet supported by `build`) |
+| `client` | Whether to generate a TypeScript client. Defaults to `true`. With `false` the contract is still built and deployed, for example as a dependency of other contracts. Only valid at the top level of a contract, so a client is the same on every network |
 | `networks` | Per-network entries. Only valid at the top level of a contract |
 
 `signer`, `args`, `after-deploy` and `after-deploy-script` only apply when Scaffold deploys the contract, which means `type: workspace` (or `from-network`). Setting them on a contract that only references an existing deployment is an error.
@@ -258,7 +263,9 @@ stellar scaffold config show --network testnet   # print the fully resolved conf
 
 ## Legacy: `environments.toml`
 
-Projects whose `scaffold.yml` says `version: 1` keep their networks, accounts and contracts in `environments.toml`, keyed by environment (`development`, `testing`, `staging`, `production`) and selected with `STELLAR_SCAFFOLD_ENV`. In those projects `scaffold.yml` only holds directories:
+Projects with an `environments.toml` and no version 2 `scaffold.yml` keep their networks, accounts and contracts in `environments.toml`, keyed by environment (`development`, `testing`, `staging`, `production`) and selected with `STELLAR_SCAFFOLD_ENV`.
+
+Contracts are read from `contracts/` and clients are written to `app-lib/clients/`, unless a version 1 `scaffold.yml` beside `environments.toml` moves them. Only its `config:` section is read:
 
 ```yaml
 version: 1
@@ -284,9 +291,9 @@ id = "C..."
 
 `build` and `watch` still read this format, and `--network` is ignored for it. To move to version 2:
 
-- Replace `config:` with `project:`, renaming `contracts_dir`/`clients_dir` to `contracts-dir`/`clients-dir`, and set `version: 2`.
+- Set `version: 2`. If your old `scaffold.yml` has a `config:` section, replace it with `project:`, renaming `contracts_dir`/`clients_dir` to `contracts-dir`/`clients-dir`.
 - Turn each environment into an entry under `networks:`. `run_locally` becomes `start-container`; an explicit `default = true` account becomes `default-account`.
-- Turn each contract into an entry under `contracts:` with `type: workspace` and its crate name as `source`, or `type: contract` and the `id` as `source`, and list the networks it belongs on.
+- Turn each contract into an entry under `contracts:` with `type: workspace` and its crate name as `source`, or `type: contract` and the `id` as `source`, and list the networks it belongs on. `client = false` becomes `client: false`.
 - Rewrite `constructor_args` as an `args` map, `$(stellar keys address x)` as `${account.x}`, and a `STELLAR_ACCOUNT=` prefix as `signer`.
 - Rewrite `after_deploy` as a list of method names. Calls that take arguments are not supported by `after-deploy` yet.
 - Move `extensions` into the top-level `extensions:` map.

@@ -43,12 +43,12 @@ pub enum VersionError {
     #[error(
         "scaffold.yml is missing or has no 'version' field. \
          Add 'version: {SCHEMA_VERSION}' at the top. \
-         See https://github.com/stellar-scaffold/cli/blob/main/CHANGELOG.md for details."
+         See https://github.com/stellar-scaffold/cli/blob/main/crates/stellar-scaffold-cli/CHANGELOG.md for details."
     )]
     MissingVersion,
     #[error(
         "scaffold.yml uses schema version {found}, but this CLI supports version {SCHEMA_VERSION}. \
-         See https://github.com/stellar-scaffold/cli/blob/main/CHANGELOG.md for migration instructions."
+         See https://github.com/stellar-scaffold/cli/blob/main/crates/stellar-scaffold-cli/CHANGELOG.md for migration instructions."
     )]
     UnsupportedVersion { found: u64 },
 }
