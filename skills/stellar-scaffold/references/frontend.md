@@ -72,7 +72,7 @@ The templates wrap the wallet state for their framework: React has `useWallet()`
 
 ## Network consistency
 
-The CLI bakes contract IDs into `index.ts` for the network it built (`STELLAR_NETWORK`). The app connects using `PUBLIC_STELLAR_NETWORK`, `PUBLIC_STELLAR_NETWORK_PASSPHRASE`, `PUBLIC_STELLAR_RPC_URL`, and `PUBLIC_STELLAR_HORIZON_URL`. If they point at different networks, every call fails with a missing contract or a passphrase mismatch. Change both together, then restart `npm run dev` so Vite picks up the new `.env`.
+The CLI bakes the network's passphrase, RPC URL, and contract IDs into `index.ts` for the network it built (`STELLAR_NETWORK`). The app connects using `PUBLIC_STELLAR_NETWORK`, `PUBLIC_STELLAR_NETWORK_PASSPHRASE`, `PUBLIC_STELLAR_RPC_URL`, and `PUBLIC_STELLAR_HORIZON_URL`. If they point at different networks, every call fails with a missing contract or a passphrase mismatch. Change both together, then restart `npm run dev` so Vite picks up the new `.env`.
 
 ## Building the app
 

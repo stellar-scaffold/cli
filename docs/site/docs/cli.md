@@ -16,7 +16,7 @@ Options:
 - `--template <name>`: Template selector. A bare framework name (`react` or `svelte`) picks an official template; a `user/repo` shorthand (optionally with `#branch` or `#tag`) degits that community repo directly; `none` creates a contracts-only project with no frontend. Omit to choose interactively
 - `--no-template`: Create a contracts-only project with no frontend (alias for `--template none`)
 - `--tutorial`: Start from the simplified project the [tutorial](./tutorial/00-overview.md) builds on, rather than a full template
-- `-p <name>` or `--package-manager <name>`: Package manager to use. Omit to choose interactively
+- `-p <name>` or `--package-manager <name>`: Package manager to use, recorded as `project.package-manager` in `scaffold.yml`. Omit to choose interactively
 - `-y` or `--yes`: Accept all defaults and skip interactive prompts
 
 `--tutorial` picks the frontend and the package manager for you, so it does not prompt. Pass `--package-manager` alongside it if you want something other than npm.
@@ -28,9 +28,9 @@ The init command creates:
 - `app-lib/`, utility code your app can use for wallet connection, network settings, and formatting, plus the directory your generated contract clients are written to
 - Configuration files for both contract and frontend development
 
-Official templates come from the [Stellar Scaffold templates repo](https://github.com/stellar-scaffold/ui).
+Official templates come from the [Stellar Scaffold templates repo](https://github.com/stellar-scaffold/ui). To build your own, see [Community Templates](./community-templates.md).
 
-With `--no-template` (or `--template none`), the frontend layer is omitted entirely: no `app/`, no `app-lib/`, no JS workspaces, no dependency install. Use plain `stellar scaffold build` to compile the contracts. Adding `--build-clients` still deploys and generates a client for every contract listed in [`scaffold.yml`](./configuration.md), even though there is no app to consume them.
+With `--no-template` (or `--template none`), the frontend layer is omitted entirely: no `app/`, no `app-lib/`, no JS workspaces, no dependency install. Every contract in [`scaffold.yml`](./configuration.md) is written with `client: false`, so `stellar scaffold build --build-clients` and `watch` deploy contracts without generating TypeScript clients. Remove it from a contract if you later need one.
 
 ## Generate Command
 
@@ -166,7 +166,7 @@ Findings that have a single-command remedy print it on a `fix:` line beneath.
 - `rustc` is installed, and matches `rust-toolchain.toml` if the project pins a version
 - The `wasm32v1-none` target contracts compile to is installed
 - The `stellar` CLI is installed, and its major version matches the one this release was built against
-- Node and the package manager named by your `package.json` `packageManager` field are installed
+- Node and the package manager named by `project.package-manager` in `scaffold.yml` (or a legacy `package.json` `packageManager` field) are installed
 
 **Project** — needs a Cargo workspace:
 
@@ -192,8 +192,7 @@ $ stellar scaffold doctor
 ✅ wasm-target        wasm32v1-none
 ✅ stellar-cli        27.0.0
 ✅ node               v24.16.0
-⚠️ package-manager    package.json pins npm@11.7.0, found 11.13.0
-    fix: corepack use npm@11.7.0
+✅ package-manager    npm 11.13.0
    Project
 ✅ scaffold-yml       scaffold.yml schema version 2
 ✅ contracts-dir      contracts
