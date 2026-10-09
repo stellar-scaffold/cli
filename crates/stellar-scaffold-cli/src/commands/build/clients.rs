@@ -991,7 +991,7 @@ impl Builder {
             (contract_id, Some(new_hash), needs_rebuild)
         };
 
-        // Without a client it's only deployed, for other contracts to depend on.
+        // Without a client, the contract is only deployed for other contracts to depend on.
         if settings.client {
             self.generate_contract_bindings(
                 name,
