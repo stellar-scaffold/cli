@@ -61,10 +61,35 @@ fn emit_local_protocol_version() {
         })
         .major;
     println!("cargo:rustc-env=LOCAL_PROTOCOL_VERSION={major}");
+    emit_local_image_tag(major);
 
     // The same pin, unparsed, so `doctor` can report which stellar-cli this
     // build expects alongside the one actually on PATH.
     println!("cargo:rustc-env=PINNED_STELLAR_CLI_VERSION={version}");
+}
+
+/// Look up the quickstart image tag for `protocol` in `quickstart-images.toml`
+/// and expose it as `LOCAL_IMAGE_TAG`. Fails the build when the protocol has no
+/// entry, so the image can't silently drift from the stellar-cli pin.
+fn emit_local_image_tag(protocol: u64) {
+    let manifest_dir = std::env::var("CARGO_MANIFEST_DIR").unwrap();
+    let path = std::path::Path::new(&manifest_dir).join("quickstart-images.toml");
+    println!("cargo:rerun-if-changed={}", path.display());
+
+    let contents = std::fs::read_to_string(&path)
+        .unwrap_or_else(|e| panic!("could not read {}: {e}", path.display()));
+    let table: toml::Table = toml::from_str(&contents)
+        .unwrap_or_else(|e| panic!("invalid {}: {e}", path.display()));
+    let tag = table
+        .get(&protocol.to_string())
+        .and_then(toml::Value::as_str)
+        .unwrap_or_else(|| {
+            panic!(
+                "no quickstart image tag for protocol {protocol}; add one to {}",
+                path.display()
+            )
+        });
+    println!("cargo:rustc-env=LOCAL_IMAGE_TAG={tag}");
 }
 
 /// Read the `stellar-cli` version pin from a manifest, checking both the

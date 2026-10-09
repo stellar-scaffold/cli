@@ -1,0 +1,5 @@
+# Quickstart image tag for each Stellar protocol the local network can run.
+# build.rs picks the entry for the protocol derived from the stellar-cli pin and
+# fails the build if there isn't one, so bumping stellar-cli forces a matching
+# image. CI reads this file too. Keys are protocol versions.
+27 = "v672-b1475.1-testing"

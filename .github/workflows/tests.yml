@@ -107,9 +107,9 @@ jobs:
           fi
           # Same pinned image the CLI starts; the floating `testing` tag can move
           # to an RPC that no longer simulates this protocol.
-          IMAGE_TAG=$(sed -n 's/^pub const LOCAL_IMAGE_TAG: &str = "\(.*\)";/\1/p' crates/stellar-scaffold-cli/src/commands/build/docker.rs)
+          IMAGE_TAG=$(sed -n "s/^$PROTOCOL_VERSION = \"\(.*\)\"/\1/p" crates/stellar-scaffold-cli/quickstart-images.toml)
           if [ -z "$IMAGE_TAG" ]; then
-            echo "Could not read LOCAL_IMAGE_TAG from docker.rs" >&2
+            echo "No quickstart image tag for protocol $PROTOCOL_VERSION in quickstart-images.toml" >&2
             exit 1
           fi
           echo "Starting local network at protocol $PROTOCOL_VERSION with quickstart:$IMAGE_TAG"

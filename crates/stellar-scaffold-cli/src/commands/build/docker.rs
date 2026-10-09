@@ -8,12 +8,11 @@ use stellar_cli::{CommandParser, commands as cli};
 /// so it tracks the protocol automatically when that dependency is bumped.
 const LOCAL_PROTOCOL_VERSION: &str = env!("LOCAL_PROTOCOL_VERSION");
 
-/// Quickstart image tag the local network runs. The floating `testing` tag
-/// moves to new RPC releases, which only simulate the current and previous
-/// protocol, so it must be pinned to an image that still simulates
-/// [`LOCAL_PROTOCOL_VERSION`]. Bump it alongside the protocol. CI reads this
-/// line to start the same image.
-pub const LOCAL_IMAGE_TAG: &str = "v672-b1475.1-testing";
+/// Quickstart image tag the local network runs, chosen by `build.rs` from
+/// `quickstart-images.toml` for [`LOCAL_PROTOCOL_VERSION`]. Pinned because the
+/// floating `testing` tag moves to RPC releases that only simulate the current
+/// and previous protocol.
+pub const LOCAL_IMAGE_TAG: &str = env!("LOCAL_IMAGE_TAG");
 
 pub async fn start_local_stellar(rpc_url: Option<&str>) -> Result<(), Box<dyn Error>> {
     let result = cli::container::StartCmd::parse_arg_vec(&[
