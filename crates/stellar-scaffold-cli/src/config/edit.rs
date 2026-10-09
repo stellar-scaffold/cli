@@ -157,7 +157,11 @@ fn last_content_line(lines: &[String], start: usize, end: usize) -> usize {
 
 /// Rejoin `lines`, keeping the original file's line endings and trailing newline.
 fn join(lines: &[String], original: &str) -> String {
-    let eol = if original.contains("\r\n") { "\r\n" } else { "\n" };
+    let eol = if original.contains("\r\n") {
+        "\r\n"
+    } else {
+        "\n"
+    };
     let mut out = lines.join(eol);
     if original.ends_with('\n') {
         out.push_str(eol);
@@ -266,6 +270,21 @@ contracts:
         let yaml = "version: 2\ncontracts:\n  token:\n    args:\n      initial_supply: 1000000000000000000000000\n";
         assert!(set_project_key(yaml, "package-manager", "npm").is_some());
         assert!(disable_clients(yaml).is_some());
+    }
+
+    #[test]
+    fn edits_keep_crlf_line_endings() {
+        let yaml = "version: 2\r\nproject:\r\n  contracts-dir: contracts\r\n";
+        assert_eq!(
+            set_project_key(yaml, "package-manager", "npm").unwrap(),
+            "version: 2\r\nproject:\r\n  contracts-dir: contracts\r\n  package-manager: npm\r\n"
+        );
+
+        let yaml = "version: 2\r\ncontracts:\r\n  a:\r\n    type: workspace\r\n";
+        assert_eq!(
+            disable_clients(yaml).unwrap(),
+            "version: 2\r\ncontracts:\r\n  a:\r\n    client: false\r\n    type: workspace\r\n"
+        );
     }
 
     #[test]

@@ -36,11 +36,11 @@ impl Check for ScaffoldYml {
         if let Some(loaded) = &ctx.config {
             return config_diagnoses(self.name(), root, loaded);
         }
+        // Version 2 files are loaded and reported above, so passing here means
+        // the project is configured by environments.toml.
 
         // Matched per variant rather than reusing the error text, which is too
         // long for one report line. The fix carries the migration link instead.
-        // Version 2 files are loaded and reported above, so passing here means
-        // the project is configured by environments.toml.
         let current = config::SCHEMA_VERSION;
         let version = match config::check_version(root) {
             Ok(()) => Diagnosis::warn(
