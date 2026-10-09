@@ -155,11 +155,12 @@ fn last_content_line(lines: &[String], start: usize, end: usize) -> usize {
         .unwrap_or(start)
 }
 
-/// Rejoin `lines`, keeping the original file's trailing newline.
+/// Rejoin `lines`, keeping the original file's line endings and trailing newline.
 fn join(lines: &[String], original: &str) -> String {
-    let mut out = lines.join("\n");
+    let eol = if original.contains("\r\n") { "\r\n" } else { "\n" };
+    let mut out = lines.join(eol);
     if original.ends_with('\n') {
-        out.push('\n');
+        out.push_str(eol);
     }
     out
 }
