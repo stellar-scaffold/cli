@@ -8,7 +8,8 @@ use crate::config::{self, CONFIG_FILE};
 use crate::extension::{ExtensionListStatus, list as list_extensions};
 
 /// Where the schema-version fixes point for migration instructions.
-const MIGRATION_URL: &str = "https://github.com/stellar-scaffold/cli/blob/main/CHANGELOG.md";
+const MIGRATION_URL: &str =
+    "https://github.com/stellar-scaffold/cli/blob/main/crates/stellar-scaffold-cli/CHANGELOG.md";
 
 /// Validates `scaffold.yml`: the full config for version 2, otherwise whether
 /// the project falls back to `environments.toml`, and the default directories.

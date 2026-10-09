@@ -16,6 +16,7 @@ version: 2 # required, must be 2
 project:
   contracts-dir: contracts # default
   clients-dir: app-lib/clients # default
+  package-manager: npm # default; npm, pnpm, yarn, bun or deno, optionally @version
 
 networks:
   local:
@@ -70,6 +71,7 @@ The parser is strict: unknown keys, duplicate keys and wrong types are errors. K
 | `default-account` | first of `accounts` | Signs deploys when a contract has no `signer`. Must be in `accounts` |
 | `start-container` | `true` only for the standalone passphrase | Start a `stellar/quickstart` container. `false` if a chain already runs at `rpc-url` |
 | `allow-deploy` | `false` for testnet, futurenet, mainnet passphrases; else `true` | Whether `workspace` contracts may deploy here. `true` on mainnet is a warning |
+| `allow-http` | `true` only for the standalone passphrase | Whether generated clients may use a plain `http://` `rpc-url`. `true` on a public network is a warning |
 | `extends` | none | Inherit another declared network's settings |
 
 Defaults come from the **passphrase**, never the name: a custom network on testnet's passphrase behaves like testnet.
@@ -91,6 +93,7 @@ The key is the **client name**: the package directory `<clients-dir>/<name>/` an
 | `after-deploy` | List of no-argument methods called, in order, right after a deploy or upgrade |
 | `after-deploy-script` | Path to an executable run after deploy (**not yet supported by `build`**) |
 | `from-network` | Copy another network's deployed Wasm and deploy it here (**not yet supported by `build`**) |
+| `client` | Generate a TypeScript client (default `true`). `false` still builds and deploys, e.g. for a dependency. Top level only; an error under `networks:` |
 | `networks` | Per-network entries. **Required**: the contract exists only on networks listed here |
 
 Keys at the contract's top level are defaults for every listed network. Per-network entries override them. Changing `type` in an override requires `source` too.
@@ -171,16 +174,16 @@ name = "my-awesome-contract"    # override an inherited value
 
 ## Legacy: `environments.toml`
 
-Projects whose `scaffold.yml` says `version: 1` (only a `config:` section with `contracts_dir`/`clients_dir`) keep networks, accounts and contracts in `environments.toml`, per environment (`development`, `testing`, `staging`, `production`), selected by `STELLAR_SCAFFOLD_ENV`. `build` still reads them, and ignores `--network`.
+Projects with an `environments.toml` and no version 2 `scaffold.yml` keep networks, accounts and contracts in `environments.toml`, per environment (`development`, `testing`, `staging`, `production`), selected by `STELLAR_SCAFFOLD_ENV`. `build` still reads them, and ignores `--network`. Directories default to `contracts/` and `app-lib/clients/`; a version 1 `scaffold.yml` beside it can move them with `config:` `contracts_dir`/`clients_dir`, and nothing else in that file is read.
 
 To convert:
 
-- `version: 2`; `config:` → `project:` with `contracts-dir`/`clients-dir`.
+- `version: 2`; an old `config:` → `project:` with `contracts-dir`/`clients-dir`.
 - Each `[<env>.network]` → a `networks:` entry. `run_locally` → `start-container`. An account with `default = true` → `default-account`.
 - Each `[<env>.contracts.<name>]` → one `contracts.<name>` entry with `type: workspace` + `source: <crate>` (or `type: contract` + `source: <id>` where it had `id`), listing each network it belongs on.
 - `constructor_args = "--admin me"` → `args: { admin: ${account.me} }`. `$(stellar keys address x)` → `${account.x}`. `STELLAR_ACCOUNT=x` prefix → `signer: x`.
 - `after_deploy` → `after-deploy: [method, …]`, no-argument calls only.
-- `client = false` has no equivalent. Every listed contract gets a client.
+- `client = false` → `client: false` on the contract (not per network).
 - `extensions = [...]` and `[<env>.ext.<name>]` → the top-level `extensions:` map.
 - `.env`: `STELLAR_SCAFFOLD_ENV=…` → `STELLAR_NETWORK=…`. Delete `environments.toml`.
 

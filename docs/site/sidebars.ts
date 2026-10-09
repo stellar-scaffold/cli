@@ -33,6 +33,7 @@ const sidebars: SidebarsConfig = {
     "cli",
     "configuration",
     "extensions",
+    "community-templates",
     "registry",
     "deploy",
     "agent-skills",

@@ -47,7 +47,7 @@ Without `--build-clients`, `build` only compiles. With it, for the selected netw
 
 `config show` applies `extends`, fills in built-in RPC URLs and passphrases, merges per-network contract overrides, and substitutes `${env.…}` and `${network.…}`. `${account.…}` stays symbolic. Contracts that don't list the network are omitted.
 
-`doctor` checks `rustc` (against `rust-toolchain.toml`), the `wasm32v1-none` target, the `stellar` CLI version, Node and the `packageManager` pin, `scaffold.yml` (listing every `config check` problem), the `contracts-dir` and `clients-dir` directories, the project's `engines.stellar-scaffold` constraint, and `.env`. Its Docker, local RPC, and extension checks currently run only for legacy `environments.toml` projects. Exit code is `1` on any error, or on warnings with `--strict`.
+`doctor` checks `rustc` (against `rust-toolchain.toml`), the `wasm32v1-none` target, the `stellar` CLI version, Node and the package manager named by `project.package-manager` (or a legacy `package.json` `packageManager` pin), `scaffold.yml` (listing every `config check` problem), the `contracts-dir` and `clients-dir` directories, the project's `engines.stellar-scaffold` constraint, and `.env`. Its Docker, local RPC, and extension checks currently run only for legacy `environments.toml` projects. Exit code is `1` on any error, or on warnings with `--strict`.
 
 ## Examples
 
