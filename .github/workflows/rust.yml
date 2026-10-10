@@ -37,7 +37,7 @@ jobs:
       - uses: taiki-e/install-action@nextest
       - uses: taiki-e/install-action@just
       - uses: cargo-bins/cargo-binstall@main
-      - uses: mozilla-actions/sccache-action@v0.0.10
+      - uses: mozilla-actions/sccache-action@v0.0.11
       - name: Run cargo fmt
         run: cargo fmt --all -- --check
       - uses: stellar/stellar-cli@v26.0.0
