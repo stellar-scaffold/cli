@@ -18,8 +18,8 @@
   },
   "dependencies": {
     "@docusaurus/core": "3.9.2",
-    "@docusaurus/plugin-client-redirects": "^3.9.2",
-    "@docusaurus/plugin-ideal-image": "^3.9.2",
+    "@docusaurus/plugin-client-redirects": "3.9.2",
+    "@docusaurus/plugin-ideal-image": "3.9.2",
     "@docusaurus/preset-classic": "3.9.2",
     "@mdx-js/react": "^3.1.1",
     "clsx": "^2.1.1",
@@ -49,5 +49,11 @@
   },
   "engines": {
     "node": ">=20.0"
+  },
+  "overrides": {
+    "tinypool": "2.2.0",
+    "serialize-javascript": "^7.1.2",
+    "sharp": "^0.35.5",
+    "webpack": "5.103.0"
   }
 }
