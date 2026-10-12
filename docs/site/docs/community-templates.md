@@ -15,10 +15,10 @@ Any `--template` value containing a `/` is treated as a community repo, with an 
 
 Your repo is used as-is, so it must already be a complete, runnable Scaffold project. At the root it needs:
 
-| Path | Purpose |
-| --- | --- |
-| `scaffold.yml` | Project config starting with `version: 2` |
-| `Cargo.toml` | Rust workspace containing your contracts |
+| Path           | Purpose                                                  |
+| -------------- | -------------------------------------------------------- |
+| `scaffold.yml` | Project config starting with `version: 2`                |
+| `Cargo.toml`   | Rust workspace containing your contracts                 |
 | `.env.example` | _Optional._ Default environment values, copied to `.env` |
 
 Everything else is up to you: where contracts live, and which language, framework, and task runner your frontend uses.
@@ -30,9 +30,9 @@ The `project:` section of `scaffold.yml` tells the CLI where things live and whi
 ```yaml
 version: 2
 project:
-  contracts-dir: contracts        # Rust contract crates
-  clients-dir: app-lib/clients    # Generated TypeScript clients
-  package-manager: pnpm           # npm, pnpm, yarn, bun, or deno; pin with pnpm@9.6.0
+  contracts-dir: contracts # Rust contract crates
+  clients-dir: app-lib/clients # Generated TypeScript clients
+  package-manager: pnpm # npm, pnpm, yarn, bun, or deno; pin with pnpm@9.6.0
 ```
 
 All three are optional. Directories default to the values above and the package manager defaults to npm. `init` uses your template's `package-manager` unless the user passes `--package-manager`. See [Configuration](/docs/configuration) for every `scaffold.yml` key.
