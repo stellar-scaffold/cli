@@ -14,7 +14,6 @@ use stellar_scaffold_test::{AssertExt, TestEnv, rpc_url};
 #[case::eth_abi("stellar/eth_abi")]
 #[case::events("stellar/events")]
 #[case::fuzzing("stellar/fuzzing")]
-#[case::groth16_verifier("stellar/groth16_verifier")]
 #[case::import_ark_bn254("stellar/import_ark_bn254")]
 #[case::increment("stellar/increment")]
 #[case::increment_with_fuzz("stellar/increment_with_fuzz")]

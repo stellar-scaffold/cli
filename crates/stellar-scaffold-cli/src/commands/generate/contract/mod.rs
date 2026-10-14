@@ -672,8 +672,11 @@ members = []
     }
 
     fn filter_soroban_examples_repository(repo_cache_path: &Path) -> Result<(), Error> {
-        // Atomic multiswap imports atomic swap contract which is currently not supported
-        let ignore_list = HashSet::from(["workspace", "atomic_multiswap"]);
+        // Examples `generate contract` can't scaffold: `workspace` and
+        // `atomic_multiswap` import other contracts; `groth16_verifier` is a
+        // nested multi-contract workspace (no top-level package), which this
+        // command doesn't support.
+        let ignore_list = HashSet::from(["workspace", "atomic_multiswap", "groth16_verifier"]);
         let rd = repo_cache_path.read_dir()?;
         for path in rd {
             let path = path?.path();
