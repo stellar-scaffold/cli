@@ -18,13 +18,12 @@ use stellar_cli::print::Print;
 use tar::Archive;
 use toml::Value::Table;
 
-// Source of the `stellar/<name>` example contracts. Points at a fork in our own
-// org, pinned to a tag whose contracts target the same protocol this CLI builds
-// against — upstream `stellar/soroban-examples` lags protocol releases (no tag
-// past v23 at time of writing). Both the repo slug and the ref are overridable
-// via env for CI/tests and for users who want to point back at upstream.
-const SOROBAN_EXAMPLES_SLUG: &str = "stellar-scaffold/soroban-examples";
-const SOROBAN_EXAMPLES_REF: &str = "v27.0.0-rc.1";
+// Source of the `stellar/<name>` example contracts: upstream
+// `stellar/soroban-examples`, pinned to current supported protocol version.
+// Both the repo slug and the ref are overridable via env for CI/tests.
+// NOTE: upstream stopped tagging releases, so we need to pin commit hash
+const SOROBAN_EXAMPLES_SLUG: &str = "stellar/soroban-examples";
+const SOROBAN_EXAMPLES_REF: &str = "03d42aa6b973dcf3a453a99d0c6a6e8d25a196e2";
 const SOROBAN_EXAMPLES_REPO_ENV: &str = "STELLAR_SCAFFOLD_EXAMPLES_REPO";
 const SOROBAN_EXAMPLES_REF_ENV: &str = "STELLAR_SCAFFOLD_EXAMPLES_REF";
 const STELLAR_PREFIX: &str = "stellar/";
