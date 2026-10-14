@@ -98,11 +98,12 @@ jobs:
       # simulation on deploy.
       - name: Start local Stellar network
         run: |
-          # Single source of truth: derive the protocol from the stellar-cli pin
-          # in Cargo.toml — the same value build.rs bakes into the CLI binary.
-          PROTOCOL_VERSION=$(sed -n 's/.*stellar-cli = .*version = "\([0-9]*\).*/\1/p' Cargo.toml | head -1)
+          # Single source of truth: the protocol + image tag the CLI bakes in
+          # live as consts in docker.rs; read both from there so CI starts the
+          # same network the binary does.
+          PROTOCOL_VERSION=$(sed -n 's/^const LOCAL_PROTOCOL_VERSION: &str = "\(.*\)";/\1/p' crates/stellar-scaffold-cli/src/commands/build/docker.rs | head -1)
           if [ -z "$PROTOCOL_VERSION" ]; then
-            echo "Could not derive protocol version from stellar-cli pin in Cargo.toml" >&2
+            echo "Could not read LOCAL_PROTOCOL_VERSION from docker.rs" >&2
             exit 1
           fi
           # Same pinned image the CLI starts; the floating `testing` tag can move

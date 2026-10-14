@@ -167,8 +167,10 @@ impl Check for StellarCli {
             )];
         };
 
-        // Majors track the protocol version, so a mismatch there is what breaks
-        // builds; patch differences are fine.
+        // Compare against the stellar-cli this binary was built with: a major
+        // mismatch is what breaks compatibility, patch differences are fine. This
+        // is CLI-vs-pin only — the local protocol is pinned separately in docker.rs
+        // (stellar-cli's major no longer tracks the protocol).
         let pinned_major = major(PINNED_STELLAR_CLI_VERSION);
         if major(installed) == pinned_major {
             Diagnosis::ok(self.name(), Category::Toolchain, installed)

@@ -1,7 +1,7 @@
 fn main() {
     crate_git_revision::init();
 
-    emit_local_protocol_version();
+    emit_pinned_stellar_cli_version();
 
     // cargo_bin!("stellar-scaffold-reporter") in integration tests expands to
     // env!("CARGO_BIN_EXE_stellar-scaffold-reporter"), which Cargo sets for
@@ -24,46 +24,17 @@ fn main() {
     );
 }
 
-/// Derive the Stellar protocol version the local network should run from the
-/// `stellar-cli` pin, and expose it as the `LOCAL_PROTOCOL_VERSION` compile-time
-/// env var. stellar-cli's major version tracks the protocol, so this stays correct
-/// across upgrades without a hardcoded number — bump the dependency and the local
-/// network follows.
-///
-/// In a normal workspace build the pin lives in the workspace `Cargo.toml` two
-/// levels up. During `cargo package`/`publish` the crate is copied to
-/// `target/package/<crate>/`, where that path no longer exists — but Cargo inlines
-/// the resolved version into the crate's own manifest (`workspace = true` becomes a
-/// concrete `version`). Read whichever manifest actually holds the pin so the
-/// build script works in both contexts.
-fn emit_local_protocol_version() {
+/// Expose the pinned `stellar-cli` version as `PINNED_STELLAR_CLI_VERSION` env
+/// var so `doctor` can report the expected version alongside the one actually
+/// on user's PATH. Read from workspace, falling back to crate manifest.
+fn emit_pinned_stellar_cli_version() {
     let manifest_dir = std::env::var("CARGO_MANIFEST_DIR").unwrap();
     let crate_toml = std::path::Path::new(&manifest_dir).join("Cargo.toml");
-    // crates/stellar-scaffold-cli -> workspace root is two levels up.
     let workspace_toml = std::path::Path::new(&manifest_dir).join("../../Cargo.toml");
 
     let version = read_stellar_cli_version(&workspace_toml)
         .or_else(|| read_stellar_cli_version(&crate_toml))
-        .expect(
-            "could not find a stellar-cli version pin in the workspace or crate Cargo.toml \
-             for the protocol version",
-        );
-
-    // The pin is a semver requirement (e.g. "=27.0.0"); take the major from its
-    // first comparator. stellar-cli's major version tracks the protocol.
-    let req = semver::VersionReq::parse(&version)
-        .unwrap_or_else(|e| panic!("invalid stellar-cli version requirement \"{version}\": {e}"));
-    let major = req
-        .comparators
-        .first()
-        .unwrap_or_else(|| {
-            panic!("stellar-cli version requirement \"{version}\" has no comparator")
-        })
-        .major;
-    println!("cargo:rustc-env=LOCAL_PROTOCOL_VERSION={major}");
-
-    // The same pin, unparsed, so `doctor` can report which stellar-cli this
-    // build expects alongside the one actually on PATH.
+        .expect("could not find a stellar-cli version in workspace or crate Cargo.toml");
     println!("cargo:rustc-env=PINNED_STELLAR_CLI_VERSION={version}");
 }
 

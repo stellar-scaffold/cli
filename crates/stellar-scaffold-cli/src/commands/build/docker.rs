@@ -2,11 +2,10 @@ use std::error::Error;
 use stellar_cli::{CommandParser, commands as cli};
 
 /// Protocol version the local network is started with. Without this, quickstart
-/// arms its baked-in default (currently protocol 25), so contracts built against
-/// a newer soroban-sdk fail transaction simulation on deploy. Derived at build
-/// time from the `stellar-cli` pin in the workspace `Cargo.toml` (see build.rs),
-/// so it tracks the protocol automatically when that dependency is bumped.
-const LOCAL_PROTOCOL_VERSION: &str = env!("LOCAL_PROTOCOL_VERSION");
+/// uses its default and contracts built against a newer soroban-sdk fail with
+/// transaction simulation on deploy. Pinned explicitly and verified against the
+/// running image by a preflight check.
+const LOCAL_PROTOCOL_VERSION: &str = "27";
 
 /// Quickstart image tag the local network runs. The floating `testing` tag
 /// moves to new RPC releases, which only simulate the current and previous
