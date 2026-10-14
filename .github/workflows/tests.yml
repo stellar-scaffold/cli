@@ -32,8 +32,8 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y libdbus-1-dev pkg-config libudev-dev
-      - run: rustup update
-      - run: rustup target add wasm32v1-none
+      # rust-toolchain.toml pins the channel and wasm32v1-none target; rustup
+      # auto-installs them, so no explicit rustup update/target add is needed.
       - uses: taiki-e/install-action@just
       - uses: taiki-e/install-action@nextest
       - uses: cargo-bins/cargo-binstall@main
@@ -145,27 +145,10 @@ jobs:
           mkdir -p /tmp/nextest-run
           cargo nextest run --archive-file nextest-archive.tar.zst --extract-to /tmp/nextest-run --workspace-remap . --no-run
           cp -a /tmp/nextest-run/target/* target/
-      # Label a PR `cross-repo` to degit the UI from a same-named branch on the
-      # UI repo, so coordinated cross-repo changes can go green before the UI
-      # is released. Unlabeled PRs always use the main branch.
       - name: Resolve UI repo ref
-        env:
-          CROSS_REPO: ${{ contains(github.event.pull_request.labels.*.name, 'cross-repo') }}
-        run: |
-          REF="${{ github.head_ref }}"
-          if [ "$CROSS_REPO" != "true" ]; then
-            echo "Using default UI monorepo (main)."
-            echo "To test against a UI branch, label this PR 'cross-repo'."
-            exit 0
-          fi
-          if ! git ls-remote --exit-code --heads \
-              https://github.com/stellar-scaffold/ui "$REF" >/dev/null 2>&1; then
-            echo "::error::PR is labeled 'cross-repo' but no branch named" \
-              "'$REF' exists on stellar-scaffold/ui. Push that branch, or" \
-              "remove the label to use main."
-            exit 1
-          fi
-          echo "STELLAR_SCAFFOLD_UI_REPO=stellar-scaffold/ui#$REF" >> "$GITHUB_ENV"
-          echo "Pinned UI monorepo -> $REF"
+        uses: ./.github/actions/resolve-ui-ref
+        with:
+          cross-repo: ${{ contains(github.event.pull_request.labels.*.name, 'cross-repo') }}
+          head-ref: ${{ github.head_ref }}
       - name: Run tests
         run: just ${{ matrix.filter }} true

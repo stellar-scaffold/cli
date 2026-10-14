@@ -1,0 +1,38 @@
+name: Resolve UI repo ref
+description: >
+  Resolve which stellar-scaffold/ui branch the build should degit. A PR labeled
+  'cross-repo' pins the UI monorepo to a same-named branch (failing if that
+  branch does not exist), so coordinated cross-repo changes can go green before
+  the UI is released; unlabeled PRs use main. Exports STELLAR_SCAFFOLD_UI_REPO
+  to the job environment when a branch is pinned.
+
+inputs:
+  cross-repo:
+    description: "true when the PR carries the 'cross-repo' label"
+    required: true
+  head-ref:
+    description: "PR head branch name (github.head_ref)"
+    required: true
+
+runs:
+  using: composite
+  steps:
+    - shell: bash
+      env:
+        CROSS_REPO: ${{ inputs.cross-repo }}
+        REF: ${{ inputs.head-ref }}
+      run: |
+        if [ "$CROSS_REPO" != "true" ]; then
+          echo "Using default UI monorepo (main)."
+          echo "To test against a UI branch, label this PR 'cross-repo'."
+          exit 0
+        fi
+        if ! git ls-remote --exit-code --heads \
+            https://github.com/stellar-scaffold/ui "$REF" >/dev/null 2>&1; then
+          echo "::error::PR is labeled 'cross-repo' but no branch named" \
+            "'$REF' exists on stellar-scaffold/ui. Push that branch, or" \
+            "remove the label to use main."
+          exit 1
+        fi
+        echo "STELLAR_SCAFFOLD_UI_REPO=stellar-scaffold/ui#$REF" >> "$GITHUB_ENV"
+        echo "Pinned UI monorepo -> $REF"
