@@ -67,7 +67,7 @@ impl std::fmt::Display for ScaffoldEnv {
 }
 
 #[derive(clap::Args, Clone, Debug)]
-pub struct Args {
+pub struct ClientsArgs {
     #[arg(env = "STELLAR_SCAFFOLD_ENV", value_enum)]
     pub env: Option<ScaffoldEnv>,
     /// Network to build for, as named under `networks:` in a version 2
@@ -1280,7 +1280,7 @@ impl Builder {
     }
 }
 
-impl Args {
+impl ClientsArgs {
     fn printer(&self) -> Print {
         Print::new(self.global_args.as_ref().is_some_and(|args| args.quiet))
     }

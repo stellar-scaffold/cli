@@ -29,6 +29,10 @@ pub struct Cmd {
     pub build_cmd: build::Command,
 }
 
+// `Build` wraps soroban-cli's build::Error, which grew past the other variants
+// after the protocol-29 dep bump. Boxing it would need a manual `From` (thiserror
+// `#[from]` + `Box` don't compose); not worth it for this internal error type.
+#[allow(clippy::large_enum_variant)]
 #[derive(thiserror::Error, Debug)]
 pub enum Error {
     #[error(transparent)]

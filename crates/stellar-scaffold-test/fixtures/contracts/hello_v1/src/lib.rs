@@ -1,5 +1,7 @@
 #![no_std]
-use soroban_sdk::{Address, BytesN, Env, String, contract, contractimpl, symbol_short};
+use soroban_sdk::{
+    Address, BytesN, ContractExecutable, Env, String, contract, contractimpl, symbol_short,
+};
 
 const ADMIN: soroban_sdk::Symbol = symbol_short!("ADMIN");
 
@@ -15,7 +17,8 @@ impl Contract {
     pub fn upgrade(env: &Env, new_wasm_hash: BytesN<32>) {
         let admin: Address = env.storage().instance().get(&ADMIN).unwrap();
         admin.require_auth();
-        env.deployer().update_current_contract_wasm(new_wasm_hash);
+        env.deployer()
+            .update_current_contract(ContractExecutable::Wasm(new_wasm_hash));
     }
 
     pub fn hello(_env: &Env, to: String) -> String {

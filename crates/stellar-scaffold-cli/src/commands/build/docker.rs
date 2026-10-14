@@ -5,14 +5,14 @@ use stellar_cli::{CommandParser, commands as cli};
 /// uses its default and contracts built against a newer soroban-sdk fail with
 /// transaction simulation on deploy. Pinned explicitly and verified against the
 /// running image by a preflight check.
-const LOCAL_PROTOCOL_VERSION: &str = "27";
+const LOCAL_PROTOCOL_VERSION: &str = "29";
 
 /// Quickstart image tag the local network runs. The floating `testing` tag
 /// moves to new RPC releases, which only simulate the current and previous
 /// protocol, so it must be pinned to an image that still simulates
 /// [`LOCAL_PROTOCOL_VERSION`]. Bump it alongside the protocol. CI reads this
 /// line to start the same image.
-pub const LOCAL_IMAGE_TAG: &str = "v672-b1475.1-testing";
+pub const LOCAL_IMAGE_TAG: &str = "v678-b1525.1-testing";
 
 pub async fn start_local_stellar(rpc_url: Option<&str>) -> Result<(), Box<dyn Error>> {
     let result = cli::container::StartCmd::parse_arg_vec(&[

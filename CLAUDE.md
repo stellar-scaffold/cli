@@ -14,7 +14,7 @@ Related repos:
 ## Common Commands
 
 ```bash
-# Install the pinned stellar-cli (v26.0.0) into ./target/bin and set up git hooks
+# Install the pinned stellar-cli version into ./target/bin and set up git hooks
 just setup
 
 # Build / check / test

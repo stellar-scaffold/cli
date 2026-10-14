@@ -20,7 +20,6 @@ tokio-stream = "0.1"
 uuid = { version = "1.23", features = ["v4"] }
 clap = { workspace = true }
 
-soroban-sdk = { workspace = true }
 stellar-strkey = { workspace = true }
 stellar-cli = { workspace = true }
 wasm-gen = "0.1.4"

@@ -39,7 +39,7 @@ pub struct Command {
     #[arg(long)]
     pub build_clients: bool,
     #[command(flatten)]
-    pub build_clients_args: clients::Args,
+    pub build_clients_args: clients::ClientsArgs,
 }
 
 #[derive(thiserror::Error, Debug)]
@@ -178,7 +178,10 @@ impl Command {
         .await;
 
         for p in &packages {
-            self.create_cmd(p, target_dir)?.run(global_args)?;
+            // Resolve the command (and its non-Send error) before the await so the
+            // rebuild future stays Send for `tokio::spawn` in `watch`.
+            let cmd = self.create_cmd(p, target_dir)?;
+            cmd.run(global_args).await?;
         }
 
         // Build post-compile context with populated wasm_paths.

@@ -362,9 +362,13 @@ impl Cmd {
         &self,
         global_args: &stellar_cli::commands::global::Args,
     ) -> Result<(), Error> {
-        // Run scaffold build to generate WASM files
+        // Run scaffold build to generate WASM files.
+        // The container arg fields of soroban-cli's build::Cmd are pub(crate)
+        // types we can't name, so they must be `Default::default()` (resolved by
+        // inference) rather than an explicit type as clippy would prefer.
+        #[allow(clippy::default_trait_access)]
         let build_cmd = build::Command {
-            build_clients_args: build::clients::Args {
+            build_clients_args: build::clients::ClientsArgs {
                 network: None,
                 plan: None,
                 env: Some(build::clients::ScaffoldEnv::Development),
@@ -384,6 +388,11 @@ impl Cmd {
                 out_dir: None,
                 locked: false,
                 print_commands_only: false,
+                image: None,
+                pull: false,
+                container_args: Default::default(),
+                run_args: Default::default(),
+                command: None,
                 build_args: stellar_cli::commands::contract::build::BuildArgs::default(),
             },
             list: false,
