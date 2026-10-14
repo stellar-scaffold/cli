@@ -130,6 +130,8 @@ jobs:
           echo "Local network failed to become healthy in time." >&2
           docker logs stellar --tail 100 || true
           exit 1
+      - name: Verify network coherence
+        run: just preflight
       - name: Download nextest archive
         uses: actions/download-artifact@v8
         with:

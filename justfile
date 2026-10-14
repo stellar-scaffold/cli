@@ -83,3 +83,33 @@ clippy *args:
 
 clippy-test:
     just clippy --tests --all-features
+
+# Assert the running local network + stellar CLI match what this repo pins
+preflight rpc_url=env_var_or_default('STELLAR_RPC_URL', 'http://localhost:8000/rpc'):
+    #!/usr/bin/env bash
+    set -euo pipefail
+    # Catches a wrong quickstart image tag (network simulates the wrong protocol) or a
+    # stale stellar-cli before integration tests deploy against it and fail with an
+    # opaque simulation error. Assumes a local network is already up.
+    docker_rs=crates/stellar-scaffold-cli/src/commands/build/docker.rs
+    pinned_protocol=$(sed -n 's/^const LOCAL_PROTOCOL_VERSION: &str = "\(.*\)";/\1/p' "$docker_rs")
+    pinned_cli=$(sed -n 's/.*stellar-cli = .*version = "\([^"]*\)".*/\1/p' Cargo.toml | head -1)
+
+    # 1) The running network must simulate the pinned protocol.
+    net=$(curl -fsS -X POST "{{ rpc_url }}" -H 'Content-Type: application/json' \
+      -d '{"jsonrpc":"2.0","id":1,"method":"getNetwork"}')
+    running=$(printf '%s' "$net" | sed -n 's/.*"protocolVersion":[[:space:]]*\([0-9]*\).*/\1/p')
+    if [ "$running" != "$pinned_protocol" ]; then
+      echo "::error::local network runs protocol '$running' but this build pins '$pinned_protocol'" \
+           "— the quickstart image tag (LOCAL_IMAGE_TAG) likely doesn't match the protocol." >&2
+      exit 1
+    fi
+
+    # 2) The stellar CLI on PATH must match the pinned major (its protocol line).
+    installed=$(stellar --version | sed -n 's/^stellar \([0-9][0-9.]*\).*/\1/p' | head -1)
+    if [ "${installed%%.*}" != "${pinned_cli%%.*}" ]; then
+      echo "::error::stellar '$installed' on PATH but this build pins stellar-cli '$pinned_cli'." >&2
+      exit 1
+    fi
+
+    echo "preflight OK: network protocol $running, stellar-cli $installed (pin $pinned_cli)."
