@@ -11,38 +11,6 @@ import Heading from '@theme/Heading';
 
 import styles from './index.module.css';
 
-/**
- * The brand mark: a braced frame, the shape of the scaffolding that holds a
- * structure while it is being built. Reused as the favicon/logo motif.
- */
-function ScaffoldMark({className}: {className?: string}) {
-  return (
-    <svg
-      className={className}
-      viewBox="0 0 32 32"
-      fill="none"
-      role="img"
-      aria-hidden="true"
-      focusable="false">
-      <rect
-        x="3.5"
-        y="3.5"
-        width="25"
-        height="25"
-        rx="1.5"
-        stroke="currentColor"
-        strokeWidth="2"
-      />
-      <path
-        d="M3.5 16h25M16 3.5v25M3.5 3.5l25 25M28.5 3.5l-25 25"
-        stroke="currentColor"
-        strokeWidth="1.25"
-        opacity="0.45"
-      />
-    </svg>
-  );
-}
-
 const INSTALL_COMMAND = 'cargo install --locked stellar-scaffold-cli';
 
 function InstallCommand() {
@@ -119,7 +87,6 @@ function HomepageHeader() {
   return (
     <header className={styles.hero}>
       <div className={styles.heroInner}>
-        <ScaffoldMark className={styles.heroMark} />
         <Heading as="h1" className={styles.heroHeading}>
           {siteConfig.title}
         </Heading>

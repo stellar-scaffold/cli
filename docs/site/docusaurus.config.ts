@@ -108,10 +108,6 @@ const config: Config = {
     },
     navbar: {
       title: 'Stellar Scaffold',
-      logo: {
-        alt: 'Stellar Scaffold logo',
-        src: 'img/logo.svg',
-      },
       items: [
         {
           type: 'docSidebar',

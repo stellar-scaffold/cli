@@ -3,10 +3,6 @@
     "message": "Stellar Scaffold",
     "description": "The title in the navbar"
   },
-  "logo.alt": {
-    "message": "Stellar Scaffold Logo",
-    "description": "The alt text of navbar logo"
-  },
   "item.label.Documentation": {
     "message": "Documentación",
     "description": "Navbar item with label Documentation"
