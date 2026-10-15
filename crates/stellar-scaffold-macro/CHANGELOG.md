@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.8.16](https://github.com/stellar-scaffold/cli/compare/stellar-scaffold-macro-v0.8.15...stellar-scaffold-macro-v0.8.16) - 2026-10-15
+
+### Other
+
+- updated the following local packages: stellar-build
+
 ## [0.8.15](https://github.com/stellar-scaffold/cli/compare/stellar-scaffold-macro-v0.8.14...stellar-scaffold-macro-v0.8.15) - 2026-06-29
 
 ### Other

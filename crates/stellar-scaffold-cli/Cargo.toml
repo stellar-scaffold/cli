@@ -5,7 +5,7 @@ homepage = "https://github.com/stellar-scaffold/cli"
 authors = ["Aha Labs <hello@theaha.co>"]
 license = "Apache-2.0"
 readme = "README.md"
-version = "0.0.29"
+version = "0.0.30"
 edition = "2024"
 autobins = false
 repository = "https://github.com/stellar-scaffold/cli/tree/main/crates/stellar-scaffold-cli"
@@ -25,7 +25,7 @@ path = "src/lib.rs"
 doctest = false
 
 [dependencies]
-stellar-build = { path = "../stellar-build", version = "0.0.7" }
+stellar-build = { path = "../stellar-build", version = "0.0.8" }
 stellar-scaffold-ext-types = { path = "../stellar-scaffold-ext-types", version = "0.0.4" }
 stellar-cli = { workspace = true, default-features = true }
 soroban-rpc = { workspace = true }

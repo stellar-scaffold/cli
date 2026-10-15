@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.0.8](https://github.com/stellar-scaffold/cli/compare/stellar-build-v0.0.7...stellar-build-v0.0.8) - 2026-10-15
+
+### Other
+
+- *(stellar-build)* real README & desc ([#627](https://github.com/stellar-scaffold/cli/pull/627))
+
 ## [0.0.7](https://github.com/stellar-scaffold/cli/compare/stellar-build-v0.0.6...stellar-build-v0.0.7) - 2026-06-29
 
 ### Other
