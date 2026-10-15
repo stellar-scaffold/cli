@@ -2,7 +2,7 @@
 name = "stellar-build"
 version = "0.0.7"
 edition = "2024"
-description = "A library for gathering Contracts"
+description = "Stellar contract dependency discovery, build ordering, Wasm artifact paths, and network utilities"
 license = "Apache-2.0"
 repository = "https://github.com/stellar-scaffold/cli/tree/main/crates/stellar-build"
 
