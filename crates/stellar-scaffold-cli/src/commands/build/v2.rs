@@ -28,6 +28,10 @@ pub fn is_v2(root: &Path) -> bool {
     config::declared_version(root) == Some(u64::from(config::SCHEMA_VERSION))
 }
 
+/// Set by stellar-cli to `use` when it filled [`config::NETWORK_ENV`] from
+/// its `stellar network use` default before running this plugin.
+const NETWORK_SOURCE_ENV: &str = "STELLAR_NETWORK_SOURCE";
+
 /// The network to build for, and where the choice came from: `--network` or
 /// `STELLAR_NETWORK` (passed in as `flag`), else stellar-cli's default from
 /// `stellar network use`, else `local`.
@@ -35,11 +39,23 @@ pub fn select_network(flag: Option<&str>) -> (String, &'static str) {
     let stellar_default = stellar_cli::config::Config::new()
         .ok()
         .and_then(|c| c.defaults.network);
-    pick_network(flag, stellar_default)
+    let injected = std::env::var(NETWORK_SOURCE_ENV)
+        .is_ok_and(|source| source == "use")
+        .then(|| std::env::var(config::NETWORK_ENV).ok())
+        .flatten();
+    pick_network(flag, stellar_default, injected.as_deref())
 }
 
-fn pick_network(flag: Option<&str>, stellar_default: Option<String>) -> (String, &'static str) {
+/// `injected` is the `STELLAR_NETWORK` value stellar-cli copied from
+/// `stellar network use`. It only affects the reported source: run as
+/// `stellar scaffold`, the default arrives through `flag` like a user's value.
+fn pick_network(
+    flag: Option<&str>,
+    stellar_default: Option<String>,
+    injected: Option<&str>,
+) -> (String, &'static str) {
     match (flag, stellar_default) {
+        (Some(name), _) if Some(name) == injected => (name.to_string(), "`stellar network use`"),
         (Some(name), _) => (name.to_string(), "--network or STELLAR_NETWORK"),
         (None, Some(name)) => (name, "`stellar network use`"),
         (None, None) => (config::DEFAULT_NETWORK.to_string(), "default"),
@@ -250,11 +266,29 @@ mod tests {
     #[test]
     fn network_precedence() {
         assert_eq!(
-            pick_network(Some("preview"), Some("testnet".into())).0,
+            pick_network(Some("preview"), Some("testnet".into()), None).0,
             "preview"
         );
-        assert_eq!(pick_network(None, Some("testnet".into())).0, "testnet");
-        assert_eq!(pick_network(None, None).0, "local");
+        assert_eq!(
+            pick_network(None, Some("testnet".into()), None).0,
+            "testnet"
+        );
+        assert_eq!(pick_network(None, None, None).0, "local");
+    }
+
+    #[test]
+    fn network_injected_by_stellar_cli_reports_network_use() {
+        let default = || Some("testnet".to_string());
+        // `stellar scaffold build` after `stellar network use testnet`
+        assert_eq!(
+            pick_network(Some("testnet"), default(), Some("testnet")),
+            ("testnet".into(), "`stellar network use`")
+        );
+        // `--network local` wins over the injected default
+        assert_eq!(
+            pick_network(Some("local"), default(), Some("testnet")),
+            ("local".into(), "--network or STELLAR_NETWORK")
+        );
     }
 
     #[test]

@@ -4,13 +4,15 @@ use std::path::PathBuf;
 
 use clap::Parser;
 
-use crate::config::{self, DEFAULT_NETWORK, NETWORK_ENV, Workspace};
+use crate::commands::build::v2;
+use crate::config::{self, NETWORK_ENV, Workspace};
 
 #[derive(Parser, Debug, Clone)]
 pub struct Cmd {
-    /// Network to resolve
-    #[arg(long, env = NETWORK_ENV, default_value = DEFAULT_NETWORK)]
-    pub network: String,
+    /// Network to resolve. Defaults to `STELLAR_NETWORK`, then `stellar
+    /// network use`, then `local`, the same as `build`
+    #[arg(long, env = NETWORK_ENV)]
+    pub network: Option<String>,
 
     /// Path to Cargo.toml
     #[arg(long)]
@@ -43,7 +45,8 @@ impl Cmd {
             return Err(Error::Invalid);
         };
         let env = |name: &str| std::env::var(name).ok();
-        match config::resolved_view(config, &self.network, &env) {
+        let (network, _) = v2::select_network(self.network.as_deref());
+        match config::resolved_view(config, &network, &env) {
             Ok(view) if self.json => println!("{}", serde_json::to_string_pretty(&view)?),
             Ok(view) => print!("{}", serde_saphyr::to_string(&view)?),
             Err(diags) => {
