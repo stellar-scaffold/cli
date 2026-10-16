@@ -7,6 +7,7 @@ mod arg_parsing;
 pub mod commands;
 pub mod config;
 pub mod extension;
+pub mod state;
 
 use std::path::Path;
 
