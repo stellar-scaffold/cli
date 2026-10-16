@@ -187,8 +187,8 @@ There are a few more files than the ones listed here, but let's highlight some i
 
 So how do all these pieces work together? Here's what Stellar Scaffold handles for you:
 
-1. Our `npm run dev` command runs `stellar scaffold watch --build-clients`
-2. Our `.env` file set an environment variable to say we're building for the _local_ network (`STELLAR_NETWORK=local`)
+1. Our `npm run dev` command runs `stellar scaffold watch`
+2. With no `STELLAR_NETWORK` set, Stellar Scaffold builds for the _local_ network
 3. Stellar Scaffold looked to `scaffold.yml` for the local network's configuration, which told it to:
    - Start up a local Stellar network
    - Create an account on the network

@@ -95,7 +95,7 @@ At each hook invocation, Scaffold writes a flat JSON object to the extension's s
 | `wasm_out_dir` | ✓ | ✓ | ✓ | ✓ |
 | `source_dirs` | ✓ | ✓ | ✓ | ✓ |
 | `wasm_paths` | ✓ (empty at pre) | ✓ | ✓ | — |
-| `network` | — | ✓ | ✓ | ✓ (if `--build-clients`) |
+| `network` | — | ✓ | ✓ | ✓ (when deploying) |
 | `contract_name` | — | ✓ | ✓ | — |
 | `wasm_path` | — | ✓ | ✓ | — |
 | `wasm_hash` | — | ✓ | ✓ | — |

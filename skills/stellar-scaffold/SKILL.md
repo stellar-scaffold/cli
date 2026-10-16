@@ -1,6 +1,6 @@
 ---
 name: stellar-scaffold
-description: Build full-stack Stellar dApps with Stellar Scaffold, the `stellar scaffold` CLI plugin. Use when creating a new Soroban project with a frontend (`stellar scaffold init`), adding a frontend to an existing Soroban workspace (`upgrade`), configuring networks, accounts, and contracts in `scaffold.yml`, running the local dev loop (`npm run dev` / `stellar scaffold watch --build-clients`), calling contracts from a React or Svelte app through the generated clients in `@stellar-scaffold/app-lib/clients`, adding example contracts (`generate contract`), building for testnet or mainnet, or debugging a Scaffold build with `config check` and `doctor`.
+description: Build full-stack Stellar dApps with Stellar Scaffold, the `stellar scaffold` CLI plugin. Use when creating a new Soroban project with a frontend (`stellar scaffold init`), adding a frontend to an existing Soroban workspace (`upgrade`), configuring networks, accounts, and contracts in `scaffold.yml`, running the local dev loop (`npm run dev` / `stellar scaffold watch`), calling contracts from a React or Svelte app through the generated clients in `@stellar-scaffold/app-lib/clients`, adding example contracts (`generate contract`), building for testnet or mainnet, or debugging a Scaffold build with `config check` and `doctor`.
 ---
 
 # Stellar Scaffold
@@ -51,7 +51,7 @@ my-app/
 ├── app-lib/             # @stellar-scaffold/app-lib: wallet, network, format helpers
 │   └── clients/         # GENERATED: one package per contract + index.ts. Never edit.
 ├── scaffold.yml         # networks, accounts, contracts
-├── .env                 # STELLAR_NETWORK + PUBLIC_STELLAR_* for the frontend (gitignored)
+├── .env                 # optional STELLAR_NETWORK, secrets for ${env.…} (gitignored)
 ├── Cargo.toml           # Rust workspace
 └── package.json         # npm workspaces root
 ```
@@ -60,7 +60,7 @@ my-app/
 
 ## The dev loop
 
-`npm run dev` runs two processes: `stellar scaffold watch --build-clients` and Vite. On every change to a contract or to `scaffold.yml`, `watch`:
+`npm run dev` runs two processes: `stellar scaffold watch` and Vite. On every change to a contract or to `scaffold.yml`, `watch`:
 
 1. Builds the contracts (Wasm in `target/stellar/<STELLAR_NETWORK, default local>/<crate_name>.wasm`, with `-` replaced by `_`).
 2. For the selected network: starts the local container if needed, creates and funds the accounts, deploys or upgrades contracts whose Wasm changed, and runs their `after-deploy` calls.
@@ -76,9 +76,8 @@ version: 2
 networks:
   local:
     accounts: [me] # created and funded; the first one signs deploys
-  testnet:
+  testnet: # staging: bind to deployments you made deliberately, never deploy from the dev loop
     accounts: [testnet-user]
-    allow-deploy: true # public networks don't deploy unless you opt in
 
 contracts:
   guess-the-number: # client name: exported as `guessTheNumber`
@@ -149,15 +148,13 @@ Then `stellar scaffold config check`. The client appears as `myToken` in `@stell
 
 ## Testnet and mainnet
 
-The network comes from `--network <name>`, else `STELLAR_NETWORK` (set in `.env`), else `stellar network use`, else `local`. Switching networks takes two changes in `.env`:
+The network comes from `--network <name>`, else `STELLAR_NETWORK` (from the shell or `.env`), else `stellar network use`, else `local`. The frontend reads its network from the generated clients, so switching is one setting:
 
 ```bash
-STELLAR_NETWORK=testnet                     # what the CLI builds and deploys to
-PUBLIC_STELLAR_NETWORK="TESTNET"            # what the frontend connects to
-PUBLIC_STELLAR_NETWORK_PASSPHRASE="Test SDF Network ; September 2015"
-PUBLIC_STELLAR_RPC_URL="https://soroban-testnet.stellar.org"
-PUBLIC_STELLAR_HORIZON_URL="https://horizon-testnet.stellar.org"
+STELLAR_NETWORK=testnet npm run dev
 ```
+
+Local is for thrashing: deploy and redeploy freely. Testnet is staging, a dry run for mainnet.
 
 `testnet`, `futurenet` and `mainnet` refuse Scaffold deploys until the network sets `allow-deploy: true`. For production, deploy once yourself and point Scaffold at the result instead of deploying from the dev loop:
 
@@ -193,8 +190,8 @@ Full command list: [references/cli.md](references/cli.md).
 
 - **Edited `app-lib/clients/`**: it is regenerated on every build. Wrap a client in your own module under `app/` instead.
 - **`Module has no exported member 'myContract'`**: the contract has no entry for the network you built (`networks:` under the contract), the build failed before codegen, or the client name doesn't match. Client `my-contract` exports as `myContract`.
-- **Frontend talks to the wrong network**: `STELLAR_NETWORK` and the `PUBLIC_STELLAR_*` values in `.env` disagree. The CLI bakes contract IDs for `STELLAR_NETWORK`; the app connects with `PUBLIC_STELLAR_*`.
-- **`would be deployed to testnet, which has deploys disabled`**: add `allow-deploy: true` to that network, or point the contract at an existing deployment with `type: contract`.
+- **Built for an unexpected network**: the first line of build output names the network and where it came from. Check `STELLAR_NETWORK` in your shell and `.env`.
+- **`would be deployed to testnet, which has deploys disabled`**: point the contract at an existing deployment with `type: contract`. To redeploy freely on testnet, add a separate network (e.g. `testnet-dev: { extends: testnet, allow-deploy: true }`) rather than opting in `testnet` itself.
 - **`account <x> is not listed in network <n>'s accounts`**: each network has its own accounts. Add it to `networks.<n>.accounts`, or override `args` for that network.
 - **`uses type: registry, which build does not support yet`**: see the supported types above. Use `type: contract` with the address for now.
 - **Changed constructor `args`, nothing happened**: only Wasm changes redeploy. Stop the dev server, `stellar scaffold clean`, restart.

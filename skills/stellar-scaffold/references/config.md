@@ -5,7 +5,7 @@ A Scaffold project has three config surfaces:
 | File | Holds | Committed |
 |---|---|---|
 | `scaffold.yml` | Networks, accounts, contracts, extensions, project directories | Yes |
-| `.env` | `STELLAR_NETWORK`, `PUBLIC_STELLAR_*` for the frontend, secrets referenced by `${env.…}` | No (copy from `.env.example`) |
+| `.env` | Optional `STELLAR_NETWORK`, secrets referenced by `${env.…}` | No (copy from `.env.example`) |
 | `Cargo.toml` | Rust workspace (`members = ["contracts/*"]`), per-crate `[package.metadata.stellar]` contract metadata | Yes |
 
 ## `scaffold.yml` (schema version 2)
@@ -24,6 +24,8 @@ networks:
     default-account: me
   testnet:
     accounts: [testnet-user]
+  testnet-dev: # redeploy freely on testnet, keeping `testnet` itself bind-only
+    extends: testnet
     allow-deploy: true
   preview: # a second setup on testnet, with its own accounts
     extends: testnet
@@ -149,16 +151,11 @@ Map of extension name to its config, run in order on every network. The value is
 ## `.env`
 
 ```bash
-STELLAR_NETWORK=local                       # network the CLI builds and deploys for
-XDG_CONFIG_HOME=".config"                   # keeps keys and aliases inside the project
-
-PUBLIC_STELLAR_NETWORK="LOCAL"              # LOCAL | TESTNET | FUTURENET | PUBLIC (mainnet)
-PUBLIC_STELLAR_NETWORK_PASSPHRASE="Standalone Network ; February 2017"
-PUBLIC_STELLAR_RPC_URL="http://localhost:8000/rpc"
-PUBLIC_STELLAR_HORIZON_URL="http://localhost:8000"
+# STELLAR_NETWORK=testnet                   # network the CLI builds for
+# MAINNET_RPC_TOKEN=                        # secrets referenced as ${env.NAME}
 ```
 
-`PUBLIC_*` variables are exposed to the frontend by Vite. Keep them on the same network as `STELLAR_NETWORK`. `.env.example` in the project lists the testnet and mainnet values.
+A `STELLAR_NETWORK` set in the shell wins over `.env`. The frontend needs no network variables: `app-lib` reads the network from the generated clients. `PUBLIC_*` variables are still exposed to the frontend by Vite for your own values.
 
 The `stellar` CLI loads `.env` from the current directory before running a plugin, so `stellar scaffold …` (and `npm run dev`) see `STELLAR_NETWORK`. Running the `stellar-scaffold` binary directly does not load `.env`.
 

@@ -315,7 +315,7 @@ You could also try this out in the CLI. Create a non-admin identity to see how i
 
 ```bash
 $ stellar keys generate bob --network local --fund
-✅ Key saved with alias bob in ".config/stellar/identity/bob.toml"
+✅ Key saved with alias bob in "~/.config/stellar/identity/bob.toml"
 ✅ Account bob funded on "Standalone Network ; February 2017"
 
 $ stellar contract invoke --id guess-the-number --source bob --network local -- reset
@@ -446,7 +446,7 @@ mod test;
 
 Let's test that our improvements work. You should still have the `npm run dev` process running from earlier. If not, run it again and we can look a little closer at what it's doing. There's two concurrent processes:
 
-1. `stellar scaffold watch --build-clients`: watches for any changes in your `contracts/` folders, then rebuilds and redeploys them
+1. `stellar scaffold watch`: watches for any changes in your `contracts/` folders, then rebuilds and redeploys them
 2. `vite`: watches for any changes in your `src/` folder and hot-reloads the UI
 
 That means any time you add a method, tweak arguments, or even add documentation, everything is immediately reflected on the local network, your application in the browser, and in the Debugger. Let's add some info to the `guess` method's documentation:

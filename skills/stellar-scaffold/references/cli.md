@@ -2,7 +2,7 @@
 
 Run every command as `stellar scaffold <command>`. All commands accept the Stellar CLI global flags: `--config-dir`, `-q/--quiet`, `-v/--verbose`, `--very-verbose`, `-f/--filter-logs`, `--no-cache`.
 
-Network selection, wherever a command takes `--network`: the flag, else `STELLAR_NETWORK`, else the `stellar network use` default, else `local`. The name must be declared under `networks:` in `scaffold.yml`.
+Network selection, wherever a command takes `--network`: the flag, else `STELLAR_NETWORK` (from the shell or `.env`), else the `stellar network use` default, else `local`. The name must be declared under `networks:` in `scaffold.yml`.
 
 ## Projects
 
@@ -24,15 +24,15 @@ Network selection, wherever a command takes `--network`: the flag, else `STELLAR
 
 | Command | Purpose | Key arguments |
 |---|---|---|
-| `build` | Compile every `cdylib` crate in dependency order | `--build-clients` (also deploy and generate clients for the selected network), `--network <NAME>`, `--package <NAME>`, `--manifest-path <PATH>`, `--profile <NAME>` (default `release`), `--out-dir <DIR>`, `--features`, `--all-features`, `--no-default-features`, `--locked`, `--optimize[=false]`, `--meta <KEY=VALUE>`, `--list/--ls`, `--print-commands-only` |
-| `watch` | `build`, then rebuild on any change to a contract or `scaffold.yml` | Same as `build`. The project's `npm run dev` runs `stellar scaffold watch --build-clients` |
+| `build` | Compile every `cdylib` crate in dependency order | `--network <NAME>`, `--package <NAME>`, `--manifest-path <PATH>`, `--profile <NAME>` (default `release`), `--out-dir <DIR>`, `--features`, `--all-features`, `--no-default-features`, `--locked`, `--optimize[=false]`, `--meta <KEY=VALUE>`, `--list/--ls`, `--print-commands-only` |
+| `watch` | `build`, then rebuild on any change to a contract or `scaffold.yml` | Same as `build`. The project's `npm run dev` runs `stellar scaffold watch` |
 | `clean` | Remove Scaffold-generated artifacts | `--manifest-path <PATH>` |
 
-Without `--build-clients`, `build` only compiles. With it, for the selected network it also: starts the local container (when the network's passphrase is the standalone one, or `start-container: true`), creates and funds the network's `accounts`, deploys or upgrades `workspace` contracts whose Wasm changed, runs their `after-deploy` methods, and regenerates `<clients-dir>/<name>/` and `<clients-dir>/index.ts`. If one contract fails, the rest still deploy and export, then the build exits non-zero.
+After compiling, for the selected network `build` also: starts the local container (when the network's passphrase is the standalone one, or `start-container: true`), creates and funds the network's `accounts`, deploys or upgrades `workspace` contracts whose Wasm changed, runs their `after-deploy` methods, and regenerates `<clients-dir>/<name>/` and `<clients-dir>/index.ts`. If one contract fails, the rest still deploy and export, then the build exits non-zero. To only compile, use `stellar contract build`. `--build-clients` is only needed by projects still on `environments.toml`.
 
 `build` and `watch` also accept a positional `[ENV]` (`development`, `testing`, `staging`, `production`, or `STELLAR_SCAFFOLD_ENV`). It only applies to legacy projects with `environments.toml`, and their `--help` text still describes that legacy flow.
 
-`clean` deletes `target/stellar/`, everything generated in the clients directory (keeping checked-in files like `.gitkeep`), and the contract and identity aliases Scaffold created for the local and test networks. Use it to force fresh deployments, then rerun `build --build-clients` or `npm run dev`.
+`clean` deletes `target/stellar/`, everything generated in the clients directory (keeping checked-in files like `.gitkeep`), and the contract and identity aliases Scaffold created for the local and test networks. Use it to force fresh deployments, then rerun `build` or `npm run dev`.
 
 ## Config and diagnostics
 
@@ -58,8 +58,8 @@ stellar scaffold init my-app --template react -p pnpm -y
 # Contracts-only project
 stellar scaffold init my-contracts --template none
 
-# Build and deploy for testnet once, without the dev server
-stellar scaffold build --build-clients --network testnet
+# Build clients for testnet (bound to existing deployments), without the dev server
+stellar scaffold build --network testnet
 
 # Validate in CI
 stellar scaffold config check --strict --json

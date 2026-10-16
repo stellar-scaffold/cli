@@ -42,9 +42,9 @@ Machine-local settings and secrets stay out of this file. They go in `.env`, whi
 2. The default set with `stellar network use <name>`
 3. `local`
 
-The name must be declared under `networks:`. New projects set `STELLAR_NETWORK=local` in `.env`; switch it to `testnet` to build against testnet. Keep the `PUBLIC_STELLAR_*` values in `.env` pointed at the same network, since those are what your frontend connects to.
+The first line of build output names the network and which of these picked it. The name must be declared under `networks:`. To build against testnet, run `STELLAR_NETWORK=testnet npm start` (or `stellar scaffold build --network testnet`), or set `STELLAR_NETWORK` in the project's `.env`, which the `stellar` CLI loads; a value in your shell wins over `.env`.
 
-Generated clients are bound to the network they were built for: its passphrase and RPC URL are written into `<clients-dir>/index.ts`. Rebuild after switching networks.
+Generated clients are bound to the network they were built for: its passphrase and RPC URL are written into `<clients-dir>/index.ts`, and the frontend templates read the network from there. Rebuild after switching networks.
 
 `STELLAR_SCAFFOLD_ENV` is ignored with a version 2 `scaffold.yml`. The CLI warns if it is set.
 

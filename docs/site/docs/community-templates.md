@@ -39,7 +39,7 @@ All three are optional. Directories default to the values above and the package 
 
 ### Generated clients
 
-During `init` and `stellar scaffold build --build-clients`, the CLI writes one TypeScript package per contract into `clients-dir`, plus an `index.ts` exporting a ready-to-use client for each. Import clients from that file wherever your frontend lives.
+During `init` and `stellar scaffold build`, the CLI writes one TypeScript package per contract into `clients-dir`, plus an `index.ts` exporting a ready-to-use client for each. Import clients from that file wherever your frontend lives.
 
 `index.ts` only imports the packages beside it, so it works from any `clients-dir`. Network settings are written in at build time, so rebuild to target a different network.
 

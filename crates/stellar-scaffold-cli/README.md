@@ -63,7 +63,7 @@ cp .env.example .env
 
 4. Start development:
 ```bash
-stellar scaffold watch --build-clients
+stellar scaffold watch
 ```
 
 ## Configuration
