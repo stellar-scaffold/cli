@@ -8,6 +8,7 @@ use crate::commands::{PackageManager, PackageManagerSpec};
 use crate::config::schema::Project;
 use crate::config::source::same_crate;
 use crate::extension::{self, ResolvedExtension};
+use crate::state::{self, ContractState, State};
 use indexmap::IndexMap;
 use regex::Regex;
 use serde_json;
@@ -39,7 +40,8 @@ use stellar_xdr::{Error as xdrError, ScSpecEntry, ScSpecTypeBytesN, ScSpecTypeDe
 /// Internal decision about what deploy action to take for a contract.
 /// Resolved before `pre-deploy` fires so the hook always has a clean execution context.
 enum DeployDecision {
-    /// No existing alias, or existing contract is not upgradeable — create a new instance.
+    /// Nothing recorded for this checkout, or the recorded contract is gone or
+    /// not upgradeable — create a new instance.
     Fresh,
     /// Existing contract upgraded in-place; the returned ID is unchanged.
     Upgraded(Contract),
@@ -147,6 +149,8 @@ pub enum Error {
     WasmHash(#[from] xdrError),
     #[error(transparent)]
     Io(#[from] std::io::Error),
+    #[error("⛔ ️failed to record the deployment in {}: {source}", path.display())]
+    State { path: PathBuf, source: state::Error },
     #[error(transparent)]
     Json(#[from] serde_json::Error),
     #[error("⛔ ️Failed to run package manager command in {0:?}: {1}")]
@@ -335,13 +339,26 @@ impl Builder {
         }
     }
 
-    fn get_contract_alias(
-        &self,
-        name: &str,
-        network: &network::Network,
-    ) -> Result<Option<Contract>, stellar_cli::config::locator::Error> {
-        self.get_config_locator()
-            .get_contract_id(name, &network.network_passphrase)
+    /// This checkout's `.scaffold/state.json`. An unreadable file is reported
+    /// and treated as empty, so its contracts are deployed fresh and the file
+    /// is rewritten.
+    fn load_state(&self) -> State {
+        State::load(&self.workspace_root).unwrap_or_else(|e| {
+            self.printer.warnln(format!(
+                "Ignoring {}: {e}",
+                State::path(&self.workspace_root).display()
+            ));
+            State::default()
+        })
+    }
+
+    /// The contract this checkout last deployed as `name` on the current
+    /// network. stellar-cli's aliases are machine-wide, so another project's
+    /// contract of the same name is never mistaken for this one.
+    fn recorded_contract(&self, name: &str) -> Option<Contract> {
+        let state = self.load_state();
+        let recorded = state.contract(&self.env_label, &self.network.network_passphrase, name)?;
+        Contract::from_string(&recorded.contract_id).ok()
     }
 
     async fn get_contract_hash(
@@ -375,30 +392,83 @@ impl Builder {
         }
     }
 
-    fn save_contract_alias(
+    /// Record `contract_id` as this checkout's deployment of `name`, and point
+    /// a stellar-cli alias (see [`state::alias_name`]) at it for running
+    /// `stellar` by hand. The alias is only written when it's free or already
+    /// Scaffold's, so an alias someone made by hand is never overwritten.
+    fn record_deployment(&self, name: &str, contract_id: &Contract) -> Result<(), Error> {
+        let root = &self.workspace_root;
+        let passphrase = &self.network.network_passphrase;
+        let mut state = self.load_state();
+        let previous = state.contract(&self.env_label, passphrase, name).cloned();
+        let previous_id = previous.as_ref().map(|p| p.contract_id.as_str());
+
+        let alias = state::alias_name(root, name)
+            .filter(|alias| self.may_write_alias(alias, contract_id, previous_id));
+        if let Some(alias) = &alias {
+            self.get_config_locator()
+                .save_contract_id(passphrase, contract_id, alias)?;
+            self.printer
+                .infoln(format!("Saved alias {alias:?} for {name:?}"));
+        }
+        // An alias saved under an earlier directory name is no longer ours to keep.
+        if let Some(old) = previous.as_ref().and_then(|p| p.alias.as_deref())
+            && alias.as_deref() != Some(old)
+            && self.alias_target(old).as_deref() == previous_id
+        {
+            let _ = self
+                .get_config_locator()
+                .remove_contract_id(passphrase, old);
+        }
+
+        let recorded = ContractState {
+            contract_id: format!("{contract_id}"),
+            alias,
+        };
+        state.record(&self.env_label, passphrase, name, recorded);
+        state.save(root).map_err(|source| Error::State {
+            path: State::path(root),
+            source,
+        })
+    }
+
+    /// The contract `alias` points at on the current network, if any.
+    fn alias_target(&self, alias: &str) -> Option<String> {
+        self.get_config_locator()
+            .get_contract_id(alias, &self.network.network_passphrase)
+            .ok()
+            .flatten()
+            .map(|c| format!("{c}"))
+    }
+
+    /// Whether Scaffold may point `alias` at `contract_id`, warning if not.
+    fn may_write_alias(
         &self,
-        name: &str,
+        alias: &str,
         contract_id: &Contract,
-        network: &network::Network,
-    ) -> Result<(), stellar_cli::config::locator::Error> {
-        let config_dir = self.get_config_locator();
-        let passphrase = &network.network_passphrase;
-        config_dir.save_contract_id(passphrase, contract_id, name)
+        previous_id: Option<&str>,
+    ) -> bool {
+        let existing = self.alias_target(alias);
+        let ours = alias_is_ours(existing.as_deref(), &format!("{contract_id}"), previous_id);
+        if !ours {
+            self.printer.warnln(format!(
+                "Not saving alias {alias:?}: it points at a contract this checkout didn't deploy. Run `stellar contract alias remove {alias}` to let Scaffold manage it"
+            ));
+        }
+        ours
     }
 
     /// Resolve the on-chain contract id baked into a Client: a pinned `id` from
-    /// the environment config takes precedence, otherwise the saved alias for the
-    /// current network.
-    fn resolve_contract_id(&self, name: &str) -> Result<Option<String>, Error> {
+    /// the environment config takes precedence, otherwise the contract this
+    /// checkout deployed on the current network.
+    fn resolve_contract_id(&self, name: &str) -> Option<String> {
         if let Some(contracts) = self.env.contracts.as_ref()
             && let Some(contract) = contracts.get(name)
             && let Some(id) = &contract.id
         {
-            return Ok(Some(id.clone()));
+            return Some(id.clone());
         }
-        Ok(self
-            .get_contract_alias(name, &self.network)?
-            .map(|c| format!("{c}")))
+        self.recorded_contract(name).map(|c| format!("{c}"))
     }
 
     /// Regenerate the single flattened Clients file `clients_dir/index.ts` from
@@ -444,7 +514,7 @@ impl Builder {
             {
                 continue;
             }
-            let Some(contract_id) = self.resolve_contract_id(name)? else {
+            let Some(contract_id) = self.resolve_contract_id(name) else {
                 continue;
             };
             clients.push((name.clone(), contract_id));
@@ -907,7 +977,7 @@ impl Builder {
             let new_hash = self.upload_contract_wasm(name, &wasm_path).await?;
 
             // Determine what deploy action is needed before firing any hooks.
-            let decision = if let Some(existing_id) = self.get_contract_alias(name, network)? {
+            let decision = if let Some(existing_id) = self.recorded_contract(name) {
                 let hash = self.get_contract_hash(&existing_id, network).await?;
                 if let Some(current_hash) = hash {
                     if current_hash == new_hash {
@@ -953,7 +1023,7 @@ impl Builder {
                 }
             };
 
-            // Run after_deploy script and save alias only when something changed on-chain.
+            // Run after_deploy and record the deployment only when something changed on-chain.
             if deploy_kind != DeployKind::Unchanged {
                 if let Some(resolved) = &settings.resolved {
                     self.run_after_deploy_methods(name, &contract_id, resolved)
@@ -965,7 +1035,7 @@ impl Builder {
                     self.run_after_deploy_script(name, &contract_id, after_deploy)
                         .await?;
                 }
-                self.save_contract_alias(name, &contract_id, network)?;
+                self.record_deployment(name, &contract_id)?;
             }
 
             extension::run_hook(
@@ -1061,12 +1131,11 @@ impl Builder {
 
     async fn deploy_contract(
         &self,
-        name: &str,
+        _name: &str,
         hash: &str,
         settings: &env_toml::Contract,
     ) -> Result<Contract, Error> {
         let mut deploy_args = vec![
-            format!("--alias={name}"),
             format!("--wasm-hash={hash}"),
             "--config-dir".to_string(),
             self.get_config_dir()?
@@ -1360,6 +1429,13 @@ impl ClientsArgs {
     }
 }
 
+/// Whether an alias currently pointing at `existing` belongs to Scaffold and
+/// may be pointed at `new`: it's unset, already `new`, or still the contract
+/// this checkout recorded before (`previous`).
+fn alias_is_ours(existing: Option<&str>, new: &str, previous: Option<&str>) -> bool {
+    existing.is_none_or(|existing| existing == new || Some(existing) == previous)
+}
+
 /// Whether generated binding source is bound to `contract_id`. Matches the
 /// `contractId: "C…"` field the bindings generator writes, not the address
 /// appearing anywhere in the file.
@@ -1496,8 +1572,22 @@ async fn fetch_contract_spec(
 
 #[cfg(test)]
 mod tests {
-    use super::{binding_targets, render_clients_index, to_camel_case, to_pascal_case};
+    use super::{
+        alias_is_ours, binding_targets, render_clients_index, to_camel_case, to_pascal_case,
+    };
     use stellar_cli::config::network::passphrase;
+
+    #[test]
+    fn scaffold_only_moves_aliases_it_owns() {
+        // free, or already pointing at the new deployment
+        assert!(alias_is_ours(None, "C2", None));
+        assert!(alias_is_ours(Some("C2"), "C2", None));
+        // still this checkout's previous deployment, e.g. after a redeploy
+        assert!(alias_is_ours(Some("C1"), "C2", Some("C1")));
+        // made by hand, or by another checkout with the same directory name
+        assert!(!alias_is_ours(Some("C9"), "C2", None));
+        assert!(!alias_is_ours(Some("C9"), "C2", Some("C1")));
+    }
 
     #[test]
     fn binding_target_matches_the_contract_id_field() {

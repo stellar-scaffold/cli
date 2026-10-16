@@ -274,6 +274,67 @@ soroban_token_contract.client = false
     });
 }
 
+/// Two checkouts with the same directory name, sharing one stellar-cli
+/// config the way projects on one machine do. Each deploys and keeps its own
+/// contract; the second doesn't adopt or upgrade the first's through the
+/// machine-wide alias, and doesn't overwrite that alias either.
+#[test]
+fn checkouts_sharing_a_stellar_config_keep_their_own_contracts() {
+    let shared_config = tempfile::TempDir::new().unwrap();
+    let first = TestEnv::new("soroban-init-boilerplate");
+    let second = TestEnv::new("soroban-init-boilerplate");
+    let toml = format!(
+        r#"
+development.accounts = [
+    {{ name = "alice" }},
+]
+
+[development.network]
+rpc-url = "{}"
+network-passphrase = "Standalone Network ; February 2017"
+
+[development.contracts]
+soroban_hello_world_contract.client = true
+soroban_custom_types_contract.client = false
+soroban_auth_contract.client = false
+soroban_token_contract.client = false
+"#,
+        rpc_url()
+    );
+    // Identical Wasm in both, so only the recorded state tells them apart
+    let build = |env: &TestEnv| {
+        env.set_environments_toml(&toml);
+        env.scaffold_build("development", false)
+            .env("XDG_CONFIG_HOME", shared_config.path())
+            .assert()
+            .success()
+            .stderr_as_str()
+    };
+    let contract_id = |env: &TestEnv| {
+        let index = std::fs::read_to_string(env.cwd.join("app-lib/clients/index.ts")).unwrap();
+        extract_contract_id_from_ts(&index).unwrap()
+    };
+
+    let first_build = build(&first);
+    assert!(
+        first_build
+            .contains("Saved alias \"soroban-init-boilerplate-soroban_hello_world_contract\"")
+    );
+    let second_build = build(&second);
+    assert!(!second_build.contains("is up to date"), "{second_build}");
+    assert!(second_build.contains("Not saving alias"), "{second_build}");
+    assert_ne!(contract_id(&first), contract_id(&second));
+
+    // The first checkout's contract is untouched and still recognized
+    let rebuild = build(&first);
+    assert!(
+        rebuild.contains("Contract \"soroban_hello_world_contract\" is up to date"),
+        "{rebuild}"
+    );
+    assert!(first.cwd.join(".scaffold/state.json").exists());
+    assert!(first.cwd.join(".scaffold/.gitignore").exists());
+}
+
 /// Extracts the first contract ID from a `contractId: "..."` line in the
 /// generated flattened Clients `index.ts` (`regenerate_clients_index`).
 fn extract_contract_id_from_ts(content: &str) -> Option<String> {
