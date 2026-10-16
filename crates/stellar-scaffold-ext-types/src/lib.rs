@@ -348,10 +348,11 @@ pub struct ProjectContractInfo {
 
 /// Context passed to `pre-dev` and `post-dev` hooks.
 ///
-/// Fired once per watch cycle (or once for a non-watch build with
-/// `--build-clients`). Aggregates all per-contract information into a single
-/// flat list rather than nesting `CodegenContext` directly, since the
-/// per-contract hooks fire sequentially inside a single build cycle.
+/// Fired once per watch cycle (or once for a non-watch build that deploys:
+/// always with a version 2 `scaffold.yml`, or with `--build-clients`).
+/// Aggregates all per-contract information into a single flat list rather
+/// than nesting `CodegenContext` directly, since the per-contract hooks fire
+/// sequentially inside a single build cycle.
 ///
 /// ## Field availability by hook
 ///
@@ -359,7 +360,7 @@ pub struct ProjectContractInfo {
 /// |---|---|---|
 /// | `project_root`, `env`, `wasm_out_dir` | ✓ | ✓ |
 /// | `source_dirs`, `watch_paths` | ✓ | ✓ |
-/// | `network` | ✓ if `--build-clients` | ✓ if `--build-clients` |
+/// | `network` | ✓ when deploying | ✓ when deploying |
 /// | `contracts[*].wasm_path` etc. | `None` | populated |
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ProjectContext {
@@ -383,8 +384,8 @@ pub struct ProjectContext {
 
     /// Resolved network configuration.
     ///
-    /// `None` when the build was invoked without `--build-clients` (i.e. no
-    /// network interaction occurs).
+    /// `None` when the build doesn't deploy (an environments.toml project
+    /// built without `--build-clients`), so no network interaction occurs.
     pub network: Option<NetworkConfig>,
 
     /// Per-contract summary for every cdylib package in the workspace.

@@ -78,6 +78,7 @@ pub async fn prepare(
     // every contract opts out with `client = false`; a no-frontend project has
     // no clients to generate, so skip it and just compile.
     build_command.build_clients = pkg_manager.is_some();
+    build_command.compile_only = pkg_manager.is_none();
     let mut build_args = global_args.clone();
     if !(global_args.verbose && global_args.very_verbose) {
         build_args.quiet = true;

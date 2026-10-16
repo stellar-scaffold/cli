@@ -131,7 +131,7 @@ fn config_diagnoses(name: &'static str, root: &Path, loaded: &config::Loaded) ->
             "clients-dir",
             root,
             &config.project.clients_dir,
-            "stellar scaffold build --build-clients",
+            "stellar scaffold build",
         ));
     }
     findings

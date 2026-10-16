@@ -35,11 +35,18 @@ pub struct Command {
     pub list: bool,
     #[command(flatten)]
     pub build: build::Cmd,
-    /// Build client code in addition to building the contract
+    /// Also deploy contracts and generate their clients. Only needed for
+    /// projects on environments.toml; with a version 2 scaffold.yml this
+    /// always happens, as configured there.
     #[arg(long)]
     pub build_clients: bool,
     #[command(flatten)]
     pub build_clients_args: clients::ClientsArgs,
+    /// Only compile, skipping deploys and client generation even for a
+    /// version 2 project. Set by commands that build as one step of their own
+    /// work; users get compile-only from `stellar contract build`.
+    #[arg(skip)]
+    pub compile_only: bool,
 }
 
 #[derive(thiserror::Error, Debug)]
@@ -132,6 +139,7 @@ impl Command {
         }
 
         let target_dir = &metadata.target_directory;
+        let build_clients = self.builds_clients(workspace_root, &printer);
 
         // Configuration for this build: a resolved plan for version 2
         // projects, otherwise the selected environments.toml environment.
@@ -145,7 +153,7 @@ impl Command {
                 &metadata,
                 &packages,
                 &printer,
-                self.build_clients,
+                build_clients,
             )
             .await?
             .unwrap_or_else(|| self.empty_inputs());
@@ -210,7 +218,7 @@ impl Command {
         )
         .await;
 
-        if self.build_clients {
+        if build_clients {
             let mut build_clients_args = self.build_clients_args.clone();
             // Pass through the workspace_root, out_dir, global_args, and printer
             build_clients_args.workspace_root = Some(metadata.workspace_root.into_std_path_buf());
@@ -225,6 +233,21 @@ impl Command {
         }
 
         Ok(())
+    }
+
+    /// Whether this build deploys and generates clients after compiling.
+    /// A version 2 `scaffold.yml` declares what to deploy and which clients
+    /// to generate for each network, so it always does; environments.toml
+    /// projects still opt in with `--build-clients`, which a version 2
+    /// project notes as redundant.
+    fn builds_clients(&self, workspace_root: &Path, printer: &Print) -> bool {
+        let is_v2 = v2::is_v2(workspace_root);
+        if self.build_clients && is_v2 {
+            printer.infoln(
+                "--build-clients is no longer needed: with a version 2 scaffold.yml, build always deploys and generates clients as configured there",
+            );
+        }
+        builds_clients(self.compile_only, self.build_clients, is_v2)
     }
 
     /// For environments.toml projects building `development`, start the local
@@ -325,9 +348,10 @@ impl Command {
         let unlisted = v2::unlisted_crates(packages.iter().map(|p| p.name.as_str()), &plan);
         if !unlisted.is_empty() {
             printer.infoln(format!(
-                "Not deploying {}: not listed under `contracts:` in {}",
+                "Not deploying {} to {network:?}: no contract in {} lists that network for {}",
                 unlisted.join(", "),
-                crate::config::CONFIG_FILE
+                crate::config::CONFIG_FILE,
+                if unlisted.len() == 1 { "it" } else { "them" }
             ));
         }
         if plan.network.run_locally {
@@ -488,5 +512,34 @@ impl Command {
 
     fn is_simple(val: &Value) -> bool {
         !matches!(val, Value::Array(_) | Value::Object(_))
+    }
+}
+
+/// See [`Command::builds_clients`]; split out so the rule is testable without
+/// a project on disk.
+fn builds_clients(compile_only: bool, flag: bool, is_v2: bool) -> bool {
+    !compile_only && (flag || is_v2)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::builds_clients;
+
+    #[test]
+    fn v2_builds_clients_without_the_flag() {
+        assert!(builds_clients(false, false, true));
+        assert!(builds_clients(false, true, true));
+    }
+
+    #[test]
+    fn environments_toml_still_needs_the_flag() {
+        assert!(!builds_clients(false, false, false));
+        assert!(builds_clients(false, true, false));
+    }
+
+    #[test]
+    fn compile_only_wins() {
+        assert!(!builds_clients(true, true, true));
+        assert!(!builds_clients(true, true, false));
     }
 }

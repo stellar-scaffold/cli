@@ -97,7 +97,7 @@ All hooks receive a **flat** JSON object on stdin regardless of how the Rust str
 | `wasm_out_dir` | ✓ | ✓ | ✓ | ✓ |
 | `source_dirs` | ✓ | ✓ | ✓ | ✓ |
 | `wasm_paths` | ✓ (empty at pre) | ✓ | ✓ | — |
-| `network` | — | ✓ | ✓ | ✓ (if `--build-clients`) |
+| `network` | — | ✓ | ✓ | ✓ (when deploying) |
 | `contract_name` | — | ✓ | ✓ | — |
 | `wasm_path` | — | ✓ | ✓ | — |
 | `wasm_hash` | — | ✓ | ✓ | — |

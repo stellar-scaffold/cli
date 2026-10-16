@@ -396,7 +396,9 @@ impl Cmd {
                 build_args: stellar_cli::commands::contract::build::BuildArgs::default(),
             },
             list: false,
-            build_clients: false, // Don't build clients, just contracts
+            build_clients: false,
+            // Don't deploy or build clients, just contracts
+            compile_only: true,
         };
 
         build_cmd.run(global_args).await?;
