@@ -32,7 +32,7 @@ After compiling, for the selected network `build` also: starts the local contain
 
 `build` and `watch` also accept a positional `[ENV]` (`development`, `testing`, `staging`, `production`, or `STELLAR_SCAFFOLD_ENV`). It only applies to legacy projects with `environments.toml`, and their `--help` text still describes that legacy flow.
 
-`clean` deletes `target/stellar/`, everything generated in the clients directory (keeping checked-in files like `.gitkeep`), and the contract and identity aliases Scaffold created for the local and test networks. Use it to force fresh deployments, then rerun `build` or `npm run dev`.
+`clean` deletes `target/stellar/`, everything generated in the clients directory (keeping checked-in files like `.gitkeep`), and `.scaffold/state.json` along with the contract aliases it recorded. Keys are kept, since stellar-cli shares them across projects. Use it to force fresh deployments, then rerun `build` or `npm run dev`.
 
 ## Config and diagnostics
 

@@ -95,9 +95,9 @@ contracts:
     after-deploy: [reset]
     networks:
       local:
-      testnet:
-        args:
-          admin: ${account.testnet-user}
+      # testnet:
+      #   type: contract
+      #   source: C...  # the deployed contract's ID
 ```
 
 Let's walk through this line by line:
@@ -152,7 +152,7 @@ Let's walk through this line by line:
 
   ```bash
   stellar contract invoke \
-      --id guess-the-number \
+      --id CCMMU6UYIPGSBR7ZP4DTQEEOQDHL3PJ52ZD7FJIFG4O46Q3QPVGVHAAV \
       --source me \
       -- \
       reset
@@ -165,7 +165,7 @@ Let's walk through this line by line:
   [0] ✅ After deploy calls for "guess-the-number" completed
   ```
 
-- `networks`: the networks this contract exists on. A contract only exists on the networks it lists, so if you built for a network that isn't here, Scaffold would skip it and your frontend wouldn't get a `guessTheNumber` client at all. Entries here can also override the settings above for one network: on `testnet`, the `admin` is a testnet account instead, because accounts belong to a network.
+- `networks`: the networks this contract exists on. A contract only exists on the networks it lists, so if you built for a network that isn't here, Scaffold would skip it and your frontend wouldn't get a `guessTheNumber` client at all. Entries here can also override the settings above for one network. The commented `testnet` entry shows the usual shape for a public network: rather than deploying from your dev loop, point at a contract you deployed there deliberately.
 
 Want to see exactly what Scaffold will use for a network, with all the defaults filled in? Run `stellar scaffold config show --network local`.
 
@@ -188,7 +188,7 @@ Nothing. Nothing happens. At least not yet.
 
 The contract didn't change, so Scaffold CLI didn't re-deploy the contract. You're still using the instance that had the `reset` method called right after deploy.
 
-To get a fresh deployment, clear the artifacts Stellar Scaffold is tracking — the generated clients, the build output, and the contract and identity aliases it uses to remember what is already deployed. Stop the `npm run dev` process, then run:
+To get a fresh deployment, clear the artifacts Stellar Scaffold is tracking — the generated clients, the build output, and its record of what it already deployed, in `.scaffold/state.json`. Stop the `npm run dev` process, then run:
 
 ```bash
 stellar scaffold clean
@@ -287,10 +287,10 @@ $ npm run dev
 
 Click over to the Debugger if you're not there already and select the `guess-the-number` contract. You'll see that `reset` is listed here, but `set_random_number` is not.
 
-Our `reset` method is available to be called by code _outside_ our contract because we opted in to it being a public method with the `pub` keyword. Our `set_random_number` is private by default, it's not visible to the outside world. It's not listed in the Contract Explorer. It's not listed in the CLI help either:
+Our `reset` method is available to be called by code _outside_ our contract because we opted in to it being a public method with the `pub` keyword. Our `set_random_number` is private by default, it's not visible to the outside world. It's not listed in the Contract Explorer. It's not listed in the CLI help either. Scaffold saved a contract alias for it, named after your project's directory and the client, so you can refer to it by name:
 
 ```bash
-$ stellar contract invoke --id guess-the-number --source me --network local -- help
+$ stellar contract invoke --id guessing-game-tutorial-guess-the-number --source me --network local -- help
 Commands:
   reset    Update the number. Only callable by admin.
   guess    Guess a number between 1 and 10
@@ -301,7 +301,7 @@ Commands:
 It would error if you tried to invoke it:
 
 ```bash
-$ stellar contract invoke --id guess-the-number --source me --network local -- set_random_number
+$ stellar contract invoke --id guessing-game-tutorial-guess-the-number --source me --network local -- set_random_number
 error: unrecognized subcommand 'set_random_number'
 ```
 
@@ -318,7 +318,7 @@ $ stellar keys generate bob --network local --fund
 ✅ Key saved with alias bob in "~/.config/stellar/identity/bob.toml"
 ✅ Account bob funded on "Standalone Network ; February 2017"
 
-$ stellar contract invoke --id guess-the-number --source bob --network local -- reset
+$ stellar contract invoke --id guessing-game-tutorial-guess-the-number --source bob --network local -- reset
 ❌ error: Missing signing key for account GDAQWVA6REGN47BBCFY6SGQ4YTIGMDZZFHDOVUZXMVRAAT6OEZGCACGH
 ```
 

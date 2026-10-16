@@ -52,6 +52,7 @@ my-app/
 │   └── clients/         # GENERATED: one package per contract + index.ts. Never edit.
 ├── scaffold.yml         # networks, accounts, contracts
 ├── .env                 # optional STELLAR_NETWORK, secrets for ${env.…} (gitignored)
+├── .scaffold/           # GENERATED: what this checkout deployed (state.json). Ignores itself.
 ├── Cargo.toml           # Rust workspace
 └── package.json         # npm workspaces root
 ```

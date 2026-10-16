@@ -213,6 +213,10 @@ after-deploy: [reset, unpause]
 
 When a `workspace` contract's Wasm changes, the next build upgrades the existing deployment if the contract supports it, or redeploys it otherwise. Changing only `args` or `after-deploy` does not trigger a redeploy. Run `stellar scaffold clean` to start fresh.
 
+Scaffold records what it deployed in `.scaffold/state.json`, per network, and decides between upgrading and redeploying from that record. The file belongs to one checkout of your project and isn't committed: the `.scaffold/` directory ignores itself. Separate checkouts, such as git worktrees, keep separate records, so they never upgrade each other's contracts. If the network was reset and a recorded contract is gone, the next build deploys it again.
+
+For running `stellar` commands yourself, Scaffold also saves a contract alias named after the project's directory and the contract, such as `my-app-guess-the-number`. stellar-cli's aliases are shared by every project on the machine, so Scaffold only writes one that is unused or already its own, and warns instead of overwriting an alias someone else made.
+
 If one contract fails to deploy, the build carries on with the rest, exports what it can, and then exits with an error.
 
 ## `extensions`

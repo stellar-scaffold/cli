@@ -84,7 +84,7 @@ Network fields may use `${env.…}` only.
 
 ### `contracts`
 
-The key is the **client name**: the package directory `<clients-dir>/<name>/` and, camelCased, the export from `index.ts` (`my-token` → `myToken`). It is independent of the crate name. It is also the contract alias Scaffold saves, so `stellar contract invoke --id my-token --network local -- …` works after a deploy.
+The key is the **client name**: the package directory `<clients-dir>/<name>/` and, camelCased, the export from `index.ts` (`my-token` → `myToken`). It is independent of the crate name. Scaffold also saves a contract alias of `<project directory>-<client name>`, so in a project directory `my-app`, `stellar contract invoke --id my-app-my-token --network local -- …` works after a deploy. What Scaffold deployed is recorded in `.scaffold/state.json`, which isn't committed.
 
 | Key | Meaning |
 |---|---|

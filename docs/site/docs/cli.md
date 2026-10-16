@@ -126,11 +126,13 @@ Options:
 
 Clean removes:
 
-- `target/stellar/`, the deployment state for the local and test networks
+- `target/stellar/`, the built Wasm
 - Everything generated into your clients directory, while leaving checked-in files such as `.gitkeep` alone
-- The contract and identity aliases the CLI created for the local and test networks
+- `.scaffold/state.json`, the record of what this checkout deployed, and the contract aliases it lists, if they still point at those deployments
 
-Reach for it when you want a genuinely fresh deployment. Because Stellar Scaffold only redeploys a contract when the contract itself changes, editing something else — constructor `args` or `after-deploy` in `scaffold.yml`, for instance — will not produce a new instance on its own. Clearing the aliases makes the next `stellar scaffold watch` deploy from scratch.
+Keys are kept. stellar-cli stores them for the whole machine, so other projects may be using them; remove one yourself with `stellar keys rm <name>`.
+
+Reach for it when you want a genuinely fresh deployment. Because Stellar Scaffold only redeploys a contract when the contract itself changes, editing something else — constructor `args` or `after-deploy` in `scaffold.yml`, for instance — will not produce a new instance on its own. Clearing the record makes the next `stellar scaffold watch` deploy from scratch.
 
 ## Doctor Command
 
