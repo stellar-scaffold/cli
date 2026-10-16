@@ -32,7 +32,11 @@ contracts:
 
 Machine-local settings and secrets stay out of this file. They go in `.env`, which is gitignored and also read by your frontend.
 
-:::note Projects created before `scaffold.yml` version 2 use `environments.toml` instead. `build` and `watch` still read it as long as the project has an `environments.toml` and no version 2 `scaffold.yml`. See [Legacy: `environments.toml`](#legacy-environmentstoml) below. :::
+:::note
+
+Projects created before `scaffold.yml` version 2 use `environments.toml` instead. `build` and `watch` still read it as long as the project has an `environments.toml` and no version 2 `scaffold.yml`. See [Legacy: `environments.toml`](#legacy-environmentstoml) below.
+
+:::
 
 ## Choosing a network
 
@@ -171,7 +175,11 @@ Keys directly under a contract are defaults for every network it lists. Entries 
 | `wasm-hash` | A 64-character hex Wasm hash installed on the network | Generates a types-only client |
 | `wasm-registry` | `[namespace/]name@version` of a Wasm in the Stellar Registry | Generates a types-only client |
 
-:::caution `build` and `watch` currently support only `workspace` and `contract`. The other types pass `config check` but fail at build time with `uses type: <type>, which build does not support yet`. The same applies to `from-network` and `after-deploy-script`. :::
+:::caution
+
+`build` and `watch` currently support only `workspace` and `contract`. The other types pass `config check` but fail at build time with `uses type: <type>, which build does not support yet`. The same applies to `from-network` and `after-deploy-script`.
+
+:::
 
 `registry` and `wasm-registry` sources without an `@version` are accepted with a warning, because the thing they point at can change under you.
 

@@ -53,7 +53,11 @@ extensions:
 
 Scaffold converts this value to JSON and injects it as the `config` field in every hook invocation for that extension. Keys are passed exactly as written. If the extension has no value (a bare `reporter:`), `config` is absent from the JSON.
 
-:::note Projects still on `environments.toml` register extensions per environment instead, with `extensions = ["reporter"]` under `[development]` and configuration in a `[development.ext.reporter]` table. :::
+:::note
+
+Projects still on `environments.toml` register extensions per environment instead, with `extensions = ["reporter"]` under `[development]` and configuration in a `[development.ext.reporter]` table.
+
+:::
 
 ---
 
