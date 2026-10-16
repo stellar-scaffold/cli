@@ -293,7 +293,11 @@ after_deploy = "reset"
 id = "C..."
 ```
 
-`build` and `watch` still read this format, and `--network` is ignored for it. To move to version 2:
+`build` and `watch` still read this format, and `--network` is ignored for it.
+
+Scaffold used to find earlier deployments by contract-name aliases such as `guess_the_number`. It now reads only `.scaffold/state.json`, so the first build after upgrading Scaffold deploys every contract again, whether or not you have moved to version 2. Later builds upgrade them as before. The old aliases stay in your stellar-cli config; remove them with `stellar contract alias remove guess_the_number`.
+
+To move to version 2:
 
 - Set `version: 2`. If your old `scaffold.yml` has a `config:` section, replace it with `project:`, renaming `contracts_dir`/`clients_dir` to `contracts-dir`/`clients-dir`.
 - Turn each environment into an entry under `networks:`. `run_locally` becomes `start-container`; an explicit `default = true` account becomes `default-account`.
