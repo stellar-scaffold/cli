@@ -178,7 +178,7 @@ Findings that have a single-command remedy print it on a `fix:` line beneath.
 - For projects still on `environments.toml`: it parses, defines the selected environment, has a usable network, and names contracts that exist in the workspace
 - For projects still on `environments.toml`: every extension the environment lists can be found and reports a valid manifest
 
-**Network** — only for projects on `environments.toml` whose selected environment sets `run_locally = true`. These checks are skipped for version 2 projects:
+**Network** — when the project runs any network in a local container: a version 2 network with `start-container` (true by default for the local network's passphrase), or an `environments.toml` environment with `run_locally = true`. They run whichever network you're currently building for:
 
 - The Docker daemon is running, not merely installed
 - The local network's RPC endpoint reports healthy
@@ -202,8 +202,9 @@ $ stellar scaffold doctor
 ⚠️ dot-env            app/.env is missing
     fix: cp app/.env.example app/.env
    Network
-ℹ️ docker-daemon      no environment configured
-ℹ️ localnet           no environment configured
+✅ docker-daemon      daemon is running
+✅ localnet-rpc       RPC is healthy
+✅ localnet-friendbot friendbot is up
    0 problems, 2 warnings
 ```
 

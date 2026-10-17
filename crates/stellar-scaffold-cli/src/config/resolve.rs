@@ -34,7 +34,7 @@ impl Template {
         }
     }
 
-    fn is_literal(&self) -> bool {
+    pub(crate) fn is_literal(&self) -> bool {
         self.segments.iter().all(|s| matches!(s, Segment::Lit(_)))
     }
 }

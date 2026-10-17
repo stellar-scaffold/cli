@@ -6,7 +6,7 @@ use std::io;
 use std::path::{Path, PathBuf};
 use std::process::Command;
 
-use super::build::env_toml;
+use super::build::docker;
 use super::init::instantiate::APP_DIR;
 use super::{
     EngineConstraintError, PackageManager, PackageManagerSpec, build, check_engine_constraint,
@@ -49,15 +49,6 @@ pub async fn prepare(
         }
     }
 
-    if let Ok(Some(dev_env)) =
-        env_toml::Environment::get(project_path, &build::clients::ScaffoldEnv::Development)
-        && dev_env.network.run_locally
-        && Command::new("docker").arg("--version").output().is_err()
-    {
-        printer.warnln("Docker not found. Install it from https://docs.docker.com/get-docker/");
-        printer.warnln("Docker is required to run a local Stellar network (run-locally = true in environments.toml).");
-    }
-
     ensure_extensions_installed(project_path, &printer, yes);
 
     if let Some(pkg_manager) = pkg_manager {
@@ -71,6 +62,15 @@ pub async fn prepare(
     }
     let mut build_command = build::Command::parse_from(["build"]);
     build_command.build.manifest_path = Some(project_path.join("Cargo.toml"));
+    let local_networks = docker::local_networks(project_path);
+    if !local_networks.is_empty() && Command::new("docker").arg("--version").output().is_err() {
+        let names: Vec<_> = local_networks.iter().map(|n| n.name.as_str()).collect();
+        printer.warnln("Docker not found. Install it from https://docs.docker.com/get-docker/");
+        printer.warnln(format!(
+            "Docker is required to run these networks locally: {}",
+            names.join(", ")
+        ));
+    }
     // The clients pipeline needs a network (account funding, deploys) even when
     // every contract opts out with `client = false`; a no-frontend project has
     // no clients to generate, so skip it and just compile.

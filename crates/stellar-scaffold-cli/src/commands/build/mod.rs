@@ -99,7 +99,7 @@ async fn start_container_if_local(network: &env_toml::Network) -> Result<(), Err
     docker::start_local_stellar(network.rpc_url.as_deref())
         .await
         .map_err(|e| {
-            eprintln!("Failed to start Stellar Docker container: {e:?}");
+            eprintln!("Failed to start Stellar Docker container: {e}");
             Error::DockerStart
         })
 }
