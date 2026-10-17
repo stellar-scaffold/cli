@@ -15,10 +15,10 @@ Docs: https://stellarscaffold.org/docs
 
 ## Setup
 
-Prerequisites: Rust (with the `wasm32v1-none` target), the Stellar CLI (`stellar`), Node.js, and Docker (for the local network).
+Prerequisites: Rust (with the `wasm32v1-none` target) and a C toolchain, the Stellar CLI (`stellar`), Node.js, and Docker (for the local network). On Linux, install the Stellar CLI with `curl -fsSL https://github.com/stellar/stellar-cli/raw/main/install.sh | sh -s -- --install-deps` to also get the system libraries Scaffold needs.
 
 ```bash
-cargo install --locked stellar-scaffold-cli   # or: cargo binstall stellar-scaffold-cli
+cargo binstall stellar-scaffold-cli   # pre-built; or: cargo install --locked stellar-scaffold-cli
 stellar scaffold version
 ```
 
@@ -34,7 +34,7 @@ npm run dev                                         # app at http://localhost:51
 
 - `--template` takes `react`, `svelte`, `none` (contracts only, no JS at all), or a community repo as `org/repo[#branch]`. Omit it to be prompted. `--no-template` is the same as `--template none`.
 - `-p <npm|pnpm|yarn|bun|deno>` picks the package manager. With `--template` or `-y` it defaults to npm without prompting.
-- `init` does everything up front: copies `.env.example` to `.env`, installs dependencies, compiles the contracts, deploys them to the local network and generates their clients, then `git init`s and commits. If that build fails (most often because Docker isn't running), `init` only warns and still creates the project. Fix the cause, then run `npm run dev`.
+- `init` does everything up front: copies `app/.env.example` to `app/.env`, installs dependencies, compiles the contracts, deploys them to the local network and generates their clients, then `git init`s and commits. If that build fails (most often because Docker isn't running), `init` only warns and still creates the project. Fix the cause, then run `npm run dev`.
 
 Already have a Soroban workspace (`Cargo.toml` plus `contracts/`)? Run `stellar scaffold upgrade --template react` in it instead. It adds the frontend files and never overwrites files that already exist. **Then fix the config by hand**, because `upgrade` currently copies the template's `scaffold.yml`, whose `contracts:` lists the template's example crates rather than yours, and also writes a legacy `environments.toml` that version 2 ignores:
 
@@ -48,10 +48,10 @@ Already have a Soroban workspace (`Cargo.toml` plus `contracts/`)? Run `stellar 
 my-app/
 ├── contracts/<crate>/   # Soroban contracts; the workspace builds every cdylib in contracts/*
 ├── app/                 # your React or Svelte app
+│   └── .env             # optional STELLAR_NETWORK, secrets for ${env.…} (gitignored)
 ├── app-lib/             # @stellar-scaffold/app-lib: wallet, network, format helpers
 │   └── clients/         # GENERATED: one package per contract + index.ts. Never edit.
 ├── scaffold.yml         # networks, accounts, contracts
-├── .env                 # optional STELLAR_NETWORK, secrets for ${env.…} (gitignored)
 ├── .scaffold/           # GENERATED: what this checkout deployed (state.json). Ignores itself.
 ├── Cargo.toml           # Rust workspace
 └── package.json         # npm workspaces root
@@ -191,7 +191,7 @@ Full command list: [references/cli.md](references/cli.md).
 
 - **Edited `app-lib/clients/`**: it is regenerated on every build. Wrap a client in your own module under `app/` instead.
 - **`Module has no exported member 'myContract'`**: the contract has no entry for the network you built (`networks:` under the contract), the build failed before codegen, or the client name doesn't match. Client `my-contract` exports as `myContract`.
-- **Built for an unexpected network**: the first line of build output names the network and where it came from. Check `STELLAR_NETWORK` in your shell and `.env`.
+- **Built for an unexpected network**: the first line of build output names the network and where it came from. Check `STELLAR_NETWORK` in your shell and `app/.env`.
 - **`would be deployed to testnet, which has deploys disabled`**: point the contract at an existing deployment with `type: contract`. To redeploy freely on testnet, add a separate network (e.g. `testnet-dev: { extends: testnet, allow-deploy: true }`) rather than opting in `testnet` itself.
 - **`account <x> is not listed in network <n>'s accounts`**: each network has its own accounts. Add it to `networks.<n>.accounts`, or override `args` for that network.
 - **`uses type: registry, which build does not support yet`**: see the supported types above. Use `type: contract` with the address for now.
