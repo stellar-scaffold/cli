@@ -76,10 +76,7 @@ pub async fn prepare(
     // no clients to generate, so skip it and just compile.
     build_command.build_clients = pkg_manager.is_some();
     build_command.compile_only = pkg_manager.is_none();
-    let mut build_args = global_args.clone();
-    if !(global_args.verbose && global_args.very_verbose) {
-        build_args.quiet = true;
-    }
+    let build_args = init_build_args(global_args);
     // rustup picks the toolchain from the working directory, so build from
     // the project to use its rust-toolchain.toml. Otherwise the Wasm differs
     // from what later builds produce, and the first `npm start` redeploys.
@@ -102,6 +99,15 @@ pub async fn prepare(
     }
 
     Ok(())
+}
+
+/// Arguments for `init`'s build: quiet, unless `-v` or `-vv` asks to see it.
+fn init_build_args(global_args: &global::Args) -> global::Args {
+    let mut build_args = global_args.clone();
+    if !(global_args.verbose || global_args.very_verbose) {
+        build_args.quiet = true;
+    }
+    build_args
 }
 
 /// Directories that may hold a project's `.env`, relative to its root: the
@@ -416,6 +422,21 @@ mod tests {
         let env = std::fs::read_to_string(app.join(".env")).unwrap();
         assert_eq!(env, "STELLAR_NETWORK=local\n");
         assert!(!dir.path().join(".env").exists());
+    }
+
+    #[test]
+    fn init_build_is_quiet_unless_verbose() {
+        let quiet = |verbose, very_verbose| {
+            let args = global::Args {
+                verbose,
+                very_verbose,
+                ..global::Args::default()
+            };
+            init_build_args(&args).quiet
+        };
+        assert!(quiet(false, false));
+        assert!(!quiet(true, false));
+        assert!(!quiet(false, true));
     }
 
     #[test]
