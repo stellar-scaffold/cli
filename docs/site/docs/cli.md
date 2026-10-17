@@ -174,7 +174,7 @@ Findings that have a single-command remedy print it on a `fix:` line beneath.
 - `scaffold.yml` exists and uses a schema version this CLI supports. For version 2, every problem `stellar scaffold config check` would report is listed under the `scaffold-yml` check
 - The `contracts-dir` and `clients-dir` directories exist
 - The running CLI satisfies the project's `engines.stellar-scaffold` constraint
-- `.env` exists when there is a `.env.example` to copy from
+- `.env` exists when there is a `.env.example` to copy from, in the project root or `app/`
 - For projects still on `environments.toml`: it parses, defines the selected environment, has a usable network, and names contracts that exist in the workspace
 - For projects still on `environments.toml`: every extension the environment lists can be found and reports a valid manifest
 
@@ -199,8 +199,8 @@ $ stellar scaffold doctor
 ✅ contracts-dir      contracts
 ✅ clients-dir        app-lib/clients
 ✅ engine-constraint  stellar-scaffold 0.0.27
-⚠️ dot-env            .env is missing
-    fix: cp .env.example .env
+⚠️ dot-env            app/.env is missing
+    fix: cp app/.env.example app/.env
    Network
 ℹ️ docker-daemon      no environment configured
 ℹ️ localnet           no environment configured

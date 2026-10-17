@@ -35,7 +35,7 @@ That doesn't look like much! Every Stellar network is identified by a _network p
 
 Scaffold also notices that `local` uses the local (standalone) passphrase, so it uses _Stellar_ CLI to run a local network container (`stellar container start`) and waits for it to finish startup before moving on.
 
-Which network does `npm run dev` use? Look in `.env`: `STELLAR_NETWORK=local`. You could also pass `--network <name>` to `stellar scaffold watch`.
+Which network does `npm run dev` use? `local`, unless `STELLAR_NETWORK` is set in `app/.env` or your shell, or you picked a default with `stellar network use`. You could also pass `--network <name>` to `stellar scaffold watch`.
 
 These settings correspond to the following `npm run dev` output:
 

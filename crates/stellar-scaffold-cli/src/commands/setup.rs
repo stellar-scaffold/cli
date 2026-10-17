@@ -3,10 +3,11 @@ use dialoguer::theme::ColorfulTheme;
 use dialoguer::{Confirm, Select};
 use std::fs::copy;
 use std::io;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::process::Command;
 
 use super::build::env_toml;
+use super::init::instantiate::APP_DIR;
 use super::{
     EngineConstraintError, PackageManager, PackageManagerSpec, build, check_engine_constraint,
 };
@@ -42,12 +43,8 @@ pub async fn prepare(
     crate::config::check_version(project_path)?;
     check_engine_constraint(project_path)?;
 
-    let env_path = project_path.join(".env");
-    if !env_path.exists() {
-        let example_path = project_path.join(".env.example");
-        if example_path.exists()
-            && let Err(e) = copy(&example_path, &env_path)
-        {
+    for dir in dot_env_dirs(project_path) {
+        if let Err(e) = copy_env_example(&dir) {
             printer.warnln(format!("Failed to copy .env.example: {e}"));
         }
     }
@@ -95,6 +92,27 @@ pub async fn prepare(
         }
     }
 
+    Ok(())
+}
+
+/// Directories that may hold a project's `.env`, relative to its root: the
+/// root itself, and `app/`, where `init` puts the frontend. Its dev server
+/// and the `stellar` CLI it starts both read `app/.env`.
+pub(crate) const DOT_ENV_DIRS: [&str; 2] = ["", APP_DIR];
+
+/// The [`DOT_ENV_DIRS`] of the project at `root`.
+pub(crate) fn dot_env_dirs(root: &Path) -> impl Iterator<Item = PathBuf> {
+    DOT_ENV_DIRS.iter().map(|dir| root.join(dir))
+}
+
+/// Copy `.env.example` in `dir` to `.env`, unless there's no example or
+/// `.env` already exists.
+fn copy_env_example(dir: &Path) -> io::Result<()> {
+    let env_path = dir.join(".env");
+    let example_path = dir.join(".env.example");
+    if !env_path.exists() && example_path.exists() {
+        copy(example_path, env_path)?;
+    }
     Ok(())
 }
 
@@ -374,6 +392,34 @@ fn is_semver_like(s: &str) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn env_example_is_copied_in_the_app_dir() {
+        let dir = tempfile::TempDir::new().unwrap();
+        let app = dir.path().join(APP_DIR);
+        std::fs::create_dir(&app).unwrap();
+        std::fs::write(app.join(".env.example"), "STELLAR_NETWORK=local\n").unwrap();
+
+        for dir in dot_env_dirs(dir.path()) {
+            copy_env_example(&dir).unwrap();
+        }
+
+        let env = std::fs::read_to_string(app.join(".env")).unwrap();
+        assert_eq!(env, "STELLAR_NETWORK=local\n");
+        assert!(!dir.path().join(".env").exists());
+    }
+
+    #[test]
+    fn existing_env_is_kept() {
+        let dir = tempfile::TempDir::new().unwrap();
+        std::fs::write(dir.path().join(".env.example"), "example").unwrap();
+        std::fs::write(dir.path().join(".env"), "mine").unwrap();
+
+        copy_env_example(dir.path()).unwrap();
+
+        let env = std::fs::read_to_string(dir.path().join(".env")).unwrap();
+        assert_eq!(env, "mine");
+    }
 
     #[test]
     fn extract_version_from_npm_output() {

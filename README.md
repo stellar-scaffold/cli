@@ -63,7 +63,7 @@ cd my-project
 
 ### 3. Configure Your Frontend Environment
 
-Edit `.env` with your preferred network, and other settings.
+`init` copies `app/.env.example` to `app/.env`. Edit it to pick a network other than `local`, or to add secrets your `scaffold.yml` reads.
 
 ### 4. Install Frontend Dependencies
 ```
@@ -106,11 +106,11 @@ After scaffolding a project, your folder structure will look like this:
 my-project/
 ├── contracts/            # Rust smart contracts (compiled to WASM)
 ├── app/                  # Your frontend
-│   └── src/              # Components, pages, hooks, entry point
+│   ├── src/              # Components, pages, hooks, entry point
+│   └── .env              # Local environment variables
 ├── app-lib/              # Utility code, ready to use from your app
 │   └── clients/          # Generated contract clients — regenerated, don't edit
 ├── scaffold.yml          # Networks, accounts, and contracts
-├── .env                  # Local environment variables
 ├── package.json          # npm workspace root
 ├── target/               # Build outputs
 ```
@@ -203,7 +203,7 @@ After installation, you can interact with the contract using `stellar-cli`:
 stellar contract invoke --id my-contract-instance -- --help
 ```
 
-> You can deploy to testnet or mainnet depending on the network you select in `.env` (`STELLAR_NETWORK`) and `scaffold.yml`.
+> You can deploy to testnet or mainnet depending on the network you select in `app/.env` (`STELLAR_NETWORK`) and `scaffold.yml`.
 
 ---
 ## Concept: What Is the Contract Registry?
