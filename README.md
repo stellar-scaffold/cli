@@ -37,6 +37,8 @@ Before you begin, make sure you have the following installed:
 | [Stellar CLI](https://github.com/stellar/stellar-cli)   | For building, deploying, and interacting with smart contracts | [`Link for the repo`](https://github.com/stellar/stellar-cli) |
 | [Docker](https://docs.docker.com/get-started/)          | For running a Stellar node locally                            | Download from official site                                   |
 
+Rust needs a C toolchain to compile contracts: run `xcode-select --install` on macOS, or install `build-essential` (Debian/Ubuntu) or your distribution's equivalent on Linux. On Linux, install Stellar CLI with `curl -fsSL https://github.com/stellar/stellar-cli/raw/main/install.sh | sh -s -- --install-deps`, which also adds the system libraries Stellar Scaffold needs.
+
 For Windows users, please refer to the additional setup instructions [here](./WINDOWS.md).
 
 ---
@@ -47,13 +49,16 @@ This section walks you through setting up Scaffold Stellar from scratch.
 
 ### 1. Install the Scaffold Stellar CLI
 
+Install a pre-built binary with [cargo-binstall](https://github.com/cargo-bins/cargo-binstall):
+
 ```
-cargo install --locked stellar-scaffold-cli
+curl -L --proto '=https' --tlsv1.2 -sSf https://raw.githubusercontent.com/cargo-bins/cargo-binstall/main/install-from-binstall-release.sh | bash
+cargo binstall stellar-scaffold-cli
 ```
+
+On Windows, install cargo-binstall with [its PowerShell instructions](https://github.com/cargo-bins/cargo-binstall#installation) instead. To build from source, which takes several minutes, run `cargo install --locked stellar-scaffold-cli`.
 
 The Scaffold Stellar CLI is installed as a plugin under the `stellar` CLI.
-
-> We recommend the use of [cargo-binstall](https://github.com/cargo-bins/cargo-binstall) to install pre-compiled binaries.
 
 ### 2. Create a New Project
 ```

@@ -104,18 +104,14 @@ All names are normalized by the [stellar-registry-name](https://crates.io/crates
 
 ## Prerequisites
 
-Install the registry CLI:
+Install a pre-built registry CLI with [cargo-binstall](https://github.com/cargo-bins/cargo-binstall):
 
 ```bash
-cargo install --locked stellar-registry-cli
-```
-
-As this currently embeds Stellar CLI as a dependency, it takes some time. To make it faster, you can use [cargo-binstall](https://github.com/cargo-bins/cargo-binstall):
-
-```bash
-cargo install cargo-binstall
+curl -L --proto '=https' --tlsv1.2 -sSf https://raw.githubusercontent.com/cargo-bins/cargo-binstall/main/install-from-binstall-release.sh | bash
 cargo binstall stellar-registry-cli
 ```
+
+Building it from source with `cargo install --locked stellar-registry-cli` also works, but takes several minutes since it embeds Stellar CLI.
 
 ## Commands
 
