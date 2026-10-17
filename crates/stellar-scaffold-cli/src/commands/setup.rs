@@ -3,10 +3,11 @@ use dialoguer::theme::ColorfulTheme;
 use dialoguer::{Confirm, Select};
 use std::fs::copy;
 use std::io;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::process::Command;
 
-use super::build::env_toml;
+use super::build::docker;
+use super::init::instantiate::APP_DIR;
 use super::{
     EngineConstraintError, PackageManager, PackageManagerSpec, build, check_engine_constraint,
 };
@@ -42,48 +43,53 @@ pub async fn prepare(
     crate::config::check_version(project_path)?;
     check_engine_constraint(project_path)?;
 
-    let env_path = project_path.join(".env");
-    if !env_path.exists() {
-        let example_path = project_path.join(".env.example");
-        if example_path.exists()
-            && let Err(e) = copy(&example_path, &env_path)
-        {
+    for dir in dot_env_dirs(project_path) {
+        if let Err(e) = copy_env_example(&dir) {
             printer.warnln(format!("Failed to copy .env.example: {e}"));
         }
     }
 
-    if let Ok(Some(dev_env)) =
-        env_toml::Environment::get(project_path, &build::clients::ScaffoldEnv::Development)
-        && dev_env.network.run_locally
-        && Command::new("docker").arg("--version").output().is_err()
-    {
-        printer.warnln("Docker not found. Install it from https://docs.docker.com/get-docker/");
-        printer.warnln("Docker is required to run a local Stellar network (run-locally = true in environments.toml).");
-    }
-
     ensure_extensions_installed(project_path, &printer, yes);
+
+    let mut build_command = build::Command::parse_from(["build"]);
+    build_command.build.manifest_path = Some(project_path.join("Cargo.toml"));
+    let local_networks = docker::local_networks(project_path);
+    if !local_networks.is_empty() && Command::new("docker").arg("--version").output().is_err() {
+        let names: Vec<_> = local_networks.iter().map(|n| n.name.as_str()).collect();
+        printer.warnln("Docker not found. Install it from https://docs.docker.com/get-docker/");
+        printer.warnln(format!(
+            "Docker is required to run these networks locally: {}",
+            names.join(", ")
+        ));
+    }
 
     if let Some(pkg_manager) = pkg_manager {
         // A frontend without a JS manifest has no dependencies to install.
         if has_js_manifest(project_path) {
             run_install(pkg_manager.kind.command(), project_path, &printer);
         }
-        printer.infoln("Compiling contracts and generating client packages...");
+        let network_flag = build_command.build_clients_args.network.as_deref();
+        let (network, local) = deploy_target(project_path, network_flag, &local_networks);
+        printer.infoln(deploy_notice(&network, local));
     } else {
         printer.infoln("Compiling contracts...");
     }
-    let mut build_command = build::Command::parse_from(["build"]);
-    build_command.build.manifest_path = Some(project_path.join("Cargo.toml"));
     // The clients pipeline needs a network (account funding, deploys) even when
     // every contract opts out with `client = false`; a no-frontend project has
     // no clients to generate, so skip it and just compile.
     build_command.build_clients = pkg_manager.is_some();
     build_command.compile_only = pkg_manager.is_none();
-    let mut build_args = global_args.clone();
-    if !(global_args.verbose && global_args.very_verbose) {
-        build_args.quiet = true;
+    let build_args = init_build_args(global_args);
+    // rustup picks the toolchain from the working directory, so build from
+    // the project to use its rust-toolchain.toml. Otherwise the Wasm differs
+    // from what later builds produce, and the first `npm start` redeploys.
+    let previous_dir = std::env::current_dir().ok();
+    std::env::set_current_dir(project_path)?;
+    let built = build_command.run(&build_args).await;
+    if let Some(dir) = previous_dir {
+        let _ = std::env::set_current_dir(dir);
     }
-    if let Err(e) = build_command.run(&build_args).await.map_err(Box::new) {
+    if let Err(e) = built {
         printer.warnln(format!("Failed to compile contracts: {e}"));
     }
 
@@ -95,6 +101,65 @@ pub async fn prepare(
         }
     }
 
+    Ok(())
+}
+
+/// The network `init`'s build deploys to, and whether it runs locally: the
+/// network `build` selects for a version 2 project, or environments.toml's
+/// `development` environment.
+fn deploy_target(
+    project_path: &Path,
+    network_flag: Option<&str>,
+    local_networks: &[docker::LocalNetwork],
+) -> (String, bool) {
+    if build::v2::is_v2(project_path) {
+        let (name, _) = build::v2::select_network(network_flag);
+        let local = local_networks.iter().any(|n| n.name == name);
+        return (name, local);
+    }
+    let name = build::clients::ScaffoldEnv::Development.to_string();
+    (name, !local_networks.is_empty())
+}
+
+/// What `init` says before deploying, so a slow first run isn't a surprise.
+fn deploy_notice(network: &str, local: bool) -> String {
+    let notice = format!("Deploying contracts to {network} and generating their clients...");
+    if local {
+        format!(
+            "{notice} The first time, Docker downloads the Stellar quickstart image (over 2 GB) to run the local network, which can take several minutes."
+        )
+    } else {
+        notice
+    }
+}
+
+/// Arguments for `init`'s build: quiet, unless `-v` or `-vv` asks to see it.
+fn init_build_args(global_args: &global::Args) -> global::Args {
+    let mut build_args = global_args.clone();
+    if !(global_args.verbose || global_args.very_verbose) {
+        build_args.quiet = true;
+    }
+    build_args
+}
+
+/// Directories that may hold a project's `.env`, relative to its root: the
+/// root itself, and `app/`, where `init` puts the frontend. Its dev server
+/// and the `stellar` CLI it starts both read `app/.env`.
+pub(crate) const DOT_ENV_DIRS: [&str; 2] = ["", APP_DIR];
+
+/// The [`DOT_ENV_DIRS`] of the project at `root`.
+pub(crate) fn dot_env_dirs(root: &Path) -> impl Iterator<Item = PathBuf> {
+    DOT_ENV_DIRS.iter().map(|dir| root.join(dir))
+}
+
+/// Copy `.env.example` in `dir` to `.env`, unless there's no example or
+/// `.env` already exists.
+fn copy_env_example(dir: &Path) -> io::Result<()> {
+    let env_path = dir.join(".env");
+    let example_path = dir.join(".env.example");
+    if !env_path.exists() && example_path.exists() {
+        copy(example_path, env_path)?;
+    }
     Ok(())
 }
 
@@ -374,6 +439,75 @@ fn is_semver_like(s: &str) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn env_example_is_copied_in_the_app_dir() {
+        let dir = tempfile::TempDir::new().unwrap();
+        let app = dir.path().join(APP_DIR);
+        std::fs::create_dir(&app).unwrap();
+        std::fs::write(app.join(".env.example"), "STELLAR_NETWORK=local\n").unwrap();
+
+        for dir in dot_env_dirs(dir.path()) {
+            copy_env_example(&dir).unwrap();
+        }
+
+        let env = std::fs::read_to_string(app.join(".env")).unwrap();
+        assert_eq!(env, "STELLAR_NETWORK=local\n");
+        assert!(!dir.path().join(".env").exists());
+    }
+
+    #[test]
+    fn local_deploy_notice_warns_about_the_image_download() {
+        assert!(deploy_notice("local", true).contains("quickstart image"));
+        assert!(!deploy_notice("testnet", false).contains("quickstart image"));
+        assert!(deploy_notice("testnet", false).contains("testnet"));
+    }
+
+    #[test]
+    fn deploy_target_follows_the_selected_network() {
+        let dir = tempfile::TempDir::new().unwrap();
+        std::fs::write(
+            dir.path().join("scaffold.yml"),
+            "version: 2\nnetworks:\n  local: {}\n  testnet: {}\n",
+        )
+        .unwrap();
+        let local = docker::local_networks(dir.path());
+        assert_eq!(
+            deploy_target(dir.path(), Some("testnet"), &local),
+            ("testnet".to_string(), false)
+        );
+        assert_eq!(
+            deploy_target(dir.path(), Some("local"), &local),
+            ("local".to_string(), true)
+        );
+    }
+
+    #[test]
+    fn init_build_is_quiet_unless_verbose() {
+        let quiet = |verbose, very_verbose| {
+            let args = global::Args {
+                verbose,
+                very_verbose,
+                ..global::Args::default()
+            };
+            init_build_args(&args).quiet
+        };
+        assert!(quiet(false, false));
+        assert!(!quiet(true, false));
+        assert!(!quiet(false, true));
+    }
+
+    #[test]
+    fn existing_env_is_kept() {
+        let dir = tempfile::TempDir::new().unwrap();
+        std::fs::write(dir.path().join(".env.example"), "example").unwrap();
+        std::fs::write(dir.path().join(".env"), "mine").unwrap();
+
+        copy_env_example(dir.path()).unwrap();
+
+        let env = std::fs::read_to_string(dir.path().join(".env")).unwrap();
+        assert_eq!(env, "mine");
+    }
 
     #[test]
     fn extract_version_from_npm_output() {

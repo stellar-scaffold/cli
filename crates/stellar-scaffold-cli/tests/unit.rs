@@ -81,3 +81,42 @@ fn init_copies_frontend_template() {
     let config = std::fs::read_to_string(project_path.join("scaffold.yml")).unwrap();
     assert!(config.contains("\n  package-manager: npm@"));
 }
+
+#[test]
+fn init_builds_with_the_projects_toolchain() {
+    let env = TestEnv::new_empty();
+    let project_path = env.cwd.join("toolchain-project");
+
+    // rustup sets RUSTUP_TOOLCHAIN for the processes it starts, which would
+    // override the project's rust-toolchain.toml. Without it, a build started
+    // from outside the project uses rustup's default toolchain instead.
+    env.scaffold("init")
+        .args([project_path.to_str().unwrap(), "--template", "none"])
+        .env_remove("RUSTUP_TOOLCHAIN")
+        .assert()
+        .success();
+
+    let toolchain = std::fs::read_to_string(project_path.join("rust-toolchain.toml")).unwrap();
+    let channel = toolchain
+        .lines()
+        .find_map(|line| line.strip_prefix("channel = "))
+        .unwrap()
+        .trim_matches('"');
+    let wasms: Vec<_> = walkdir::WalkDir::new(project_path.join("target/stellar"))
+        .into_iter()
+        .filter_map(Result::ok)
+        .filter(|entry| entry.path().extension().is_some_and(|ext| ext == "wasm"))
+        .collect();
+    assert!(!wasms.is_empty(), "init built no contracts");
+    for wasm in wasms {
+        // The Wasm's `rsver` metadata records the rustc that built it.
+        let bytes = std::fs::read(wasm.path()).unwrap();
+        assert!(
+            bytes
+                .windows(channel.len())
+                .any(|w| w == channel.as_bytes()),
+            "{} wasn't built with Rust {channel}",
+            wasm.path().display()
+        );
+    }
+}

@@ -149,7 +149,6 @@ Open the project in your editor. You will see a generated project structure incl
 
 ```
 .
-├── .env
 ├── Cargo.lock
 ├── Cargo.toml
 ├── contracts/
@@ -160,6 +159,7 @@ Open the project in your editor. You will see a generated project structure incl
 │          └── test.rs
 ├── scaffold.yml
 ├── app/
+│   └── .env
 ├── app-lib/
 │   ├── clients/
 │   └── wallet.ts
@@ -177,7 +177,7 @@ There are a few more files than the ones listed here, but let's highlight some i
 - `app/`: our frontend. This is our code, and we'll spend most of the tutorial here.
 - `app-lib/`: utility code that came with the project — connecting a wallet, reading network settings, funding an account, formatting balances. It saves us writing the same plumbing every Stellar app needs, but it isn't special: it's plain source we can read and change, and we can ignore it entirely if we'd rather write our own. We import it as `@stellar-scaffold/app-lib`.
 - `app-lib/clients/`: the one directory we should _not_ edit. Stellar Scaffold generates our contract clients here and rewrites them every time the contracts build, so anything we change by hand gets overwritten. More on this below.
-- `.env`: is where we store environment variables that will be used by Stellar Scaffold commands and by our frontend.
+- `app/.env`: is where we store environment variables that will be used by Stellar Scaffold commands and by our frontend.
 - `scaffold.yml`: This is the Stellar Scaffold secret sauce! This file is where we configure:
   - the _networks_ our project runs on, ...
   - the _accounts_ we use on each network, ...

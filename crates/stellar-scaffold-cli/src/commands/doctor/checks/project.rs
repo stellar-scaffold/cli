@@ -3,6 +3,7 @@ use std::path::Path;
 use crate::commands::build::env_toml::{self, ENV_FILE};
 use crate::commands::check_engine_constraint;
 use crate::commands::doctor::diagnosis::{Category, Check, Context, Diagnosis};
+use crate::commands::setup::DOT_ENV_DIRS;
 use crate::commands::{EngineConstraintError, version};
 use crate::config::{self, CONFIG_FILE};
 use crate::extension::{ExtensionListStatus, list as list_extensions};
@@ -197,7 +198,8 @@ impl Check for EngineConstraint {
     }
 }
 
-/// Warns when `.env` is absent but `.env.example` is there to copy from.
+/// Warns when `.env` is absent but `.env.example` is there to copy from, in
+/// each directory `init` copies one (the root and `app/`).
 pub struct DotEnv;
 
 #[async_trait::async_trait]
@@ -215,17 +217,36 @@ impl Check for DotEnv {
             return vec![skipped_no_workspace(self.name())];
         };
 
-        let diagnosis = if root.join(".env").exists() {
-            Diagnosis::ok(self.name(), Category::Project, ".env present")
-        } else if root.join(".env.example").exists() {
-            Diagnosis::warn(self.name(), Category::Project, ".env is missing")
-                .with_fix("cp .env.example .env")
-        } else {
-            // Neither file: nothing to copy from, and not every project uses one.
-            Diagnosis::skipped(self.name(), Category::Project, "no .env or .env.example")
-        };
+        let diagnoses: Vec<Diagnosis> =
+            DOT_ENV_DIRS
+                .iter()
+                .filter_map(|dir| {
+                    let env = Path::new(dir).join(".env");
+                    let example = Path::new(dir).join(".env.example");
+                    if root.join(&env).exists() {
+                        let message = format!("{} present", env.display());
+                        Some(Diagnosis::ok(self.name(), Category::Project, message))
+                    } else if root.join(&example).exists() {
+                        let message = format!("{} is missing", env.display());
+                        Some(
+                            Diagnosis::warn(self.name(), Category::Project, message)
+                                .with_fix(format!("cp {} {}", example.display(), env.display())),
+                        )
+                    } else {
+                        None
+                    }
+                })
+                .collect();
 
-        vec![diagnosis]
+        if diagnoses.is_empty() {
+            // Neither file: nothing to copy from, and not every project uses one.
+            return vec![Diagnosis::skipped(
+                self.name(),
+                Category::Project,
+                "no .env or .env.example",
+            )];
+        }
+        diagnoses
     }
 }
 
@@ -606,6 +627,20 @@ mod tests {
         let finding = findings.first().unwrap();
         assert_eq!(finding.severity, Severity::Warn);
         assert_eq!(finding.fix.as_deref(), Some("cp .env.example .env"));
+    }
+
+    #[tokio::test]
+    async fn dot_env_warns_when_only_app_example_present() {
+        let dir = tempfile::TempDir::new().unwrap();
+        std::fs::create_dir(dir.path().join("app")).unwrap();
+        std::fs::write(dir.path().join("app/.env.example"), "").unwrap();
+
+        let printer = Print::new(true);
+        let findings = DotEnv.run(&context(Some(dir.path()), &printer)).await;
+
+        let finding = findings.first().unwrap();
+        assert_eq!(finding.severity, Severity::Warn);
+        assert_eq!(finding.fix.as_deref(), Some("cp app/.env.example app/.env"));
     }
 
     #[tokio::test]

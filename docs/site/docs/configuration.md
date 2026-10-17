@@ -30,7 +30,7 @@ contracts:
           admin: ${account.testnet-user}
 ```
 
-Machine-local settings and secrets stay out of this file. They go in `.env`, which is gitignored and also read by your frontend.
+Machine-local settings and secrets stay out of this file. They go in `app/.env`, which is gitignored and also read by your frontend.
 
 :::note
 
@@ -46,7 +46,7 @@ Projects created before `scaffold.yml` version 2 use `environments.toml` instead
 2. The default set with `stellar network use <name>`
 3. `local`
 
-The first line of build output names the network and which of these picked it. The name must be declared under `networks:`. To build against testnet, run `STELLAR_NETWORK=testnet npm start` (or `stellar scaffold build --network testnet`), or set `STELLAR_NETWORK` in the project's `.env`, which the `stellar` CLI loads; a value in your shell wins over `.env`.
+The first line of build output names the network and which of these picked it. The name must be declared under `networks:`. To build against testnet, run `STELLAR_NETWORK=testnet npm start` (or `stellar scaffold build --network testnet`), or set `STELLAR_NETWORK` in `app/.env`, which the `stellar` CLI loads; a value in your shell wins over `.env`.
 
 Generated clients are bound to the network they were built for: its passphrase and RPC URL are written into `<clients-dir>/index.ts`, and the frontend templates read the network from there. Rebuild after switching networks.
 

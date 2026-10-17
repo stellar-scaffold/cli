@@ -112,7 +112,12 @@ impl Watcher {
         if matches!(
             event.kind,
             notify::EventKind::Create(notify::event::CreateKind::File)
-                | notify::EventKind::Modify(notify::event::ModifyKind::Data(_))
+                | notify::EventKind::Modify(
+                    notify::event::ModifyKind::Data(_)
+                    // Editors that save by writing a temporary file and
+                    // renaming it over the original report a rename instead.
+                    | notify::event::ModifyKind::Name(_)
+                )
                 | notify::EventKind::Remove(notify::event::RemoveKind::File)
         ) {
             let watched_file = event.paths.iter().find(|path| {
@@ -348,5 +353,23 @@ mod tests {
         assert!(watcher.is_scaffold_yml(&link.join(crate::config::CONFIG_FILE)));
         assert!(watcher.is_scaffold_yml(&real.join(crate::config::CONFIG_FILE)));
         assert!(!watcher.is_scaffold_yml(&real.join("other.yml")));
+    }
+
+    #[test]
+    fn rename_over_a_source_file_is_a_change() {
+        let dir = tempfile::TempDir::new().unwrap();
+        let lib = dir.path().join("lib.rs");
+        std::fs::write(&lib, "").unwrap();
+        let watcher = Watcher::new(dir.path(), &[]);
+        let (tx, mut rx) = mpsc::channel(1);
+
+        // What inotify reports when an editor renames `lib.rs.tmp` over `lib.rs`
+        let event = notify::Event::new(notify::EventKind::Modify(notify::event::ModifyKind::Name(
+            notify::event::RenameMode::To,
+        )))
+        .add_path(lib);
+        watcher.handle_event(&event, &tx);
+
+        assert!(matches!(rx.try_recv(), Ok(Message::FileChanged)));
     }
 }
