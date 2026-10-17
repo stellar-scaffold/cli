@@ -51,15 +51,6 @@ pub async fn prepare(
 
     ensure_extensions_installed(project_path, &printer, yes);
 
-    if let Some(pkg_manager) = pkg_manager {
-        // A frontend without a JS manifest has no dependencies to install.
-        if has_js_manifest(project_path) {
-            run_install(pkg_manager.kind.command(), project_path, &printer);
-        }
-        printer.infoln("Compiling contracts and generating client packages...");
-    } else {
-        printer.infoln("Compiling contracts...");
-    }
     let mut build_command = build::Command::parse_from(["build"]);
     build_command.build.manifest_path = Some(project_path.join("Cargo.toml"));
     let local_networks = docker::local_networks(project_path);
@@ -70,6 +61,18 @@ pub async fn prepare(
             "Docker is required to run these networks locally: {}",
             names.join(", ")
         ));
+    }
+
+    if let Some(pkg_manager) = pkg_manager {
+        // A frontend without a JS manifest has no dependencies to install.
+        if has_js_manifest(project_path) {
+            run_install(pkg_manager.kind.command(), project_path, &printer);
+        }
+        let network_flag = build_command.build_clients_args.network.as_deref();
+        let (network, local) = deploy_target(project_path, network_flag, &local_networks);
+        printer.infoln(deploy_notice(&network, local));
+    } else {
+        printer.infoln("Compiling contracts...");
     }
     // The clients pipeline needs a network (account funding, deploys) even when
     // every contract opts out with `client = false`; a no-frontend project has
@@ -99,6 +102,35 @@ pub async fn prepare(
     }
 
     Ok(())
+}
+
+/// The network `init`'s build deploys to, and whether it runs locally: the
+/// network `build` selects for a version 2 project, or environments.toml's
+/// `development` environment.
+fn deploy_target(
+    project_path: &Path,
+    network_flag: Option<&str>,
+    local_networks: &[docker::LocalNetwork],
+) -> (String, bool) {
+    if build::v2::is_v2(project_path) {
+        let (name, _) = build::v2::select_network(network_flag);
+        let local = local_networks.iter().any(|n| n.name == name);
+        return (name, local);
+    }
+    let name = build::clients::ScaffoldEnv::Development.to_string();
+    (name, !local_networks.is_empty())
+}
+
+/// What `init` says before deploying, so a slow first run isn't a surprise.
+fn deploy_notice(network: &str, local: bool) -> String {
+    let notice = format!("Deploying contracts to {network} and generating their clients...");
+    if local {
+        format!(
+            "{notice} The first time, Docker downloads the Stellar quickstart image (over 2 GB) to run the local network, which can take several minutes."
+        )
+    } else {
+        notice
+    }
 }
 
 /// Arguments for `init`'s build: quiet, unless `-v` or `-vv` asks to see it.
@@ -422,6 +454,32 @@ mod tests {
         let env = std::fs::read_to_string(app.join(".env")).unwrap();
         assert_eq!(env, "STELLAR_NETWORK=local\n");
         assert!(!dir.path().join(".env").exists());
+    }
+
+    #[test]
+    fn local_deploy_notice_warns_about_the_image_download() {
+        assert!(deploy_notice("local", true).contains("quickstart image"));
+        assert!(!deploy_notice("testnet", false).contains("quickstart image"));
+        assert!(deploy_notice("testnet", false).contains("testnet"));
+    }
+
+    #[test]
+    fn deploy_target_follows_the_selected_network() {
+        let dir = tempfile::TempDir::new().unwrap();
+        std::fs::write(
+            dir.path().join("scaffold.yml"),
+            "version: 2\nnetworks:\n  local: {}\n  testnet: {}\n",
+        )
+        .unwrap();
+        let local = docker::local_networks(dir.path());
+        assert_eq!(
+            deploy_target(dir.path(), Some("testnet"), &local),
+            ("testnet".to_string(), false)
+        );
+        assert_eq!(
+            deploy_target(dir.path(), Some("local"), &local),
+            ("local".to_string(), true)
+        );
     }
 
     #[test]
