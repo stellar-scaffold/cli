@@ -5388,7 +5388,7 @@ dependencies = [
 
 [[package]]
 name = "stellar-scaffold-cli"
-version = "0.0.30"
+version = "0.0.31"
 dependencies = [
  "assert_cmd",
  "assert_fs",
@@ -5445,7 +5445,7 @@ dependencies = [
 
 [[package]]
 name = "stellar-scaffold-ext-types"
-version = "0.0.4"
+version = "0.0.5"
 dependencies = [
  "serde",
  "serde_json",
@@ -5467,7 +5467,7 @@ dependencies = [
 
 [[package]]
 name = "stellar-scaffold-reporter"
-version = "0.1.3"
+version = "0.1.4"
 dependencies = [
  "assert_cmd",
  "clap",
