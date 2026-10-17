@@ -344,6 +344,24 @@
     "message": "Comando copiado",
     "description": "Accessible label after copying the install command"
   },
+  "homepage.agent.jump": {
+    "message": "¿Usas IA? Copia nuestro prompt para empezar."
+  },
+  "homepage.agent.heading": {
+    "message": "¿Desarrollas con un agente de IA?"
+  },
+  "homepage.agent.copy": {
+    "message": "Copiar prompt"
+  },
+  "homepage.agent.copied": {
+    "message": "Copiado"
+  },
+  "homepage.agent.body": {
+    "message": "Pégalo en Claude Code, Codex, Cursor u otro agente de programación. Instala Scaffold, te pide el nombre del proyecto, crea el proyecto y le indica al agente nuestra Agent Skill para todo lo demás."
+  },
+  "homepage.agent.cta": {
+    "message": "Sobre la Agent Skill"
+  },
   "homepage.features.quickstart.title": {
     "message": "Inicio Rápido",
     "description": "Title for the quickstart card"
