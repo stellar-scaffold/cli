@@ -186,75 +186,98 @@ function HomepageHeader() {
   );
 }
 
-type LoopStep = {
+type WorkflowStep = {
+  label: string;
   command: string;
   detail: string;
 };
 
 /**
- * The four commands that make up a working session, in the order they run.
- * The sequence is the product, so the page renders it as one.
+ * The three stages of a project, in order: fast iteration against a local
+ * network, then deliberate deploys to testnet and mainnet. Each stage is
+ * labeled because the command alone doesn't say which stage it belongs to.
  */
-function DevLoop() {
-  const steps: LoopStep[] = [
+function Workflow() {
+  const steps: WorkflowStep[] = [
     {
+      label: translate({
+        id: 'homepage.workflow.init.label',
+        message: 'Create',
+        description: 'Label for the init step',
+      }),
       command: 'stellar scaffold init my-project',
       detail: translate({
-        id: 'homepage.loop.init',
+        id: 'homepage.workflow.init',
         message:
-          'Sets up contracts, a frontend in the framework you pick, and the utility code connecting them — already wired together.',
+          'Sets up contracts, a frontend in the framework you pick, and the utility code connecting them, already wired together.',
         description: 'Description of the init step',
       }),
     },
     {
-      command: 'stellar scaffold generate contract counter',
-      detail: translate({
-        id: 'homepage.loop.generate',
-        message:
-          'Adds a contract to the workspace and registers it in your environment config.',
-        description: 'Description of the generate step',
+      label: translate({
+        id: 'homepage.workflow.dev.label',
+        message: 'Develop locally',
+        description: 'Label for the dev step',
       }),
-    },
-    {
       command: 'npm run dev',
       detail: translate({
-        id: 'homepage.loop.dev',
+        id: 'homepage.workflow.dev',
         message:
-          'Watches your contracts, rebuilds and redeploys them on change, regenerates typed clients, and serves the frontend.',
+          'Runs a local network and watches your code. Every save rebuilds and redeploys the contracts that changed, regenerates their typed clients, and reloads the frontend.',
         description: 'Description of the dev step',
       }),
     },
     {
+      label: translate({
+        id: 'homepage.workflow.publish.label',
+        message: 'Ship',
+        description: 'Label for the publish step',
+      }),
       command: 'stellar registry publish',
       detail: translate({
-        id: 'homepage.loop.publish',
+        id: 'homepage.workflow.publish',
         message:
-          'Publishes your WASM to the Stellar Registry so it can be deployed by name on testnet or mainnet.',
+          'When a contract is ready, publish its Wasm to the Stellar Registry and deploy it by name: to testnet for staging, then to mainnet. These deploys are deliberate steps, never a side effect of saving a file.',
         description: 'Description of the publish step',
       }),
     },
   ];
 
   return (
-    <section className={styles.loop}>
+    <section className={styles.workflow}>
       <Heading as="h2" className={styles.sectionHeading}>
-        <Translate id="homepage.loop.heading">The loop</Translate>
+        <Translate id="homepage.workflow.heading">The workflow</Translate>
       </Heading>
       <p className={styles.sectionBody}>
-        <Translate id="homepage.loop.intro">
-          Four commands cover the whole lifecycle. Everything in between —
-          building contracts, deploying to a local network, generating
-          TypeScript clients — happens on its own.
+        <Translate id="homepage.workflow.intro">
+          Iterate locally as fast as you can save, then deploy to testnet and
+          mainnet when you mean to. Building contracts, running the local
+          network, and generating TypeScript clients happen on their own.
         </Translate>
       </p>
-      <ol className={styles.loopList}>
+      <ol className={styles.workflowList}>
         {steps.map((step) => (
-          <li key={step.command} className={styles.loopStep}>
-            <code className={styles.loopCommand}>{step.command}</code>
-            <p className={styles.loopDetail}>{step.detail}</p>
+          <li key={step.command} className={styles.workflowStep}>
+            <span className={styles.workflowLabel}>{step.label}</span>
+            <code className={styles.workflowCommand}>{step.command}</code>
+            <p className={styles.workflowDetail}>{step.detail}</p>
           </li>
         ))}
       </ol>
+      <p className={clsx(styles.sectionBody, styles.workflowExtras)}>
+        <Translate id="homepage.workflow.extras">
+          While you develop, one committed scaffold.yml declares your networks,
+          accounts, and contracts, so everyone on your team builds the same
+          project, and the same file carries it from local to testnet to
+          mainnet. Config checks catch mistakes before a build runs, and when
+          something does break, Doctor checks your toolchain, config, and
+          local network in one pass and tells you how to fix what it finds.
+        </Translate>
+      </p>
+      <Link className={styles.sectionLink} to="/docs/cli">
+        <Translate id="homepage.workflow.cta">See every command</Translate>{' '}
+        &rarr;
+      </Link>
     </section>
   );
 }
@@ -305,7 +328,7 @@ export default function Home(): ReactNode {
           </Link>
         </section>
 
-        <DevLoop />
+        <Workflow />
       </main>
     </Layout>
   );

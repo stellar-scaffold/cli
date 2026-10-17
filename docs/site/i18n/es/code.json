@@ -422,27 +422,35 @@
   "homepage.about.cta": {
     "message": "Lee la introducción"
   },
-  "homepage.loop.heading": {
-    "message": "El ciclo"
+  "homepage.workflow.heading": {
+    "message": "El flujo de trabajo"
   },
-  "homepage.loop.intro": {
-    "message": "Cuatro comandos cubren todo el ciclo de vida. Todo lo que hay en medio —compilar contratos, desplegar en una red local, generar clientes TypeScript— ocurre por sí solo."
+  "homepage.workflow.intro": {
+    "message": "Itera en local tan rápido como guardas y despliega en testnet y mainnet cuando lo decidas. Compilar contratos, ejecutar la red local y generar clientes TypeScript ocurre por sí solo."
   },
-  "homepage.loop.init": {
-    "message": "Prepara los contratos, un frontend en el framework que elijas y el código de utilidades que los conecta, ya listos para funcionar.",
-    "description": "Description of the init step"
+  "homepage.workflow.init.label": {
+    "message": "Crear"
   },
-  "homepage.loop.generate": {
-    "message": "Añade un contrato al workspace y lo registra en la configuración de tu entorno.",
-    "description": "Description of the generate step"
+  "homepage.workflow.init": {
+    "message": "Configura los contratos, un frontend en el framework que elijas y el código utilitario que los conecta, ya integrados."
   },
-  "homepage.loop.dev": {
-    "message": "Observa tus contratos, los recompila y redespliega al cambiar, regenera los clientes tipados y sirve el frontend.",
-    "description": "Description of the dev step"
+  "homepage.workflow.dev.label": {
+    "message": "Desarrollar en local"
   },
-  "homepage.loop.publish": {
-    "message": "Publica tu WASM en el Stellar Registry para poder desplegarlo por nombre en testnet o mainnet.",
-    "description": "Description of the publish step"
+  "homepage.workflow.dev": {
+    "message": "Ejecuta una red local y vigila tu código. Cada vez que guardas, recompila y vuelve a desplegar los contratos que cambiaron, regenera sus clientes tipados y recarga el frontend."
+  },
+  "homepage.workflow.publish.label": {
+    "message": "Publicar"
+  },
+  "homepage.workflow.publish": {
+    "message": "Cuando un contrato está listo, publica su Wasm en el Stellar Registry y despliégalo por nombre: primero en testnet como staging y luego en mainnet. Estos despliegues son pasos deliberados, nunca un efecto secundario de guardar un archivo."
+  },
+  "homepage.workflow.extras": {
+    "message": "Mientras desarrollas, un único scaffold.yml versionado declara tus redes, cuentas y contratos, para que todo tu equipo compile el mismo proyecto, y ese mismo archivo lo lleva de local a testnet y a mainnet. Las comprobaciones de configuración detectan errores antes de compilar y, cuando algo falla, Doctor revisa tu toolchain, la configuración y la red local de una vez y te dice cómo arreglar lo que encuentra."
+  },
+  "homepage.workflow.cta": {
+    "message": "Ver todos los comandos"
   },
   "footer.banner.eyebrow": {
     "message": "Registro de Contratos"
