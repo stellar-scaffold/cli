@@ -80,7 +80,16 @@ pub async fn prepare(
     if !(global_args.verbose && global_args.very_verbose) {
         build_args.quiet = true;
     }
-    if let Err(e) = build_command.run(&build_args).await.map_err(Box::new) {
+    // rustup picks the toolchain from the working directory, so build from
+    // the project to use its rust-toolchain.toml. Otherwise the Wasm differs
+    // from what later builds produce, and the first `npm start` redeploys.
+    let previous_dir = std::env::current_dir().ok();
+    std::env::set_current_dir(project_path)?;
+    let built = build_command.run(&build_args).await;
+    if let Some(dir) = previous_dir {
+        let _ = std::env::set_current_dir(dir);
+    }
+    if let Err(e) = built {
         printer.warnln(format!("Failed to compile contracts: {e}"));
     }
 
