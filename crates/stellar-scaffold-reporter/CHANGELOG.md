@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.4](https://github.com/stellar-scaffold/cli/compare/stellar-scaffold-reporter-v0.1.3...stellar-scaffold-reporter-v0.1.4) - 2026-10-17
+
+### Other
+
+- updated the following local packages: stellar-scaffold-ext-types
+
 ## [0.1.3](https://github.com/stellar-scaffold/cli/compare/stellar-scaffold-reporter-v0.1.2...stellar-scaffold-reporter-v0.1.3) - 2026-10-12
 
 ### Other
