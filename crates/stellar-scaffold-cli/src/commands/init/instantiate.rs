@@ -35,10 +35,9 @@ const NO_FRONTEND_REMOVALS: &[&str] = &[
     ".prettierignore",
 ];
 
-/// The declared workspaces for the instantiated project. `e2e/` is kept (its
-/// self-adapting config targets the single `app/` post-init); `templates/*` is
-/// gone, replaced by `app`.
-const INSTANTIATED_WORKSPACES: &[&str] = &["app", "app-lib", "app-lib/clients/*", "e2e"];
+/// The declared workspaces for the instantiated project. `templates/*` is
+/// replaced by `app`, and the UI monorepo's `e2e/` suite is removed.
+const INSTANTIATED_WORKSPACES: &[&str] = &["app", "app-lib", "app-lib/clients/*"];
 
 const DENO_CONFIG: &str = "{\n  \"nodeModulesDir\": \"auto\"\n}\n";
 
@@ -127,9 +126,12 @@ pub fn instantiate(root: &Path, framework: &str) -> Result<(), Error> {
     let app = root.join(APP_DIR);
     fs::rename(&selected, &app)?;
     fs::remove_dir_all(&templates)?;
+    let e2e = root.join("e2e");
+    if e2e.is_dir() {
+        fs::remove_dir_all(&e2e)?;
+    }
 
     rewrite_root_workspaces(root)?;
-    prune_e2e_snapshots(root)?;
     Ok(())
 }
 
@@ -204,25 +206,6 @@ fn disable_clients_in_env_toml(root: &Path) -> Result<(), Error> {
         }
     }
     fs::write(&path, doc.to_string())?;
-    Ok(())
-}
-
-/// Remove the committed visual-snapshot baselines from the kept `e2e/` suite.
-/// They are per-framework (e.g. `home-react-darwin.png`); after init only the
-/// single `app/` remains, so the user regenerates their own on first run.
-fn prune_e2e_snapshots(root: &Path) -> Result<(), Error> {
-    let tests = root.join("e2e").join("tests");
-    if !tests.is_dir() {
-        return Ok(());
-    }
-    for entry in fs::read_dir(&tests)? {
-        let entry = entry?;
-        if entry.file_type()?.is_dir()
-            && entry.file_name().to_string_lossy().ends_with("-snapshots")
-        {
-            fs::remove_dir_all(entry.path())?;
-        }
-    }
     Ok(())
 }
 
@@ -309,7 +292,7 @@ mod tests {
             &root.join("scaffold.yml"),
             "version: 2\n\n# Comment kept\nproject:\n  contracts-dir: contracts\n\ncontracts:\n  guess:\n    type: workspace\n    source: guess\n    networks:\n      local:\n",
         );
-        // e2e is kept post-init; its per-framework snapshot baselines are not.
+        // The UI monorepo's e2e suite is removed post-init.
         write(&root.join("e2e/tests/smoke.spec.ts"), "// smoke");
         write(
             &root.join("e2e/tests/visual.spec.ts-snapshots/home-react-darwin.png"),
@@ -389,24 +372,28 @@ mod tests {
             serde_json::from_str(&fs::read_to_string(root.join("package.json")).unwrap()).unwrap();
         assert_eq!(
             pkg["workspaces"],
-            serde_json::json!(["app", "app-lib", "app-lib/clients/*", "e2e"])
+            serde_json::json!(["app", "app-lib", "app-lib/clients/*"])
         );
     }
 
     #[test]
-    fn instantiate_prunes_e2e_snapshots_but_keeps_specs() {
+    fn instantiate_removes_e2e_suite() {
         let dir = fixture();
         let root = dir.path();
         instantiate(root, "react").unwrap();
 
-        assert!(
-            !root.join("e2e/tests/visual.spec.ts-snapshots").exists(),
-            "stale per-framework snapshots removed"
-        );
-        assert!(
-            root.join("e2e/tests/smoke.spec.ts").exists(),
-            "e2e specs kept"
-        );
+        assert!(!root.join("e2e").exists(), "entire e2e/ suite removed");
+    }
+
+    #[test]
+    fn instantiate_ok_without_e2e() {
+        let dir = fixture();
+        let root = dir.path();
+        fs::remove_dir_all(root.join("e2e")).unwrap();
+
+        instantiate(root, "react").unwrap();
+
+        assert!(root.join("app/index.html").exists(), "app/ created");
     }
 
     #[test]
@@ -553,6 +540,7 @@ mod tests {
         assert!(yaml.contains("- \"app\""));
         assert!(yaml.contains("- \"app-lib\""));
         assert!(yaml.contains("- \"app-lib/clients/*\""));
+        assert!(!yaml.contains("e2e"));
 
         let config = fs::read_to_string(root.join("scaffold.yml")).unwrap();
         assert!(config.contains("  contracts-dir: contracts\n  package-manager: pnpm@1.2.3\n"));
