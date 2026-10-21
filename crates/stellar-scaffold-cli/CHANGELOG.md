@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.0.31](https://github.com/stellar-scaffold/cli/compare/stellar-scaffold-cli-v0.0.30...stellar-scaffold-cli-v0.0.31) - 2026-10-21
+
+### Added
+
+- config-driven builds with per-checkout deployment state ([#630](https://github.com/stellar-scaffold/cli/pull/630))
+
+### Fixed
+
+- *(stellar-scaffold-cli)* expose `build --compile-only` flag ([#637](https://github.com/stellar-scaffold/cli/pull/637))
+
 ## [0.0.30](https://github.com/stellar-scaffold/cli/compare/stellar-scaffold-cli-v0.0.29...stellar-scaffold-cli-v0.0.30) - 2026-10-15
 
 ### Other
