@@ -66,7 +66,7 @@ my-app/
 `npm run dev` runs two processes: `stellar scaffold watch` and Vite. On every change to a contract or to `scaffold.yml`, `watch`:
 
 1. Builds the contracts (Wasm in `target/stellar/<STELLAR_NETWORK, default local>/<crate_name>.wasm`, with `-` replaced by `_`).
-2. Resolves each contract dependency for the selected network (normally `local`). On `local`, that means starting the container if needed, creating and funding the accounts, deploying or upgrading `workspace` contracts whose Wasm changed, and running their `after-deploy` calls. On a network with deploys disabled, nothing is deployed: `type: contract` entries are fetched from the address given.
+2. Resolves each contract dependency for the selected network (default: `local`). On `local`, that means starting the container if needed, creating and funding the accounts, deploying or upgrading `workspace` contracts whose Wasm changed, and running their `after-deploy` calls. On a network with deploys disabled, nothing is deployed: `type: contract` entries are fetched from the address given.
 3. Regenerates `app-lib/clients/<name>/` and `app-lib/clients/index.ts` (gitignored), which Vite hot-reloads.
 
 Changing only constructor `args` or `after-deploy` does **not** redeploy. Run `stellar scaffold clean` and restart to get fresh deployments.
