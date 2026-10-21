@@ -21,10 +21,11 @@ const AGENT_PROMPT = `Help me start a new Stellar Scaffold project.
 
 1. Read the Stellar Scaffold agent skill and follow it for everything below: https://raw.githubusercontent.com/stellar-scaffold/cli/main/skills/stellar-scaffold/SKILL.md
 2. Check that I have Rust with the wasm32v1-none target, a C toolchain, the Stellar CLI (\`stellar\`), Node.js, and Docker running. If anything is missing, tell me how to install it before going further.
-3. Install the Scaffold CLI with \`cargo binstall stellar-scaffold-cli\`, installing cargo-binstall first if I don't have it (see https://stellarscaffold.org/docs/quick-start). Confirm it works with \`stellar scaffold version\`.
-4. Ask me for a project name, and whether I want a React or Svelte frontend, or contracts only.
-5. Run \`stellar scaffold init <name> --template <react|svelte|none> -y\`. The first run downloads the local network's Docker image and deploys the example contracts, so it can take several minutes.
-6. For a frontend project, start \`npm run dev\` in the project. It keeps running, so run it in the background or ask me to run it, then point me to http://localhost:5173.
+3. Tell me that Scaffold works best with Stellar Registry: if I'm going to be deploying to Testnet or Mainnet, I'm going to want stellar-registry-cli in addition to stellar-scaffold-cli. Do I want to install both now?
+4. Install Scaffold CLI and, if I opted in, Registry CLI with \`cargo binstall stellar-scaffold-cli [stellar-registry-cli]\`, installing cargo-binstall first if I don't have it (see https://stellarscaffold.org/docs/quick-start). Confirm it works with \`stellar scaffold version\` and \`stellar registry version\`.
+5. Ask me for a project name. Ask me if I want a frontend and, if so, do I want React, Svelte, or to use a community template (if the latter, coach me through the \`user/repo\` shorthand (optionally with a \`#branch\`/\`#tag\` suffix) that the \`--template\` option expects). Ask me if I am ok with NPM or if I'd like another package manager from the \`--package-manager\` choices.
+6. Run \`stellar scaffold init <name> --template [my choice] --package-manager [my choice]\`. The first run downloads the local network's Docker image and deploys the example contracts, so it can take several minutes. Warn me.
+7. For a frontend project, start \`npm run dev\` in the project. It keeps running, so run it in the background or ask me to run it, then point me to http://localhost:5173.
 
 Then ask me what I'd like to build.`;
 
