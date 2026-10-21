@@ -24,11 +24,18 @@ Network selection, wherever a command takes `--network`: the flag, else `STELLAR
 
 | Command | Purpose | Key arguments |
 |---|---|---|
-| `build` | Compile every `cdylib` crate in dependency order | `--network <NAME>`, `--package <NAME>`, `--manifest-path <PATH>`, `--profile <NAME>` (default `release`), `--out-dir <DIR>`, `--features`, `--all-features`, `--no-default-features`, `--locked`, `--optimize[=false]`, `--meta <KEY=VALUE>`, `--list/--ls`, `--print-commands-only` |
-| `watch` | `build`, then rebuild on any change to a contract or `scaffold.yml` | Same as `build`. The project's `npm run dev` runs `stellar scaffold watch` |
+| `build` | Compile every `cdylib` crate in dependency order, resolve each contract dependency for the network, and generate clients | `--network <NAME>`, `--compile-only`, `--package <NAME>`, `--manifest-path <PATH>`, `--profile <NAME>` (default `release`), `--out-dir <DIR>`, `--features`, `--all-features`, `--no-default-features`, `--locked`, `--optimize[=false]`, `--meta <KEY=VALUE>`, `--list/--ls`, `--print-commands-only` |
+| `watch` | `build`, then rebuild on any change to a contract or `scaffold.yml` (redeploying only on networks that allow it, normally `local`) | Same as `build`. The project's `npm run dev` runs `stellar scaffold watch` |
 | `clean` | Remove Scaffold-generated artifacts | `--manifest-path <PATH>` |
 
-After compiling, for the selected network `build` also: starts the local container (when the network's passphrase is the standalone one, or `start-container: true`), creates and funds the network's `accounts`, deploys or upgrades `workspace` contracts whose Wasm changed, runs their `after-deploy` methods, and regenerates `<clients-dir>/<name>/` and `<clients-dir>/index.ts`. If one contract fails, the rest still deploy and export, then the build exits non-zero. To only compile, use `stellar contract build`. `--build-clients` is only needed by projects still on `environments.toml`.
+`build` is the default way to compile, even when you only want Wasm: it builds crates in dependency order, which `stellar contract build` does not. The selected network also matters at compile time, because contracts that use `stellar_registry::import_contract!` compile to different Wasm per network.
+
+After compiling, `build` resolves each contract dependency in `scaffold.yml` for the selected network, then regenerates `<clients-dir>/<name>/` and `<clients-dir>/index.ts`:
+
+- `type: contract` entries are fetched from their address. Nothing is deployed.
+- `type: workspace` entries are deployed only where the network allows it (`local` by default). There, `build` starts the local container (when the network's passphrase is the standalone one, or `start-container: true`), creates and funds the network's `accounts`, deploys or upgrades contracts whose Wasm changed, and runs their `after-deploy` methods. On testnet, futurenet and mainnet a `workspace` entry is a `deploy-not-allowed` error by design: deploy out of band (Stellar Registry) and reference it with `type: contract`.
+
+If one contract fails, the rest still resolve and export, then the build exits non-zero. `--compile-only` stops after compiling: no accounts, deploys, or clients. Use it to produce the Wasm you publish with `stellar registry`. `--build-clients` is only needed by projects still on `environments.toml`.
 
 `build` and `watch` also accept a positional `[ENV]` (`development`, `testing`, `staging`, `production`, or `STELLAR_SCAFFOLD_ENV`). It only applies to legacy projects with `environments.toml`, and their `--help` text still describes that legacy flow.
 
@@ -58,7 +65,10 @@ stellar scaffold init my-app --template react -p pnpm -y
 # Contracts-only project
 stellar scaffold init my-contracts --template none
 
-# Build clients for testnet (bound to existing deployments), without the dev server
+# Compile testnet Wasm to publish with stellar registry (no deploys, no clients)
+stellar scaffold build --network testnet --compile-only
+
+# Fetch testnet deployments and regenerate their clients; deploys nothing
 stellar scaffold build --network testnet
 
 # Validate in CI

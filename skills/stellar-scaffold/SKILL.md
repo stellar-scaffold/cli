@@ -1,15 +1,17 @@
 ---
 name: stellar-scaffold
-description: Build full-stack Stellar dApps with Stellar Scaffold, the `stellar scaffold` CLI plugin. Use when creating a new Soroban project with a frontend (`stellar scaffold init`), adding a frontend to an existing Soroban workspace (`upgrade`), configuring networks, accounts, and contracts in `scaffold.yml`, running the local dev loop (`npm run dev` / `stellar scaffold watch`), calling contracts from a React or Svelte app through the generated clients in `@stellar-scaffold/app-lib/clients`, adding example contracts (`generate contract`), building for testnet or mainnet, or debugging a Scaffold build with `config check` and `doctor`.
+description: Build full-stack Stellar dApps with Stellar Scaffold, the `stellar scaffold` CLI plugin. Use when creating a new Soroban project with a frontend (`stellar scaffold init`), adding a frontend to an existing Soroban workspace (`upgrade`), configuring networks, accounts, and contracts in `scaffold.yml`, running the local dev loop (`npm run dev` / `stellar scaffold watch`), calling contracts from a React or Svelte app through the generated clients in `@stellar-scaffold/app-lib/clients`, adding example contracts (`generate contract`), pointing an app at contracts already deployed on testnet or mainnet, or debugging a Scaffold build with `config check` and `doctor`.
 ---
 
 # Stellar Scaffold
 
 Stellar Scaffold turns a Rust/Soroban contract workspace and a TypeScript frontend into one project:
 
-- **`stellar scaffold` CLI plugin**: creates projects, builds and deploys contracts, and generates a typed TypeScript **client** for each one.
-- **`scaffold.yml`**: one config file at the project root that says which networks you build for, which accounts exist on each, and which contracts to deploy or connect to on each network.
+- **`stellar scaffold` CLI plugin**: creates projects, builds contracts, resolves each network's contract dependencies, and generates a typed TypeScript **client** for each one.
+- **`scaffold.yml`**: one config file at the project root that declares your app's **contract dependencies, per network**: which contracts the app uses on each network and where to get each one (a crate in this workspace, or an existing deployment), plus the networks and accounts involved.
 - **`@stellar-scaffold/app-lib`**: a workspace package in every project with wallet, network, and formatting helpers, plus the generated clients at `@stellar-scaffold/app-lib/clients`.
+
+**Scaffold is not a deploy tool.** It deploys only as a convenience on throwaway networks (`local`, by default), so the dev loop has something to call. On shared networks (testnet, futurenet, mainnet), contracts get deployed out of band, normally with Stellar Registry, and `scaffold.yml` just references those deployments. On every network, `build` fetches the contract that is actually there and regenerates its client, so the frontend is typechecked against that network's real interface. Contracts can differ subtly between networks, and a fresh client per network is how you find out. Don't reach for `allow-deploy: true` to "ship" with Scaffold.
 
 Docs: https://stellarscaffold.org/docs
 
@@ -64,8 +66,8 @@ my-app/
 `npm run dev` runs two processes: `stellar scaffold watch` and Vite. On every change to a contract or to `scaffold.yml`, `watch`:
 
 1. Builds the contracts (Wasm in `target/stellar/<STELLAR_NETWORK, default local>/<crate_name>.wasm`, with `-` replaced by `_`).
-2. For the selected network: starts the local container if needed, creates and funds the accounts, deploys or upgrades contracts whose Wasm changed, and runs their `after-deploy` calls.
-3. Regenerates `app-lib/clients/<name>/` and `app-lib/clients/index.ts`, which Vite hot-reloads.
+2. Resolves each contract dependency for the selected network (normally `local`). On `local`, that means starting the container if needed, creating and funding the accounts, deploying or upgrading `workspace` contracts whose Wasm changed, and running their `after-deploy` calls. On a network with deploys disabled, nothing is deployed: `type: contract` entries are fetched from the address given.
+3. Regenerates `app-lib/clients/<name>/` and `app-lib/clients/index.ts` (gitignored), which Vite hot-reloads.
 
 Changing only constructor `args` or `after-deploy` does **not** redeploy. Run `stellar scaffold clean` and restart to get fresh deployments.
 
@@ -77,26 +79,27 @@ version: 2
 networks:
   local:
     accounts: [me] # created and funded; the first one signs deploys
-  testnet: # staging: bind to deployments you made deliberately, never deploy from the dev loop
+  testnet: # shared: Scaffold never deploys here; reference deployments made out of band
     accounts: [testnet-user]
 
 contracts:
   guess-the-number: # client name: exported as `guessTheNumber`
-    type: workspace # build + deploy this crate from contracts/
+    type: workspace # built from contracts/; deployed only on networks that allow it (local)
     source: guess-the-number # the crate's package name
-    args: # __constructor arguments, by parameter name
+    args: # __constructor arguments, by parameter name (used only where Scaffold deploys)
       admin: ${account.me}
-    after-deploy: [reset] # no-argument methods called after deploy
-    networks: # the contract ONLY exists on networks listed here
+    after-deploy: [reset] # no-argument methods called after a Scaffold deploy
+    networks: # networks where the app depends on this contract; no client elsewhere
       local:
       testnet:
-        args:
-          admin: ${account.testnet-user} # accounts belong to one network
+        type: contract # already deployed (e.g. via Stellar Registry): fetch it
+        source: CDLZFC3SYJYDZT7K67VZ75HPJVIEUVNIXF47ZG2FB2RMQQVU2HHGCYSC
 ```
 
 Rules that trip agents up:
 
-- **A contract only exists on the networks it lists.** Building any other network skips it, and its client is not exported, so imports of it fail to typecheck.
+- **The app only depends on a contract on the networks it lists.** Building any other network skips it, and its client is not exported, so imports of it fail to typecheck.
+- **`workspace` on a shared network is an error** (`deploy-not-allowed`). That's deliberate: override the network with `type: contract` pointing at a deployment you made out of band.
 - **`build` supports only `type: workspace` and `type: contract`** (a deployed `C…` address) today. `registry`, `asset`, `wasm-file`, `wasm-hash`, `wasm-registry`, `from-network` and `after-deploy-script` pass validation but fail at build time.
 - **Keys are kebab-case.** Unknown keys are errors, with a "did you mean" hint.
 - **`args` values are typed YAML, not shell.** Use `${account.<name>}` for addresses, `${env.VAR}` for secrets. `$(…)` is literal text.
@@ -155,9 +158,16 @@ The network comes from `--network <name>`, else `STELLAR_NETWORK` (from the shel
 STELLAR_NETWORK=testnet npm run dev
 ```
 
-Local is for thrashing: deploy and redeploy freely. Testnet is staging, a dry run for mainnet.
+Local is for thrashing: Scaffold deploys and redeploys there freely. Testnet is staging, a dry run for mainnet, and on both of those Scaffold only **consumes** deployments. It doesn't make them. Going to a shared network:
 
-`testnet`, `futurenet` and `mainnet` refuse Scaffold deploys until the network sets `allow-deploy: true`. For production, deploy once yourself and point Scaffold at the result instead of deploying from the dev loop:
+1. **Set the network**: `STELLAR_NETWORK=testnet` in `app/.env`.
+2. **Check each contract's `Cargo.toml` metadata** (`authors`, `homepage`, `repository`, version; see `[package.metadata.stellar]` in [references/config.md](references/config.md)). It is written into the Wasm and is permanent once published.
+3. **Compile for that network**: `stellar scaffold build --compile-only` (no deploys, no clients). The network matters: contracts that use `stellar_registry::import_contract!` for cross-contract calls emit different Wasm per network. Prefer this over `stellar contract build`, which doesn't build crates in dependency order the way `stellar scaffold build` does. If your version lacks `--compile-only`, upgrade the plugin.
+4. **Publish and deploy out of band** with Stellar Registry: https://raw.githubusercontent.com/stellar-registry/cli/main/skills/stellar-registry/SKILL.md. First publishes go under `unverified/`.
+5. **Reference the deployment** in `scaffold.yml`: under the contract's `networks:`, override that network with `type: contract` and `source: <C… address>` (`stellar registry fetch-contract-id <name>` prints it). `type: registry` with a name is planned but not yet supported by `build`.
+6. **Build for that network to typecheck and build the frontend**: `stellar scaffold build --network testnet` deploys nothing. It fetches each referenced contract and regenerates its client, so that `npm run build --workspace app` typechecks and builds the frontend against what is actually deployed (output in `app/dist/` for React, `app/build/` for Svelte). Type errors here usually mean the deployed contract differs from your local one.
+
+Mainnet works the same way, and also needs an RPC provider:
 
 ```yaml
 networks:
@@ -175,7 +185,7 @@ contracts:
         source: CDLZFC3SYJYDZT7K67VZ75HPJVIEUVNIXF47ZG2FB2RMQQVU2HHGCYSC
 ```
 
-To publish and deploy by name, use the Stellar Registry: https://raw.githubusercontent.com/stellar-registry/cli/main/skills/stellar-registry/SKILL.md (then `stellar registry fetch-contract-id <name>` gives the `C…` address for `source`). Build the frontend with `npm run build --workspace app` (output in `app/dist/` for React, `app/build/` for Svelte).
+`testnet`, `futurenet` and `mainnet` refuse Scaffold deploys unless the network sets `allow-deploy: true`. Don't turn that on to ship. If you truly need disposable deploys on testnet (say, a CI smoke test), add a separate network (`testnet-dev: { extends: testnet, allow-deploy: true }`) so `testnet` itself stays reference-only.
 
 ## Diagnosing problems
 
@@ -192,7 +202,8 @@ Full command list: [references/cli.md](references/cli.md).
 - **Edited `app-lib/clients/`**: it is regenerated on every build. Wrap a client in your own module under `app/` instead.
 - **`Module has no exported member 'myContract'`**: the contract has no entry for the network you built (`networks:` under the contract), the build failed before codegen, or the client name doesn't match. Client `my-contract` exports as `myContract`.
 - **Built for an unexpected network**: the first line of build output names the network and where it came from. Check `STELLAR_NETWORK` in your shell and `app/.env`.
-- **`would be deployed to testnet, which has deploys disabled`**: point the contract at an existing deployment with `type: contract`. To redeploy freely on testnet, add a separate network (e.g. `testnet-dev: { extends: testnet, allow-deploy: true }`) rather than opting in `testnet` itself.
+- **`would be deployed to testnet, which has deploys disabled`**: working as intended. Deploy out of band (Stellar Registry), then point the contract at that deployment with `type: contract`. Don't opt `testnet` into `allow-deploy`.
+- **App works locally, breaks on testnet**: the deployed contract differs from your local build. Rerun `stellar scaffold build --network testnet` and fix the type errors it surfaces in the frontend.
 - **`account <x> is not listed in network <n>'s accounts`**: each network has its own accounts. Add it to `networks.<n>.accounts`, or override `args` for that network.
 - **`uses type: registry, which build does not support yet`**: see the supported types above. Use `type: contract` with the address for now.
 - **Changed constructor `args`, nothing happened**: only Wasm changes redeploy. Stop the dev server, `stellar scaffold clean`, restart.
