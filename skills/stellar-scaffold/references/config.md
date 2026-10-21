@@ -5,7 +5,7 @@ A Scaffold project has three config surfaces:
 | File | Holds | Committed |
 |---|---|---|
 | `scaffold.yml` | Networks, accounts, contracts, extensions, project directories | Yes |
-| `.env` | Optional `STELLAR_NETWORK`, secrets referenced by `${env.…}` | No (copy from `.env.example`) |
+| `app/.env` | Optional `STELLAR_NETWORK`, secrets referenced by `${env.…}` | No (`init` copies it from `app/.env.example`) |
 | `Cargo.toml` | Rust workspace (`members = ["contracts/*"]`), per-crate `[package.metadata.stellar]` contract metadata | Yes |
 
 ## `scaffold.yml` (schema version 2)
@@ -149,6 +149,8 @@ No shell is involved: `$(stellar keys address me)` is passed as literal text. Us
 Map of extension name to its config, run in order on every network. The value is passed verbatim as the extension's `config` JSON (keys keep their spelling, e.g. the reporter reads `warn_size_kb`). Extensions are binaries named `stellar-scaffold-<name>` on `PATH`.
 
 ## `.env`
+
+New projects keep it in `app/`, because `npm run dev` runs `stellar scaffold watch` from there and Vite reads it from there too.
 
 ```bash
 # STELLAR_NETWORK=testnet                   # network the CLI builds for
