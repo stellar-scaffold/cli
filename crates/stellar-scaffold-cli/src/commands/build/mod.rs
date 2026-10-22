@@ -439,10 +439,10 @@ impl Command {
                 if !p.authors.is_empty() {
                     meta_map.insert("authors".to_string(), p.authors.join(", "));
                 }
-                if let Some(homepage) = p.homepage.clone() {
+                if let Some(homepage) = p.homepage.clone().filter(|s| !s.trim().is_empty()) {
                     meta_map.insert("homepage".to_string(), homepage);
                 }
-                if let Some(repository) = p.repository.clone() {
+                if let Some(repository) = p.repository.clone().filter(|s| !s.trim().is_empty()) {
                     meta_map.insert("repository".to_string(), repository);
                 }
             }
@@ -520,9 +520,11 @@ fn builds_clients(compile_only: bool, flag: bool, is_v2: bool) -> bool {
 
 #[cfg(test)]
 mod tests {
-    use super::builds_clients;
+    use super::{Command, builds_clients};
     use crate::commands::{Cmd, Root};
+    use cargo_metadata::MetadataCommand;
     use clap::Parser;
+    use rstest::rstest;
 
     #[test]
     fn compile_only_is_a_public_build_flag() {
@@ -544,6 +546,81 @@ mod tests {
                 panic!("expected build command");
             };
             assert_eq!(command.compile_only, expected);
+        }
+    }
+
+    #[rstest]
+    #[case::empty("", &[])]
+    #[case::whitespace(" \t ", &[])]
+    #[case::populated("https://example.com", &["Contract Author"])]
+    fn cargo_inherit_skips_blank_urls(#[case] url: &str, #[case] authors: &[&str]) {
+        let dir = tempfile::tempdir().unwrap();
+        let contract = dir.path().join("contract");
+        std::fs::create_dir_all(contract.join("src")).unwrap();
+        std::fs::write(contract.join("src/lib.rs"), "").unwrap();
+        let manifest = dir.path().join("Cargo.toml");
+        std::fs::write(
+            &manifest,
+            format!(
+                r#"[workspace]
+members = ["contract"]
+resolver = "2"
+
+[workspace.package]
+authors = {authors:?}
+homepage = {url:?}
+repository = {url:?}
+"#
+            ),
+        )
+        .unwrap();
+        std::fs::write(
+            contract.join("Cargo.toml"),
+            r#"[package]
+name = "metadata-test"
+version = "1.2.3"
+edition = "2024"
+authors.workspace = true
+homepage.workspace = true
+repository.workspace = true
+
+[package.metadata.stellar]
+cargo_inherit = true
+
+[lib]
+crate-type = ["cdylib"]
+"#,
+        )
+        .unwrap();
+        let metadata = MetadataCommand::new()
+            .manifest_path(&manifest)
+            .no_deps()
+            .exec()
+            .unwrap();
+        let command = Command::parse_from(["build"]);
+        let cmd = command
+            .create_cmd(&metadata.packages[0], &metadata.target_directory)
+            .unwrap();
+        let meta: std::collections::BTreeMap<_, _> = cmd.build_args.meta.into_iter().collect();
+
+        assert_eq!(meta.get("name").map(String::as_str), Some("metadata-test"));
+        assert_eq!(meta.get("binver").map(String::as_str), Some("1.2.3"));
+        for key in ["home_domain", "source_repo"] {
+            assert_eq!(
+                meta.get(key).map(String::as_str),
+                if url.trim().is_empty() {
+                    None
+                } else {
+                    Some(url)
+                }
+            );
+        }
+        assert_eq!(
+            meta.get("authors").map(String::as_str),
+            authors.first().copied()
+        );
+        for key in ["homepage", "repository", "cargo_inherit"] {
+            assert!(!meta.contains_key(key));
         }
     }
 
