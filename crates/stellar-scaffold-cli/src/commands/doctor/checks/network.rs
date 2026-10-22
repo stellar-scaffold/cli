@@ -6,7 +6,7 @@ use crate::config::CONFIG_FILE;
 
 /// Every network this project runs in a local container, or the reason the
 /// network checks don't apply. A version 2 project is checked for all of its
-/// local networks, whichever one it's building for at the moment.
+/// local networks, not just the one it's currently building for.
 fn local_networks(ctx: &Context<'_>) -> Result<Vec<LocalNetwork>, String> {
     if ctx.workspace_root.is_none() {
         return Err("not in a Cargo workspace".into());

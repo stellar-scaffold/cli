@@ -142,9 +142,10 @@ fn init_build_args(global_args: &global::Args) -> global::Args {
     build_args
 }
 
-/// Directories that may hold a project's `.env`, relative to its root: the
-/// root itself, and `app/`, where `init` puts the frontend. Its dev server
-/// and the `stellar` CLI it starts both read `app/.env`.
+/// Directories that may hold a project's `.env`, relative to its root.
+/// Keep root support for existing projects and community templates; official
+/// frontends live in `app/`, whose dev server and the `stellar` CLI it starts
+/// both read `app/.env`.
 pub(crate) const DOT_ENV_DIRS: [&str; 2] = ["", APP_DIR];
 
 /// The [`DOT_ENV_DIRS`] of the project at `root`.
@@ -439,6 +440,20 @@ fn is_semver_like(s: &str) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn env_example_is_copied_in_the_root_dir() {
+        let dir = tempfile::TempDir::new().unwrap();
+        std::fs::write(dir.path().join(".env.example"), "STELLAR_NETWORK=local\n").unwrap();
+
+        for dir in dot_env_dirs(dir.path()) {
+            copy_env_example(&dir).unwrap();
+        }
+
+        let env = std::fs::read_to_string(dir.path().join(".env")).unwrap();
+        assert_eq!(env, "STELLAR_NETWORK=local\n");
+        assert!(!dir.path().join(APP_DIR).exists());
+    }
 
     #[test]
     fn env_example_is_copied_in_the_app_dir() {
