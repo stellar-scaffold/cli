@@ -58,13 +58,13 @@ jobs:
           - target: x86_64-unknown-linux-gnu
             os: ubuntu-22.04
           - target: x86_64-apple-darwin
-            os: macos-14
+            os: macos-26
           - target: x86_64-pc-windows-msvc
             os: windows-2022
           - target: aarch64-unknown-linux-gnu
             os: ubuntu-22.04-arm
           - target: aarch64-apple-darwin
-            os: macos-14
+            os: macos-26
     timeout-minutes: 60
     steps:
       - name: Checkout repository
@@ -100,7 +100,8 @@ jobs:
       - name: Cache Rust dependencies
         uses: Swatinem/rust-cache@v2
         with:
-          key: release-${{ matrix.target }}
+          # Native dependencies must not cross runner image / SDK migrations.
+          key: release-${{ matrix.os }}-${{ matrix.target }}
           # Keep GitHub's ref isolation: PR caches cannot feed release builds.
           # The filtered main-branch dry runs seed caches usable by tags.
           cache-bin: false
