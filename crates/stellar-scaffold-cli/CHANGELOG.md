@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.0.32](https://github.com/stellar-scaffold/cli/compare/stellar-scaffold-cli-v0.0.31...stellar-scaffold-cli-v0.0.32) - 2026-10-23
+
+### Added
+
+- *(stellar-scaffold-cli)* don't write empty meta ([#640](https://github.com/stellar-scaffold/cli/pull/640))
+
+### Fixed
+
+- scaffold.yml v2 fast-follows for the 1.0 preview ([#632](https://github.com/stellar-scaffold/cli/pull/632))
+- *(cli)* use the stellar-scaffold name in help and version output ([#636](https://github.com/stellar-scaffold/cli/pull/636))
+
 ## [0.0.31](https://github.com/stellar-scaffold/cli/compare/stellar-scaffold-cli-v0.0.30...stellar-scaffold-cli-v0.0.31) - 2026-10-21
 
 ### Added
