@@ -4,7 +4,6 @@ use proc_macro::TokenStream;
 use proc_macro2::Span;
 use quote::quote;
 use std::env;
-use stellar_build::Network;
 use syn::parse::{Parse, ParseStream, Result};
 use syn::{Ident, LitStr, parse_macro_input};
 
@@ -211,13 +210,19 @@ fn download_from_registry(
 /// Generates a contract Client for a given asset.
 /// It is expected that the name of an asset, e.g. "native" or "USDC:G1...."
 ///
+/// The asset identity is embedded at compile time. Its contract address is
+/// derived at runtime using the executing network, independently of
+/// `STELLAR_NETWORK` and `STELLAR_NETWORK_PASSPHRASE` at build time.
+/// The generated helpers do not deploy the asset contract or verify that it
+/// exists. For issued assets, the specified issuer remains fixed across networks.
+///
 /// # Panics
 ///
 #[proc_macro]
 pub fn import_asset(input: TokenStream) -> TokenStream {
     // Parse the input as a string literal
     let input_str = syn::parse_macro_input!(input as syn::LitStr);
-    asset::parse_literal(&input_str, &Network::passphrase_from_env()).into()
+    asset::parse_literal(&input_str).into()
 }
 
 #[cfg(test)]

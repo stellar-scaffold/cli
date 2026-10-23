@@ -5459,6 +5459,7 @@ dependencies = [
  "quote",
  "regex",
  "sha2 0.10.9",
+ "soroban-sdk",
  "stellar-build",
  "stellar-strkey 0.0.13",
  "stellar-xdr 23.0.0",
