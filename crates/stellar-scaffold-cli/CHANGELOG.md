@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.0.33](https://github.com/stellar-scaffold/cli/compare/stellar-scaffold-cli-v0.0.32...stellar-scaffold-cli-v0.0.33) - 2026-10-23
+
+### Fixed
+
+- *(stellar-scaffold-cli)* rm e2e after `init` ([#638](https://github.com/stellar-scaffold/cli/pull/638))
+
 ## [0.0.32](https://github.com/stellar-scaffold/cli/compare/stellar-scaffold-cli-v0.0.31...stellar-scaffold-cli-v0.0.32) - 2026-10-23
 
 ### Added
