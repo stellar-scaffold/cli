@@ -30,6 +30,8 @@ The Registry smart contract keeps track of two kinds of information:
 
 So that's it, at its core: Stellar Registry is a smart contract, which gives other smart contracts names, and which gives Wasms both names and versions.
 
+It can also give names to accounts: see [Accounts](#accounts).
+
 ### Quick Links
 
 Around the core smart contract, Stellar Registry wraps other tooling:
@@ -90,6 +92,8 @@ Names in the registry support namespace prefixes. The CLI resolves names using t
 - `my-contract` - Looks up in the verified (root) registry
 - `unverified/my-contract` - First fetches the `unverified` registry contract ID from the root registry, then looks up `my-contract` in that registry
 - `some-other-subregistry/my-contract` — Same as above. Looks up `some-other-subregistry` in the root registry, then looks up `my-contract` in that registry.
+
+Account names resolve the same way, but in their own namespace: `unverified/alice` is the account named `alice` in the `unverified` registry, even if a contract is also named `alice` there.
 
 ### Name Normalization
 
@@ -321,6 +325,65 @@ Look up the owner who registered a contract name:
 stellar contract invoke --id <REGISTRY_CONTRACT_ID> -- \
   fetch_contract_owner \
   --contract-name <NAME>
+```
+
+## Accounts
+
+Besides Wasms and Contracts, a Registry can name accounts: a classic Stellar account (G-address) or a smart account (a C-address backed by a Wasm contract, not a Stellar Asset Contract). Account names live in a separate namespace from contract names, and follow the same [normalization](#name-normalization) rules.
+
+Like a contract name, an account name has an owner, who can rename it, point it at a different address, transfer it, or flag it as compromised.
+
+### Consent
+
+You can't put a name on someone else's address without their agreement. Registering a name for an address (and renaming it, or pointing a name at a new address) needs that address's consent, given one of two ways:
+
+1. **It signs the transaction.** This is implied when the address is the one submitting it, e.g. naming your own account.
+2. **It preauthorized the name beforehand** with `preauthorize-account`, for a specific name _and_ owner. A preauthorization is single-use, expires after about 180 days on Mainnet, can be withdrawn with `revoke-account-preauth`, and doesn't reserve the name: registration is still first come, first served.
+
+The CLI can't sign for a smart account. A smart account has to preauthorize from its own wallet, by calling the Registry's `preauthorize_account` function.
+
+### Managed and Unmanaged Registries
+
+On the unmanaged `unverified` registry, you can register an account name yourself, as long as the account consents:
+
+```bash
+stellar registry register-account \
+  --account-name unverified/alice \
+  --account-address alice
+```
+
+Passing a local identity (`alice`, as created with `stellar keys`) as the address lets it sign the transaction.
+
+On a managed registry, like the root, the manager executes the registration via the [governance process](#quick-links), and that call can't carry the account's signature. So the account preauthorizes first, naming the owner the governance request is for:
+
+```bash
+stellar registry preauthorize-account \
+  --account-name alice \
+  --account-address alice \
+  --owner <OWNER_ADDRESS> \
+  --source alice
+```
+
+Then open the governance request. If a command would fail for lack of consent, the CLI stops before submitting and prints the `preauthorize-account` command to run.
+
+### Account Commands
+
+| Command | Purpose | Key options |
+| --- | --- | --- |
+| `register-account` | Name an account | `--account-name`, `--account-address` (G-address, C-address, or identity alias), `--owner` (defaults to source), `--dry-run` |
+| `preauthorize-account` | Consent in advance to being named; signed by the account | `--account-name`, `--account-address`, `--owner` (defaults to source), `--dry-run` |
+| `revoke-account-preauth` | Withdraw a pending preauthorization; signed by the account | `--account-name`, `--account-address`, `--dry-run` |
+| `fetch-account-id <NAME>` | Look up a named account's address | `--force` (return it even if flagged as compromised) |
+| `fetch-account-owner <NAME>` | Look up who owns an account name |  |
+| `rename-account` | Rename an account; it must consent to the new name | `--account-name`, `--new-name`, `--dry-run` |
+| `update-account-address` | Point a name at a different address, which must consent | `--account-name`, `--new-address`, `--dry-run` |
+| `update-account-owner` | Transfer ownership of an account name | `--account-name`, `--new-owner`, `--dry-run` |
+| `flag-account` | Flag an account as compromised, or clear the flag | `--account-name`, `--unflag`, `--dry-run` |
+
+All `--account-name` values support prefix notation like `unverified/alice`. For example:
+
+```bash
+stellar registry fetch-account-id unverified/alice
 ```
 
 ## Configuration
