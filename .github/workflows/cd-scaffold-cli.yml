@@ -6,11 +6,22 @@ permissions:
 
 on:
   push:
+    branches:
+      - main
     tags:
       - "stellar-scaffold-cli-v[0-9]+.[0-9]+.[0-9]+*"
+    paths:
+      - .github/workflows/cd-scaffold-cli.yml
+      - .github/scripts/*release*.py
+      - Cargo.lock
+      - Cargo.toml
+      - crates/**/Cargo.toml
+      - rust-toolchain.toml
   pull_request:
     paths:
       - crates/stellar-scaffold-cli/CHANGELOG.md
+      - .github/workflows/cd-scaffold-cli.yml
+      - .github/scripts/*release*.py
   # Allow manual escape hatch for tags that never fired this workflow, so a
   # release missing its binaries can be backfilled without re-tagging.
   workflow_dispatch:
@@ -54,29 +65,81 @@ jobs:
             os: ubuntu-22.04-arm
           - target: aarch64-apple-darwin
             os: macos-14
-          - target: universal-apple-darwin
-            os: macos-14
     timeout-minutes: 60
     steps:
       - name: Checkout repository
         uses: actions/checkout@v6
         with:
-          ref: ${{ inputs.tag || github.ref }}
+          ref: ${{ github.sha }}
+      - name: Stage build diagnostics tooling
+        # Backfilled tags may predate these scripts. Use the workflow revision's
+        # tooling even when compiling an older release.
+        run: |
+          tools="$RUNNER_TEMP/release-build-tools"
+          mkdir -p "$tools"
+          cp .github/scripts/build-release.py .github/scripts/test_build_release.py "$tools/"
+          printf 'RELEASE_BUILD_TOOLS=%s\n' "$tools" >> "$GITHUB_ENV"
+          if [[ "$RUNNER_OS" == Windows ]]; then
+            printf 'RELEASE_BUILD_PYTHON=python\n' >> "$GITHUB_ENV"
+          else
+            printf 'RELEASE_BUILD_PYTHON=python3\n' >> "$GITHUB_ENV"
+          fi
+      - name: Checkout release tag
+        if: github.event_name == 'workflow_dispatch'
+        uses: actions/checkout@v6
+        with:
+          ref: ${{ inputs.tag }}
       - name: Install Rust toolchain
-        uses: dtolnay/rust-toolchain@stable
+        # Respect rust-toolchain.toml instead of also installing unused stable.
+        run: |
+          rustup show active-toolchain
+          rustup target add "$BUILD_TARGET"
+          rustc --version --verbose
+        env:
+          BUILD_TARGET: ${{ matrix.target }}
+      - name: Cache Rust dependencies
+        uses: Swatinem/rust-cache@v2
+        with:
+          key: release-${{ matrix.target }}
+          # Keep GitHub's ref isolation: PR caches cannot feed release builds.
+          # The filtered main-branch dry runs seed caches usable by tags.
+          cache-bin: false
       - if: runner.os == 'Linux'
         run: sudo apt-get update && sudo apt-get install libudev-dev libdbus-1-dev libssl-dev
       - uses: taiki-e/install-action@cross
         if: contains(matrix.target, '-musl')
+      - name: Test build diagnostics
+        run: |
+          "$RELEASE_BUILD_PYTHON" -B -m unittest discover \
+            -s "$RELEASE_BUILD_TOOLS" -p 'test_build_release.py'
+      - name: Build release binary with diagnostics
+        run: |
+          "$RELEASE_BUILD_PYTHON" -B "$RELEASE_BUILD_TOOLS/build-release.py" \
+            cargo build --release --locked --bin stellar-scaffold \
+            --target "$BUILD_TARGET" --timings
+        env:
+          BUILD_TARGET: ${{ matrix.target }}
+      - name: Upload build diagnostics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-diagnostics-${{ matrix.target }}
+          path: |
+            target/cargo-timings/
+            diagnostics/
+          retention-days: 14
+          if-no-files-found: warn
       - uses: taiki-e/upload-rust-binary-action@v1
         with:
           bin: stellar-scaffold
           target: ${{ matrix.target }}
+          # Same build options as above: Cargo reuses the compiled binary.
+          locked: true
           ref: ${{ inputs.tag && format('refs/tags/{0}', inputs.tag) || '' }}
           tar: all
           zip: windows
           archive: $tag-$target
           token: ${{ secrets.GITHUB_TOKEN }}
-          dry-run: ${{ github.event_name == 'pull_request' }}
+          dry-run: ${{ github.event_name == 'pull_request' || (github.event_name == 'push' && github.ref == 'refs/heads/main') }}
         env:
           CARGO_TARGET_AARCH64_UNKNOWN_LINUX_GNU_LINKER: aarch64-linux-gnu-gcc
