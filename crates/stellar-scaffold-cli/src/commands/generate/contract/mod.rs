@@ -7,11 +7,9 @@ use clap::Parser;
 use flate2::read::GzDecoder;
 use reqwest;
 use serde::Deserialize;
-use serde_json::Value;
 use std::collections::HashSet;
 use std::num::ParseIntError;
 use std::path::PathBuf;
-use std::process::Command;
 use std::{fs, path::Path};
 use stellar_cli::commands::global;
 use stellar_cli::print::Print;
@@ -29,7 +27,9 @@ const SOROBAN_EXAMPLES_REF_ENV: &str = "STELLAR_SCAFFOLD_EXAMPLES_REF";
 const STELLAR_PREFIX: &str = "stellar/";
 const OZ_EXAMPLES_REPO: &str = "https://github.com/OpenZeppelin/stellar-contracts/examples";
 const OZ_PREFIX: &str = "oz/";
-const LATEST_SUPPORTED_OZ_RELEASE: &str = "v0.6.0";
+// Keep in step with the `stellar-*` versions in the `stellar-scaffold/ui`
+// template's Cargo.toml (checked in CI), or generated examples won't compile.
+const LATEST_SUPPORTED_OZ_RELEASE: &str = "v0.8.0";
 
 #[derive(Deserialize)]
 struct Release {
@@ -468,10 +468,11 @@ impl Cmd {
         let printer = Print::new(global_args.quiet);
 
         let example_cargo_content = fs::read_to_string(example_path.join("Cargo.toml"))?;
-        let deps = Self::extract_stellar_dependencies(&example_cargo_content)?;
+        let deps = Self::extract_workspace_dependencies(&example_cargo_content)?;
         if deps.is_empty() {
             return Ok(());
         }
+        let oz_deps = Self::oz_workspace_dependencies(example_path);
 
         // Parse the workspace Cargo.toml
         let mut manifest = cargo_toml::Manifest::from_path(workspace_path)?;
@@ -492,34 +493,51 @@ members = []
 
         let mut workspace_deps = workspace.dependencies.clone();
 
+        // OZ publishes its packages to crates.io under the release version, so
+        // depend on that rather than on the git tag. This matches how the UI
+        // template declares them and avoids mixing git and registry sources.
+        let version = tag.trim_start_matches('v');
+
         let mut added_deps = Vec::new();
         let mut updated_deps = Vec::new();
 
         for dep in deps {
-            let git_dep = cargo_toml::DependencyDetail {
-                git: Some("https://github.com/OpenZeppelin/stellar-contracts".to_string()),
-                tag: Some(tag.to_string()),
-                ..Default::default()
+            // What the example was written against: the OZ release for its
+            // own packages, otherwise the OZ workspace's declaration.
+            let expected = if dep.starts_with("stellar-") {
+                Simple(version.to_string())
+            } else if let Some(oz_dep) = oz_deps.get(&dep) {
+                oz_dep.clone()
+            } else {
+                continue;
             };
 
-            if let Some(existing_dep) = workspace_deps.clone().get(&dep) {
-                // Check if we need to update the tag
-                if let cargo_toml::Dependency::Detailed(detail) = existing_dep
-                    && let Some(existing_tag) = &detail.tag
-                    && existing_tag != tag
-                {
-                    workspace_deps.insert(
-                        dep.clone(),
-                        cargo_toml::Dependency::Detailed(Box::new(git_dep)),
-                    );
-                    updated_deps.push((dep, existing_tag.clone()));
+            match workspace_deps.get(&dep) {
+                None => {
+                    workspace_deps.insert(dep.clone(), expected);
+                    added_deps.push(dep);
                 }
-            } else {
-                workspace_deps.insert(
-                    dep.clone(),
-                    cargo_toml::Dependency::Detailed(Box::new(git_dep)),
-                );
-                added_deps.push(dep);
+                // Git dependency on another OZ tag, as written by older CLI versions
+                Some(Dependency::Detailed(detail))
+                    if detail.git.is_some()
+                        && detail.tag.as_ref().is_some_and(|existing| existing != tag) =>
+                {
+                    let old_tag = detail.tag.clone().unwrap_or_default();
+                    workspace_deps.insert(dep.clone(), expected);
+                    updated_deps.push((dep, old_tag));
+                }
+                Some(existing) => {
+                    if let Some(expected_version) = expected.req().split(',').next()
+                        && Self::is_incompatible_version(existing, expected_version.trim())
+                    {
+                        printer.warnln(format!(
+                            "Workspace {dep} version doesn't match the example's {expected_version} (example might not compile)."
+                        ));
+                        printer.println(format!(
+                            "   Set {dep} = \"{expected_version}\" in [workspace.dependencies] to use this example."
+                        ));
+                    }
+                }
             }
         }
 
@@ -539,7 +557,7 @@ members = []
             if !updated_deps.is_empty() {
                 printer.infoln("Updated the following dependencies:");
                 for (dep, old_tag) in updated_deps {
-                    printer.println(format!("   • {dep}: {old_tag} -> {tag}"));
+                    printer.println(format!("   • {dep}: {old_tag} -> {version}"));
                 }
             }
         }
@@ -547,22 +565,57 @@ members = []
         Ok(())
     }
 
-    fn extract_stellar_dependencies(cargo_toml_content: &str) -> Result<Vec<String>, Error> {
+    /// Whether a workspace dependency's version requirement excludes the OZ
+    /// release `version`. Unparseable or version-less (path/git) dependencies
+    /// are left to the user and never reported.
+    fn is_incompatible_version(dependency: &Dependency, version: &str) -> bool {
+        let requirement = match dependency {
+            Simple(requirement) => Some(requirement),
+            Dependency::Detailed(detail) if detail.git.is_none() && detail.path.is_none() => {
+                detail.version.as_ref()
+            }
+            _ => None,
+        };
+        let (Some(requirement), Ok(version)) = (requirement, semver::Version::parse(version))
+        else {
+            return false;
+        };
+        semver::VersionReq::parse(requirement).is_ok_and(|req| !req.matches(&version))
+    }
+
+    /// Names of the dependencies (including dev-dependencies) the example
+    /// inherits from its workspace.
+    fn extract_workspace_dependencies(cargo_toml_content: &str) -> Result<Vec<String>, Error> {
         let manifest: cargo_toml::Manifest = toml::from_str(cargo_toml_content)?;
 
-        Ok(manifest
+        let mut deps: Vec<String> = manifest
             .dependencies
             .iter()
-            .filter(|(dep_name, _)| dep_name.starts_with("stellar-"))
-            .filter_map(|(dep_name, dep_detail)| match dep_detail {
-                cargo_toml::Dependency::Detailed(detail)
-                    if !(detail.inherited || detail.git.is_some()) =>
-                {
-                    None
-                }
-                _ => Some(dep_name.clone()),
+            .chain(&manifest.dev_dependencies)
+            .filter(|(_, dep)| match dep {
+                Dependency::Inherited(_) => true,
+                Dependency::Detailed(detail) => detail.inherited,
+                Simple(_) => false,
             })
-            .collect())
+            .map(|(name, _)| name.clone())
+            .collect();
+        deps.sort();
+        deps.dedup();
+        Ok(deps)
+    }
+
+    /// `[workspace.dependencies]` of the OZ repository the example came from.
+    fn oz_workspace_dependencies(example_path: &Path) -> DepsSet {
+        let Some(root) = example_path.ancestors().nth(2) else {
+            return DepsSet::new();
+        };
+        fs::read_to_string(root.join("Cargo.toml"))
+            .ok()
+            .and_then(|content| content.parse::<toml::Table>().ok())
+            .and_then(|mut table| table.remove("workspace"))
+            .and_then(|mut workspace| workspace.as_table_mut()?.remove("dependencies"))
+            .and_then(|deps| deps.try_into().ok())
+            .unwrap_or_default()
     }
 
     fn examples_list(examples_path: PathBuf) -> Result<Vec<String>, Error> {
@@ -890,26 +943,23 @@ members = []
         Ok(())
     }
 
+    /// Find the workspace root manifest for the package at `path` the way
+    /// cargo does: the nearest ancestor `Cargo.toml` with a `[workspace]`
+    /// table. This deliberately avoids `cargo locate-project`, which parses
+    /// the new package's manifest and fails while the workspace is still
+    /// missing the dependencies it inherits.
     fn get_workspace_root(path: &Path) -> Result<PathBuf, Error> {
-        let output = Command::new("cargo")
-            .arg("locate-project")
-            .arg("--workspace")
-            .arg("--message-format")
-            .arg("json")
-            .arg("--manifest-path")
-            .arg(path)
-            .output()?;
-
-        if !output.status.success() {
-            return Err(Error::CargoError);
-        }
-
-        let json_str = String::from_utf8(output.stdout).map_err(|_| Error::CargoError)?;
-        let parsed_json: Value = serde_json::from_str(&json_str).map_err(|_| Error::CargoError)?;
-
-        let workspace_root_str = parsed_json["root"].as_str().ok_or(Error::CargoError)?;
-
-        Ok(PathBuf::from(workspace_root_str))
+        path.parent()
+            .into_iter()
+            .flat_map(Path::ancestors)
+            .map(|dir| dir.join("Cargo.toml"))
+            .find(|manifest| {
+                fs::read_to_string(manifest)
+                    .ok()
+                    .and_then(|content| content.parse::<toml::Table>().ok())
+                    .is_some_and(|table| table.contains_key("workspace"))
+            })
+            .ok_or(Error::CargoError)
     }
 
     fn output_dir(&self, example_name: &str) -> PathBuf {
@@ -1044,5 +1094,112 @@ mod tests {
         let global_args = global::Args::default();
         let result = cmd.run(&global_args).await;
         assert!(matches!(result, Err(Error::NoActionSpecified)));
+    }
+
+    // A project workspace at the root, plus a cached OZ repository with one
+    // example at `oz/examples/ex`.
+    fn write_oz_fixture(workspace_deps: &str) -> tempfile::TempDir {
+        let dir = tempfile::tempdir().unwrap();
+        fs::write(
+            dir.path().join("Cargo.toml"),
+            format!(
+                "[workspace]\nmembers = [\"contracts/*\"]\n\n[workspace.dependencies]\n{workspace_deps}"
+            ),
+        )
+        .unwrap();
+        let oz = dir.path().join("oz");
+        let example = oz.join("examples/ex");
+        fs::create_dir_all(&example).unwrap();
+        fs::write(
+            oz.join("Cargo.toml"),
+            "[workspace]\nmembers = [\"examples/*\"]\n\n[workspace.dependencies]\n\
+             soroban-sdk = \"28.0.0\"\n\
+             hex-literal = \"1.0.0\"\n\
+             stellar-tokens = { path = \"packages/tokens\", version = \"0.8.0\" }\n",
+        )
+        .unwrap();
+        fs::write(
+            example.join("Cargo.toml"),
+            "[package]\nname = \"ex\"\nversion = \"0.0.0\"\n\n[dependencies]\n\
+             soroban-sdk = { workspace = true }\n\
+             stellar-macros = { workspace = true }\n\
+             stellar-tokens = { workspace = true }\n\n\
+             [dev-dependencies]\n\
+             hex-literal = { workspace = true }\n\
+             soroban-sdk = { workspace = true, features = [\"testutils\"] }\n",
+        )
+        .unwrap();
+        dir
+    }
+
+    fn workspace_deps_after_update(workspace_deps: &str) -> DepsSet {
+        let dir = write_oz_fixture(workspace_deps);
+        let workspace_path = dir.path().join("Cargo.toml");
+        Cmd::update_workspace_dependencies(
+            &workspace_path,
+            &dir.path().join("oz/examples/ex"),
+            "v0.8.0",
+            &global::Args::default(),
+        )
+        .unwrap();
+        Manifest::from_path(&workspace_path)
+            .unwrap()
+            .workspace
+            .unwrap()
+            .dependencies
+    }
+
+    #[test]
+    fn test_oz_example_dev_dependencies_added_from_oz_workspace() {
+        let deps = workspace_deps_after_update("soroban-sdk = \"28.0.0\"\n");
+        assert_eq!(deps["hex-literal"], Simple("1.0.0".to_string()));
+    }
+
+    #[test]
+    fn test_workspace_root_found_before_dependencies_exist() {
+        let dir = write_oz_fixture("");
+        let contract = dir.path().join("contracts/ex");
+        fs::create_dir_all(&contract).unwrap();
+        fs::copy(
+            dir.path().join("oz/examples/ex/Cargo.toml"),
+            contract.join("Cargo.toml"),
+        )
+        .unwrap();
+        assert_eq!(
+            Cmd::get_workspace_root(&contract.join("Cargo.toml")).unwrap(),
+            dir.path().join("Cargo.toml")
+        );
+    }
+
+    #[test]
+    fn test_oz_deps_added_as_crates_io_versions() {
+        let deps = workspace_deps_after_update("soroban-sdk = \"28.0.0\"\n");
+        assert_eq!(deps["stellar-tokens"], Simple("0.8.0".to_string()));
+        assert_eq!(deps["stellar-macros"], Simple("0.8.0".to_string()));
+    }
+
+    #[test]
+    fn test_oz_git_tag_deps_updated_to_release_version() {
+        let deps = workspace_deps_after_update(
+            "stellar-tokens = { git = \"https://github.com/OpenZeppelin/stellar-contracts\", tag = \"v0.6.0\" }\n",
+        );
+        assert_eq!(deps["stellar-tokens"], Simple("0.8.0".to_string()));
+    }
+
+    #[test]
+    fn test_oz_existing_version_deps_left_alone() {
+        let deps = workspace_deps_after_update("stellar-tokens = \"0.7.2\"\n");
+        assert_eq!(deps["stellar-tokens"], Simple("0.7.2".to_string()));
+    }
+
+    #[test]
+    fn test_is_incompatible_version() {
+        let incompatible =
+            |req: &str| Cmd::is_incompatible_version(&Simple(req.to_string()), "0.8.0");
+        assert!(!incompatible("0.8.0"));
+        assert!(!incompatible("0.8"));
+        assert!(incompatible("0.7.2"));
+        assert!(incompatible("0.6.0"));
+        assert!(!incompatible("not a version"));
     }
 }

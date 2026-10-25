@@ -52,5 +52,21 @@ jobs:
         with:
           cross-repo: ${{ contains(github.event.pull_request.labels.*.name, 'cross-repo') }}
           head-ref: ${{ github.head_ref }}
+      # `generate contract --from oz/...` copies examples from the pinned OZ
+      # release; they only compile if the UI template uses the same version.
+      - name: Check OZ release matches UI template
+        run: |
+          repo="${STELLAR_SCAFFOLD_UI_REPO:-stellar-scaffold/ui}"
+          ref="main"
+          if [[ "$repo" == *#* ]]; then ref="${repo#*#}"; repo="${repo%%#*}"; fi
+          pinned=$(sed -n 's/^const LATEST_SUPPORTED_OZ_RELEASE: &str = "v\(.*\)";/\1/p' \
+            crates/stellar-scaffold-cli/src/commands/generate/contract/mod.rs)
+          ui=$(curl -fsSL "https://raw.githubusercontent.com/$repo/$ref/Cargo.toml" \
+            | sed -n 's/^stellar-tokens = "\(.*\)"/\1/p')
+          echo "Pinned OZ release: $pinned, UI template stellar-tokens: $ui"
+          if [ -z "$pinned" ] || [ "$pinned" != "$ui" ]; then
+            echo "::error::LATEST_SUPPORTED_OZ_RELEASE (v$pinned) doesn't match stellar-tokens ($ui) in $repo@$ref Cargo.toml"
+            exit 1
+          fi
       - name: Unit Tests
         run: just test
