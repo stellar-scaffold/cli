@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.0.34](https://github.com/stellar-scaffold/cli/compare/stellar-scaffold-cli-v0.0.33...stellar-scaffold-cli-v0.0.34) - 2026-10-25
+
+### Fixed
+
+- *(generate)* don't fall back to stale OZ examples when GitHub API fails ([#649](https://github.com/stellar-scaffold/cli/pull/649))
+
+### Other
+
+- Fix --ls listing incorrect commands at the end ([#648](https://github.com/stellar-scaffold/cli/pull/648))
+
 ## [0.0.33](https://github.com/stellar-scaffold/cli/compare/stellar-scaffold-cli-v0.0.32...stellar-scaffold-cli-v0.0.33) - 2026-10-25
 
 ### Fixed
