@@ -6,7 +6,6 @@ use cargo_toml::{
 use clap::Parser;
 use flate2::read::GzDecoder;
 use reqwest;
-use serde::Deserialize;
 use std::collections::HashSet;
 use std::num::ParseIntError;
 use std::path::PathBuf;
@@ -30,11 +29,6 @@ const OZ_PREFIX: &str = "oz/";
 // Keep in step with the `stellar-*` versions in the `stellar-scaffold/ui`
 // template's Cargo.toml (checked in CI), or generated examples won't compile.
 const LATEST_SUPPORTED_OZ_RELEASE: &str = "v0.8.0";
-
-#[derive(Deserialize)]
-struct Release {
-    tag_name: String,
-}
 
 #[derive(Parser, Debug)]
 pub struct Cmd {
@@ -124,7 +118,7 @@ impl Cmd {
 
         printer.infoln(format!("Downloading example '{example_name}'..."));
 
-        let examples_info = self.ensure_cache_updated(&printer).await?;
+        let examples_info = self.ensure_cache_updated().await?;
 
         if example_name.starts_with(OZ_PREFIX) {
             let (_, example_name) = example_name.split_at(3);
@@ -192,8 +186,7 @@ impl Cmd {
             "Successfully downloaded example '{example_name}' to {}",
             dest_path.display()
         ));
-        printer
-            .infoln("You may need to modify your environments.toml to add constructor arguments!");
+        Self::print_scaffold_yml_hint(dest_path, printer);
         Ok(())
     }
 
@@ -262,9 +255,28 @@ impl Cmd {
             "Successfully downloaded example '{example_name}' to {}",
             dest_path.display()
         ));
-        printer
-            .infoln("You may need to modify your environments.toml to add constructor arguments!");
+        Self::print_scaffold_yml_hint(dest_path, printer);
         Ok(())
+    }
+
+    /// `generate` doesn't touch scaffold.yml, so tell the user how to deploy
+    /// the new contract.
+    fn print_scaffold_yml_hint(dest_path: &Path, printer: &Print) {
+        let package = fs::read_to_string(dest_path.join("Cargo.toml"))
+            .ok()
+            .and_then(|content| content.parse::<toml::Table>().ok())
+            .and_then(|table| {
+                table
+                    .get("package")?
+                    .get("name")?
+                    .as_str()
+                    .map(String::from)
+            });
+        let source = package.as_deref().unwrap_or("<package name>");
+        printer.infoln(format!(
+            "To deploy it, add it under `contracts:` in scaffold.yml with `type: workspace`, \
+             `source: {source}` and any constructor `args`."
+        ));
     }
 
     fn write_new_manifest(
@@ -642,7 +654,7 @@ members = []
     async fn list_examples(&self, global_args: &global::Args) -> Result<(), Error> {
         let printer = Print::new(global_args.quiet);
 
-        let examples_info = self.ensure_cache_updated(&printer).await?;
+        let examples_info = self.ensure_cache_updated().await?;
 
         printer.infoln("Fetching available contract examples...");
 
@@ -679,13 +691,6 @@ members = []
         Ok(())
     }
 
-    async fn fetch_latest_oz_release() -> Result<Release, Error> {
-        Self::fetch_latest_release_from_url(&format!(
-            "https://api.github.com/repos/OpenZeppelin/stellar-contracts/releases/tags/{LATEST_SUPPORTED_OZ_RELEASE}",
-        ))
-        .await
-    }
-
     /// `org/repo` slug for the soroban examples source, overridable via env.
     fn soroban_examples_slug() -> String {
         std::env::var(SOROBAN_EXAMPLES_REPO_ENV)
@@ -695,22 +700,6 @@ members = []
     /// Git ref (tag) of the soroban examples to fetch, overridable via env.
     fn soroban_examples_ref() -> String {
         std::env::var(SOROBAN_EXAMPLES_REF_ENV).unwrap_or_else(|_| SOROBAN_EXAMPLES_REF.to_string())
-    }
-
-    async fn fetch_latest_release_from_url(url: &str) -> Result<Release, Error> {
-        let client = reqwest::Client::new();
-        let response = client
-            .get(url)
-            .header("User-Agent", "stellar-scaffold-cli")
-            .send()
-            .await?;
-
-        if !response.status().is_success() {
-            return Err(Error::Reqwest(response.error_for_status().unwrap_err()));
-        }
-
-        let release: Release = response.json().await?;
-        Ok(release)
     }
 
     async fn cache_oz_repository(repo_cache_path: &Path, tag_name: &str) -> Result<(), Error> {
@@ -809,11 +798,19 @@ members = []
         // Get the response bytes
         let bytes = response.bytes().await?;
 
-        fs::create_dir_all(dest_path)?;
+        // Extract next to the destination and move it into place once complete,
+        // so an interrupted download never leaves a cache entry that looks valid.
+        let final_path = dest_path.to_path_buf();
+        let dest_path = dest_path.with_extension("partial");
+        if dest_path.exists() {
+            fs::remove_dir_all(&dest_path)?;
+        }
+        fs::create_dir_all(&dest_path)?;
 
         // Extract the tar.gz in a blocking task to avoid blocking the async runtime
-        let dest_path = dest_path.to_path_buf();
+        let extract_path = dest_path.clone();
         tokio::task::spawn_blocking(move || {
+            let dest_path = extract_path;
             let tar = GzDecoder::new(std::io::Cursor::new(bytes));
             let mut archive = Archive::new(tar);
 
@@ -846,10 +843,11 @@ members = []
         .map_err(|e| Error::Io(std::io::Error::other(e.to_string())))?
         .map_err(Error::Io)?;
 
+        fs::rename(&dest_path, &final_path)?;
         Ok(())
     }
 
-    async fn ensure_cache_updated(&self, printer: &Print) -> Result<ExamplesInfo, Error> {
+    async fn ensure_cache_updated(&self) -> Result<ExamplesInfo, Error> {
         let cache_dir = dirs::cache_dir().ok_or_else(|| {
             Error::Io(std::io::Error::new(
                 std::io::ErrorKind::NotFound,
@@ -862,25 +860,22 @@ members = []
         let oz_cache_path = cli_cache_path.join("openzeppelin-stellar-contracts");
         let soroban_examples_cache_path = cli_cache_path.join("soroban_examples");
 
-        Self::update_cache(&oz_cache_path, &soroban_examples_cache_path)
-            .await
-            .or_else(|e| {
-                printer.warnln(format!("Failed to update examples cache: {e}"));
-                Self::get_latest_known_examples(&oz_cache_path, &soroban_examples_cache_path)
-            })
+        // No fallback to other cached versions: examples from an older OZ
+        // release don't compile against the versions the CLI adds.
+        Self::update_cache(&oz_cache_path, &soroban_examples_cache_path).await
     }
 
+    /// Make sure the pinned OZ release and soroban-examples ref are in the
+    /// cache. Both refs are fixed, so nothing is fetched once they're cached.
     async fn update_cache(
         oz_cache_path: &Path,
         soroban_examples_cache_path: &Path,
     ) -> Result<ExamplesInfo, Error> {
-        // Get the latest release tag
-        let Release { tag_name } = Self::fetch_latest_oz_release().await?;
-        let oz_repo_cache_path = oz_cache_path.join(&tag_name);
+        let oz_tag_name = LATEST_SUPPORTED_OZ_RELEASE.to_string();
+        let oz_repo_cache_path = oz_cache_path.join(&oz_tag_name);
         if !oz_repo_cache_path.exists() {
-            Self::cache_oz_repository(&oz_repo_cache_path, &tag_name).await?;
+            Self::cache_oz_repository(&oz_repo_cache_path, &oz_tag_name).await?;
         }
-        let oz_tag_name = tag_name;
 
         let tag_name = Self::soroban_examples_ref();
         let soroban_examples_cache_path = soroban_examples_cache_path.join(&tag_name);
@@ -896,40 +891,6 @@ members = []
             soroban_examples_path: soroban_examples_cache_path,
             soroban_version_tag: tag_name,
         })
-    }
-
-    fn get_latest_known_examples(
-        oz_cache_path: &Path,
-        soroban_examples_cache_path: &Path,
-    ) -> Result<ExamplesInfo, Error> {
-        if oz_cache_path.exists() && soroban_examples_cache_path.exists() {
-            let oz_tag_name = Self::get_latest_known_tag(oz_cache_path)?;
-            let soroban_examples_tag_name =
-                Self::get_latest_known_tag(soroban_examples_cache_path)?;
-
-            let oz_repo_cache_path = oz_cache_path.join(&oz_tag_name);
-            let soroban_examples_cache_path =
-                soroban_examples_cache_path.join(&soroban_examples_tag_name);
-
-            Ok(ExamplesInfo {
-                oz_examples_path: oz_repo_cache_path,
-                oz_version_tag: oz_tag_name,
-                soroban_examples_path: soroban_examples_cache_path,
-                soroban_version_tag: soroban_examples_tag_name,
-            })
-        } else {
-            Err(Error::UpdateExamplesCache)
-        }
-    }
-
-    fn get_latest_known_tag(example_cache_path: &Path) -> Result<String, Error> {
-        let rd = example_cache_path.read_dir()?;
-        let max_tag = rd
-            .filter_map(Result::ok)
-            .filter(|x| x.path().is_dir())
-            .filter_map(|x| x.file_name().to_str().map(ToString::to_string))
-            .max();
-        max_tag.ok_or(Error::UpdateExamplesCache)
     }
 
     fn copy_directory_contents(source: &Path, dest: &Path) -> Result<(), Error> {
@@ -997,7 +958,7 @@ fn open_wizard(global_args: &global::Args) -> Result<(), Error> {
     printer.println("   4. Move the contract folder to your contracts/ directory");
     printer.println("   5. Add the contract to your workspace Cargo.toml if needed");
     printer.println(
-        "   6. You may need to modify your environments.toml file to add constructor arguments",
+        "   6. Add it under `contracts:` in scaffold.yml (type: workspace) with any constructor args",
     );
     printer.infoln(
         "The wizard will generate a complete Soroban contract with your selected features!",
@@ -1009,7 +970,7 @@ fn open_wizard(global_args: &global::Args) -> Result<(), Error> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use mockito::{mock, server_url};
+    use mockito::mock;
 
     fn create_test_cmd(from: Option<String>, ls: bool, from_wizard: bool) -> Cmd {
         Cmd {
@@ -1041,51 +1002,18 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_fetch_latest_release() {
-        let _m = mock(
-            "GET",
-            "/repos/OpenZeppelin/stellar-contracts/releases/latest",
-        )
-        .with_status(200)
-        .with_header("content-type", "application/json")
-        .with_body(
-            r#"{
-                "tag_name": "v1.2.3",
-                "name": "Release v1.2.3",
-                "published_at": "2024-01-15T10:30:00Z"
-            }"#,
-        )
-        .create();
+    async fn test_cached_pinned_release_used_without_network() {
+        let dir = tempfile::tempdir().unwrap();
+        let oz = dir.path().join("oz");
+        let soroban = dir.path().join("soroban");
+        // A stale release from an older CLI must be ignored.
+        fs::create_dir_all(oz.join("v0.6.0")).unwrap();
+        fs::create_dir_all(oz.join(LATEST_SUPPORTED_OZ_RELEASE)).unwrap();
+        fs::create_dir_all(soroban.join(Cmd::soroban_examples_ref())).unwrap();
 
-        let mock_url = format!(
-            "{}/repos/OpenZeppelin/stellar-contracts/releases/latest",
-            server_url()
-        );
-        let result = Cmd::fetch_latest_release_from_url(&mock_url).await;
-
-        assert!(result.is_ok());
-        let release = result.unwrap();
-        assert_eq!(release.tag_name, "v1.2.3");
-    }
-
-    #[tokio::test]
-    async fn test_fetch_latest_release_error() {
-        let _m = mock(
-            "GET",
-            "/repos/OpenZeppelin/stellar-contracts/releases/latest",
-        )
-        .with_status(404)
-        .with_header("content-type", "application/json")
-        .with_body(r#"{"message": "Not Found"}"#)
-        .create();
-
-        let mock_url = format!(
-            "{}/repos/OpenZeppelin/stellar-contracts/releases/latest",
-            server_url()
-        );
-        let result = Cmd::fetch_latest_release_from_url(&mock_url).await;
-
-        assert!(result.is_err());
+        let info = Cmd::update_cache(&oz, &soroban).await.unwrap();
+        assert_eq!(info.oz_version_tag, LATEST_SUPPORTED_OZ_RELEASE);
+        assert_eq!(info.oz_examples_path, oz.join(LATEST_SUPPORTED_OZ_RELEASE));
     }
 
     #[tokio::test]
