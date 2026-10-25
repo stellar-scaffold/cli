@@ -670,11 +670,11 @@ members = []
         }
 
         printer.println("\nUsage:");
-        printer.println("   stellar-scaffold contract generate --from <example-name>");
+        printer.println("   stellar-scaffold generate contract --from <example-name>");
         printer.println(
-            "   Example (soroban-examples): stellar-scaffold contract generate --from stellar/hello-world",
+            "   Example (soroban-examples): stellar-scaffold generate contract --from stellar/hello-world",
         );
-        printer.println("   Example (OpenZeppelin examples): stellar-scaffold contract generate --from oz/nft-royalties");
+        printer.println("   Example (OpenZeppelin examples): stellar-scaffold generate contract --from oz/nft-royalties");
 
         Ok(())
     }
