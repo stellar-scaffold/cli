@@ -1,6 +1,7 @@
 use std::path::Path;
 
 use crate::commands::build::env_toml::{self, ENV_FILE};
+use crate::commands::build::v2::extension_entries;
 use crate::commands::check_engine_constraint;
 use crate::commands::doctor::diagnosis::{Category, Check, Context, Diagnosis};
 use crate::commands::setup::DOT_ENV_DIRS;
@@ -380,15 +381,29 @@ impl Check for Extensions {
             return vec![skipped_no_workspace(self.name())];
         }
 
-        let Some(env) = ctx.environment() else {
-            return vec![Diagnosis::skipped(
-                self.name(),
-                Category::Project,
-                format!("no {ENV_FILE}"),
-            )];
+        // A version 2 project lists its extensions in scaffold.yml and ignores
+        // environments.toml, as `build` does.
+        let extensions = if let Some(loaded) = &ctx.config {
+            let Some(config) = &loaded.config else {
+                return vec![Diagnosis::skipped(
+                    self.name(),
+                    Category::Project,
+                    format!("{CONFIG_FILE} could not be read"),
+                )];
+            };
+            extension_entries(config)
+        } else {
+            let Some(env) = ctx.environment() else {
+                return vec![Diagnosis::skipped(
+                    self.name(),
+                    Category::Project,
+                    format!("no {ENV_FILE}"),
+                )];
+            };
+            env.extensions.clone()
         };
 
-        if env.extensions.is_empty() {
+        if extensions.is_empty() {
             return vec![Diagnosis::skipped(
                 self.name(),
                 Category::Project,
@@ -396,7 +411,7 @@ impl Check for Extensions {
             )];
         }
 
-        list_extensions(&env.extensions)
+        list_extensions(&extensions)
             .into_iter()
             .map(|entry| {
                 let name = entry.name;
@@ -806,5 +821,65 @@ development.extensions = ["definitely-not-installed"]
             "got: {}",
             finding.message
         );
+    }
+
+    /// A context for a version 2 project with `yaml` as its scaffold.yml.
+    fn v2_context<'a>(root: &'a Path, yaml: &str, printer: &'a Print) -> Context<'a> {
+        std::fs::write(root.join(CONFIG_FILE), yaml).unwrap();
+        Context {
+            config: Some(config::load(root, Some(&[]), None)),
+            ..context_with_env(root, &[], printer)
+        }
+    }
+
+    #[tokio::test]
+    async fn extensions_read_from_scaffold_yml_v2() {
+        let dir = tempfile::TempDir::new().unwrap();
+        let printer = Print::new(true);
+        let yaml = "version: 2\nextensions:\n  definitely-not-installed:\nnetworks:\n  local: {}\n";
+        let findings = Extensions
+            .run(&v2_context(dir.path(), yaml, &printer))
+            .await;
+
+        let finding = findings.first().unwrap();
+        assert_eq!(finding.severity, Severity::Warn);
+        assert!(
+            finding.message.contains("definitely-not-installed"),
+            "got: {}",
+            finding.message
+        );
+    }
+
+    #[tokio::test]
+    async fn extensions_v2_ignores_environments_toml() {
+        let dir = tempfile::TempDir::new().unwrap();
+        write_env_toml(
+            dir.path(),
+            r#"
+development.network = { name = "local" }
+development.extensions = ["definitely-not-installed"]
+"#,
+        );
+
+        let printer = Print::new(true);
+        let yaml = "version: 2\nnetworks:\n  local: {}\n";
+        let findings = Extensions
+            .run(&v2_context(dir.path(), yaml, &printer))
+            .await;
+        assert_eq!(severity_of(&findings, "extensions"), Severity::Skipped);
+    }
+
+    #[tokio::test]
+    async fn extensions_skipped_when_scaffold_yml_is_unreadable() {
+        let dir = tempfile::TempDir::new().unwrap();
+        let printer = Print::new(true);
+        let findings = Extensions
+            .run(&v2_context(
+                dir.path(),
+                "version: 2\nnot-a-key: [\n",
+                &printer,
+            ))
+            .await;
+        assert_eq!(severity_of(&findings, "extensions"), Severity::Skipped);
     }
 }
