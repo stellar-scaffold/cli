@@ -120,3 +120,90 @@ fn init_builds_with_the_projects_toolchain() {
         );
     }
 }
+
+/// A version 2 `scaffold.yml` for a project with no Cargo workspace: one
+/// network, `testnet`, with the given extra settings, and the given
+/// `contracts:` section (indented two spaces).
+fn no_cargo_scaffold_yml(network: &str, contracts: &str) -> String {
+    format!("version: 2\nnetworks:\n  testnet:\n{network}contracts:\n{contracts}")
+}
+
+/// A contract that is already deployed, with no client so the build makes no
+/// network calls.
+const DEPLOYED_CONTRACT: &str = "  xlm:
+    type: contract
+    source: CDLZFC3SYJYDZT7K67VZ75HPJVIEUVNIXF47ZG2FB2RMQQVU2HHGCYSC
+    client: false
+    networks: { testnet: }
+";
+
+/// Run `build --network testnet` in `env`, which has no `Cargo.toml`.
+fn build_without_cargo(env: &TestEnv, args: &[&str]) -> assert_cmd::Command {
+    let mut cmd = env.stellar_scaffold_custom_dir("build", &["--network", "testnet"], &env.cwd);
+    cmd.args(args);
+    cmd
+}
+
+/// A TypeScript-only project, with no `Cargo.toml` and no `contracts/`, only
+/// references deployed contracts, so it builds without cargo and without any
+/// accounts to sign with.
+#[test]
+fn builds_without_cargo_when_no_contract_is_a_workspace_crate() {
+    let env = TestEnv::new_empty();
+    env.modify_file(
+        "scaffold.yml",
+        &no_cargo_scaffold_yml("", DEPLOYED_CONTRACT),
+    );
+    let stderr = build_without_cargo(&env, &[])
+        .assert()
+        .success()
+        .stderr_as_str();
+    assert!(stderr.contains("No Cargo workspace found"), "{stderr}");
+    assert!(!stderr.contains("cargo metadata"), "{stderr}");
+}
+
+/// A `workspace` contract still needs cargo; the error names it.
+#[test]
+fn workspace_contracts_need_cargo() {
+    let env = TestEnv::new_empty();
+    env.modify_file(
+        "scaffold.yml",
+        &no_cargo_scaffold_yml(
+            "    allow-deploy: true\n    accounts: [me]\n",
+            "  hello:
+    type: workspace
+    source: hello-world
+    networks: { testnet: }
+",
+        ),
+    );
+    let stderr = build_without_cargo(&env, &[])
+        .assert()
+        .failure()
+        .stderr_as_str();
+    assert!(
+        stderr.contains("contract `hello` is `type: workspace`"),
+        "{stderr}"
+    );
+    assert!(stderr.contains("Cargo.toml"), "{stderr}");
+}
+
+/// Without a version 2 `scaffold.yml`, or with `--compile-only`, a missing
+/// Cargo workspace is still cargo's error.
+#[test]
+fn without_cargo_other_builds_report_cargos_error() {
+    let env = TestEnv::new_empty();
+    build_without_cargo(&env, &[])
+        .assert()
+        .failure()
+        .stderr(predicates::str::contains("could not find `Cargo.toml`"));
+
+    env.modify_file(
+        "scaffold.yml",
+        &no_cargo_scaffold_yml("", DEPLOYED_CONTRACT),
+    );
+    build_without_cargo(&env, &["--compile-only"])
+        .assert()
+        .failure()
+        .stderr(predicates::str::contains("could not find `Cargo.toml`"));
+}

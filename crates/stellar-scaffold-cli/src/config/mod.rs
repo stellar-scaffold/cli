@@ -118,12 +118,10 @@ impl Workspace {
             cmd.manifest_path(path);
         }
         let Ok(metadata) = cmd.exec() else {
-            let root = manifest_path
-                .and_then(Path::parent)
-                .map(Path::to_path_buf)
-                .or_else(|| std::env::current_dir().ok())
-                .unwrap_or_default();
-            return Self { root, crates: None };
+            return Self {
+                root: root_without_cargo(manifest_path),
+                crates: None,
+            };
         };
         Self {
             crates: Some(cdylib_crates(&metadata)),
@@ -135,6 +133,17 @@ impl Workspace {
     pub fn load(&self, selected: Option<&str>) -> Loaded {
         load(&self.root, self.crates.as_deref(), selected)
     }
+}
+
+/// The project root when cargo can't locate a workspace, for example in a
+/// TypeScript-only project or without a Rust toolchain: the directory of
+/// `manifest_path` if given, otherwise the current directory.
+pub fn root_without_cargo(manifest_path: Option<&Path>) -> PathBuf {
+    manifest_path
+        .and_then(Path::parent)
+        .map(Path::to_path_buf)
+        .or_else(|| std::env::current_dir().ok())
+        .unwrap_or_default()
 }
 
 /// `(package name, directory)` of every `cdylib` crate in the workspace.

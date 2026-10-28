@@ -872,11 +872,13 @@ impl Builder {
 
     async fn handle_contracts(&self, package_names: Vec<String>) -> Result<(), Error> {
         let printer = self.printer();
-        if package_names.is_empty() {
-            return Ok(());
-        }
+        // Version 2 contracts referenced by `id` need nothing compiled, so a
+        // project without crates still gets their clients.
         if self.env.from_scaffold_yml {
             return self.handle_listed_contracts(&package_names).await;
+        }
+        if package_names.is_empty() {
+            return Ok(());
         }
         let contracts = self.env.contracts.as_ref();
         let network = &self.network;
@@ -1382,10 +1384,18 @@ impl ClientsArgs {
             .map(|account| account.name.clone())
             .collect::<Vec<_>>();
 
-        let default_account = match (default_account_candidates.as_slice(), accounts.as_slice()) {
+        let source_account = match (default_account_candidates.as_slice(), accounts.as_slice()) {
+            // Generating clients for contracts that are already deployed signs
+            // nothing, so a version 2 network may list no accounts.
+            ([], [])
+                if current_env.from_scaffold_yml
+                    && current_env.workspace_contracts().is_empty() =>
+            {
+                UnresolvedMuxedAccount::default()
+            }
             ([], []) => return Err(Error::NeedAtLeastOneAccount),
-            ([], [env_toml::Account { name, .. }, ..]) => name.clone(),
-            ([candidate], _) => candidate.clone(),
+            ([], [env_toml::Account { name, .. }, ..]) => name.parse()?,
+            ([candidate], _) => candidate.parse()?,
             _ => return Err(Error::OnlyOneDefaultAccount(default_account_candidates)),
         };
 
@@ -1396,7 +1406,7 @@ impl ClientsArgs {
         let builder = Builder::new(
             global_args,
             network,
-            default_account.parse()?,
+            source_account,
             workspace_root.clone(),
             env,
             self.out_dir.clone(),
@@ -1573,9 +1583,66 @@ async fn fetch_contract_spec(
 #[cfg(test)]
 mod tests {
     use super::{
-        alias_is_ours, binding_targets, render_clients_index, to_camel_case, to_pascal_case,
+        ClientsArgs, Error, alias_is_ours, binding_targets, render_clients_index, to_camel_case,
+        to_pascal_case,
     };
+    use crate::commands::build::env_toml::{self, Environment, ResolvedDeploy};
+    use clap::Parser;
     use stellar_cli::config::network::passphrase;
+
+    /// A version 2 plan for testnet with no accounts and one contract,
+    /// either built from a crate or referenced by its ID.
+    fn plan_without_accounts(workspace: bool) -> Environment {
+        let contract = env_toml::Contract {
+            id: (!workspace)
+                .then(|| "CDLZFC3SYJYDZT7K67VZ75HPJVIEUVNIXF47ZG2FB2RMQQVU2HHGCYSC".into()),
+            resolved: Some(ResolvedDeploy {
+                crate_name: workspace.then(|| "hello".into()),
+                ..ResolvedDeploy::default()
+            }),
+            ..env_toml::Contract::default()
+        };
+        Environment {
+            accounts: Some(vec![]),
+            network: env_toml::Network {
+                name: Some("testnet".into()),
+                rpc_url: Some("https://soroban-testnet.stellar.org".into()),
+                network_passphrase: Some(passphrase::TESTNET.into()),
+                rpc_headers: None,
+                run_locally: false,
+                allow_http: None,
+            },
+            contracts: Some([("hello".into(), contract)].into_iter().collect()),
+            extensions: vec![],
+            from_scaffold_yml: true,
+        }
+    }
+
+    fn builder_for(plan: Environment) -> Result<super::Builder, Error> {
+        #[derive(Parser)]
+        struct Wrapper {
+            #[command(flatten)]
+            args: ClientsArgs,
+        }
+        let dir = tempfile::tempdir().unwrap();
+        let mut args = Wrapper::parse_from(["build"]).args;
+        args.workspace_root = Some(dir.path().to_path_buf());
+        args.plan = Some(plan);
+        args.builder()
+    }
+
+    #[test]
+    fn referenced_contracts_need_no_account() {
+        assert!(builder_for(plan_without_accounts(false)).is_ok());
+    }
+
+    #[test]
+    fn workspace_contracts_need_an_account() {
+        assert!(matches!(
+            builder_for(plan_without_accounts(true)),
+            Err(Error::NeedAtLeastOneAccount)
+        ));
+    }
 
     #[test]
     fn scaffold_only_moves_aliases_it_owns() {

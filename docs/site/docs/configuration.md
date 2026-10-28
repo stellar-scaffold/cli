@@ -194,6 +194,26 @@ networks:
 
 `allow-deploy: true` on a network with the mainnet passphrase is allowed, with a warning.
 
+### Projects without Rust contracts
+
+A project that only uses contracts deployed elsewhere, such as a TypeScript-only app, doesn't need a `Cargo.toml`, a `contracts-dir` or a Rust toolchain. If no contract listed for the selected network is `type: workspace`, `build` compiles nothing and generates clients for the contracts `scaffold.yml` references. Such a network also needs no `accounts`, since nothing is deployed.
+
+```yaml
+version: 2
+
+networks:
+  testnet:
+
+contracts:
+  xlm:
+    type: contract
+    source: CDLZFC3SYJYDZT7K67VZ75HPJVIEUVNIXF47ZG2FB2RMQQVU2HHGCYSC
+    networks:
+      testnet:
+```
+
+Run `build` from the directory holding `scaffold.yml`. A `workspace` contract still needs a Cargo workspace to compile, and `build` stops with an error naming it if there isn't one.
+
 ### Constructor arguments
 
 `args` maps each `__constructor` parameter, by name, to a value. Values are checked against the contract's spec by stellar-cli when it deploys, so write them as you would on the command line: strings, numbers and booleans as YAML scalars, vectors as lists, and structs or maps as maps.

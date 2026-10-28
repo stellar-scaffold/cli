@@ -125,3 +125,61 @@ fn removed_client_is_not_exported() {
         assert!(!index.contains("export const counter = "), "{index}");
     });
 }
+
+/// A TypeScript-only project, with no `Cargo.toml`, gets a client for a
+/// contract another project deployed, without compiling anything.
+#[test]
+fn client_for_a_deployed_contract_builds_without_cargo() {
+    TestEnv::from("soroban-init-boilerplate", |env| {
+        env.modify_file(
+            "scaffold.yml",
+            &scaffold_yml(
+                "me",
+                "  hello:
+    type: workspace
+    source: soroban-hello-world-contract
+    networks: { test: }
+",
+            ),
+        );
+        let output = build(env);
+        assert!(
+            output.status.success(),
+            "{}",
+            String::from_utf8_lossy(&output.stderr)
+        );
+        let index = index_ts(env);
+        let id = index
+            .lines()
+            .find_map(|l| l.trim().strip_prefix("contractId: \""))
+            .and_then(|l| l.strip_suffix("\","))
+            .expect("hello's contract ID in index.ts")
+            .to_string();
+
+        let app = env.temp_dir.path().join("ts-only");
+        std::fs::create_dir(&app).unwrap();
+        std::fs::write(
+            app.join("scaffold.yml"),
+            scaffold_yml(
+                "",
+                &format!(
+                    "  hello:\n    type: contract\n    source: {id}\n    networks: {{ test: }}\n"
+                ),
+            ),
+        )
+        .unwrap();
+        let output = env
+            .stellar_scaffold_custom_dir("build", &["--network", "test"], &app)
+            .env("PATH", TestEnv::stellar_path())
+            .output()
+            .expect("Failed to execute command");
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        assert!(output.status.success(), "{stderr}");
+        assert!(stderr.contains("No Cargo workspace found"), "{stderr}");
+        assert!(!app.join("Cargo.toml").exists());
+        let index = std::fs::read_to_string(app.join("app-lib/clients/index.ts")).unwrap();
+        assert!(index.contains("export const hello = "), "{index}");
+        assert!(index.contains(&id), "{index}");
+        assert!(app.join("app-lib/clients/hello/dist/index.js").exists());
+    });
+}
