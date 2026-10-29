@@ -371,17 +371,21 @@ impl PackageManager {
         cmd.output()
     }
 
-    pub(crate) fn build(&self, dir: &Path) -> io::Result<Output> {
+    pub(crate) fn build_command(&self, dir: &Path) -> Command {
         let mut cmd = Command::new(self.command());
         cmd.current_dir(dir);
         match self {
-            Self::Npm => cmd.args(["run", "build", "--loglevel=error"]),
-            Self::Pnpm => cmd.args(["run", "build", "--reporter=silent"]),
+            Self::Npm => cmd.args(["--loglevel=error", "run", "build"]),
+            Self::Pnpm => cmd.args(["--reporter=silent", "run", "build"]),
             Self::Yarn | Self::Bun => cmd.args(["run", "build"]),
             // deno uses `task` not `run` to execute package.json scripts
             Self::Deno => cmd.args(["task", "build"]),
         };
-        cmd.output()
+        cmd
+    }
+
+    pub(crate) fn build(&self, dir: &Path) -> io::Result<Output> {
+        self.build_command(dir).output()
     }
 }
 
@@ -540,6 +544,7 @@ mod tests {
     mod parameterized {
         use super::*;
         use rstest::rstest;
+        use std::ffi::OsStr;
 
         #[rstest]
         #[case(PackageManager::Npm, "npm")]
@@ -559,6 +564,18 @@ mod tests {
         #[case(PackageManager::Deno)]
         fn command_contains_name(#[case] pm: PackageManager) {
             assert!(pm.command().contains(pm.as_str()));
+        }
+
+        #[rstest]
+        #[case(PackageManager::Npm)]
+        #[case(PackageManager::Pnpm)]
+        #[case(PackageManager::Yarn)]
+        #[case(PackageManager::Bun)]
+        #[case(PackageManager::Deno)]
+        fn build_script_name_is_last_arg(#[case] pm: PackageManager) {
+            // pnpm forwards anything after the script name to the script itself
+            let cmd = pm.build_command(Path::new("."));
+            assert_eq!(cmd.get_args().last(), Some(OsStr::new("build")));
         }
     }
 }
