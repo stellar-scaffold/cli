@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.0.35](https://github.com/stellar-scaffold/cli/compare/stellar-scaffold-cli-v0.0.34...stellar-scaffold-cli-v0.0.35) - 2026-11-03
+
+### Fixed
+
+- *(stellar-scaffold-cli)* pass pnpm reporter flag before run ([#653](https://github.com/stellar-scaffold/cli/pull/653))
+
 ## [0.0.34](https://github.com/stellar-scaffold/cli/compare/stellar-scaffold-cli-v0.0.33...stellar-scaffold-cli-v0.0.34) - 2026-10-25
 
 ### Fixed
