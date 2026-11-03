@@ -76,6 +76,28 @@ pub enum Error {
     EmptyPackageName(Utf8PathBuf),
     #[error(transparent)]
     Config(#[from] v2::Error),
+    #[error(
+        "⛔ ️{} `type: workspace`, so building it needs a Cargo workspace and a Rust toolchain, but cargo failed: {source}",
+        describe_workspace_contracts(.contracts)
+    )]
+    WorkspaceNeedsCargo {
+        contracts: Vec<String>,
+        source: cargo_metadata::Error,
+    },
+}
+
+/// "contract `a` is" or "contracts `a`, `b` are", for [`Error::WorkspaceNeedsCargo`].
+fn describe_workspace_contracts(contracts: &[String]) -> String {
+    let names = contracts
+        .iter()
+        .map(|c| format!("`{c}`"))
+        .collect::<Vec<_>>()
+        .join(", ");
+    if contracts.len() == 1 {
+        format!("contract {names} is")
+    } else {
+        format!("contracts {names} are")
+    }
 }
 
 /// What `build` and `watch` read from the project's config before compiling.
@@ -120,7 +142,10 @@ impl Command {
 
     pub async fn run(&self, global_args: &global::Args) -> Result<(), Error> {
         let printer = Print::new(global_args.quiet);
-        let metadata = self.metadata()?;
+        let metadata = match self.metadata() {
+            Ok(metadata) => metadata,
+            Err(e) => return self.run_without_cargo(global_args, e).await,
+        };
         let packages = self.list_packages(&metadata)?;
         let workspace_root = metadata.workspace_root.as_std_path();
         if !v2::is_v2(workspace_root) {
@@ -216,20 +241,79 @@ impl Command {
         .await;
 
         if build_clients {
-            let mut build_clients_args = self.build_clients_args.clone();
-            // Pass through the workspace_root, out_dir, global_args, and printer
-            build_clients_args.workspace_root = Some(metadata.workspace_root.into_std_path_buf());
-            build_clients_args.out_dir.clone_from(&self.build.out_dir);
-            build_clients_args.global_args = Some(global_args.clone());
-            build_clients_args.extensions = extensions;
-            build_clients_args.compile_ctx = Some(post_compile_ctx);
-            build_clients_args.plan = plan;
-            build_clients_args
-                .run(packages.iter().map(|p| p.name.replace('-', "_")).collect())
-                .await?;
+            self.clients_args(
+                metadata.workspace_root.into_std_path_buf(),
+                global_args,
+                extensions,
+                Some(post_compile_ctx),
+                plan,
+            )
+            .run(packages.iter().map(|p| p.name.replace('-', "_")).collect())
+            .await?;
         }
 
         Ok(())
+    }
+
+    /// Build a version 2 project that cargo can't find a workspace for, such
+    /// as a TypeScript-only app or a machine without a Rust toolchain. With no
+    /// `type: workspace` contract on the selected network there is nothing to
+    /// compile, so this goes straight to generating clients for the contracts
+    /// `scaffold.yml` references. Anything else fails with `cargo_error`, as
+    /// before.
+    async fn run_without_cargo(
+        &self,
+        global_args: &global::Args,
+        cargo_error: cargo_metadata::Error,
+    ) -> Result<(), Error> {
+        let printer = Print::new(global_args.quiet);
+        let root = crate::config::root_without_cargo(self.build.manifest_path.as_deref());
+        // `--list` and `--compile-only` only make sense with crates to compile.
+        if self.list || !v2::is_v2(&root) || !self.builds_clients(&root, &printer) {
+            return Err(cargo_error.into());
+        }
+
+        let plan = self.v2_plan(&root, None, &[], &printer)?;
+        let contracts: Vec<String> = plan
+            .workspace_contracts()
+            .into_iter()
+            .map(str::to_string)
+            .collect();
+        if !contracts.is_empty() {
+            return Err(Error::WorkspaceNeedsCargo {
+                contracts,
+                source: cargo_error,
+            });
+        }
+        printer.infoln("No Cargo workspace found; nothing to compile");
+        Self::start_network_if_local(&plan.network, &printer).await?;
+
+        // No compile step, so no compile hooks and no compile context.
+        let extensions = extension::discover(&plan.extensions, &printer);
+        self.clients_args(root, global_args, extensions, None, Some(plan))
+            .run(vec![])
+            .await?;
+        Ok(())
+    }
+
+    /// Arguments for the client pipeline, which deploys and generates clients
+    /// after compiling.
+    fn clients_args(
+        &self,
+        workspace_root: std::path::PathBuf,
+        global_args: &global::Args,
+        extensions: Vec<extension::ResolvedExtension>,
+        compile_ctx: Option<CompileContext>,
+        plan: Option<env_toml::Environment>,
+    ) -> clients::ClientsArgs {
+        let mut args = self.build_clients_args.clone();
+        args.workspace_root = Some(workspace_root);
+        args.out_dir.clone_from(&self.build.out_dir);
+        args.global_args = Some(global_args.clone());
+        args.extensions = extensions;
+        args.compile_ctx = compile_ctx;
+        args.plan = plan;
+        args
     }
 
     /// Whether this build deploys and generates clients after compiling.
@@ -328,10 +412,13 @@ impl Command {
             );
         }
         let crates = crate::config::cdylib_crates(metadata);
-        let network_flag = self.build_clients_args.network.as_deref();
         if !resolve_network {
-            let (extensions, env_label) =
-                v2::hook_inputs(workspace_root, Some(&crates), network_flag, printer)?;
+            let (extensions, env_label) = v2::hook_inputs(
+                workspace_root,
+                Some(&crates),
+                self.build_clients_args.network.as_deref(),
+                printer,
+            )?;
             return Ok(Inputs {
                 plan: None,
                 extensions,
@@ -339,9 +426,29 @@ impl Command {
             });
         }
 
-        let (network, source) = v2::select_network(network_flag);
+        let plan = self.v2_plan(workspace_root, Some(&crates), packages, printer)?;
+        Self::start_network_if_local(&plan.network, printer).await?;
+        Ok(Inputs {
+            extensions: plan.extensions.clone(),
+            env_label: plan.network.name.clone().unwrap_or_default(),
+            plan: Some(plan),
+        })
+    }
+
+    /// Resolve `scaffold.yml` for the selected network, naming any built
+    /// `packages` that no contract lists as not being deployed. `crates` is
+    /// `None` without a cargo workspace, which skips checking that
+    /// `workspace` sources name real crates.
+    fn v2_plan(
+        &self,
+        workspace_root: &Path,
+        crates: Option<&[(String, std::path::PathBuf)]>,
+        packages: &[Package],
+        printer: &Print,
+    ) -> Result<env_toml::Environment, Error> {
+        let (network, source) = v2::select_network(self.build_clients_args.network.as_deref());
         printer.infoln(format!("Building for network {network:?} (from {source})"));
-        let plan = v2::plan(workspace_root, Some(&crates), &network, printer)?;
+        let plan = v2::plan(workspace_root, crates, &network, printer)?;
         let unlisted = v2::unlisted_crates(packages.iter().map(|p| p.name.as_str()), &plan);
         if !unlisted.is_empty() {
             printer.infoln(format!(
@@ -351,16 +458,20 @@ impl Command {
                 if unlisted.len() == 1 { "it" } else { "them" }
             ));
         }
-        if plan.network.run_locally {
+        Ok(plan)
+    }
+
+    /// Start a version 2 network's local container, if it runs one.
+    async fn start_network_if_local(
+        network: &env_toml::Network,
+        printer: &Print,
+    ) -> Result<(), Error> {
+        if network.run_locally {
             printer.infoln("Starting local Stellar Docker container...");
-            start_container_if_local(&plan.network).await?;
+            start_container_if_local(network).await?;
             printer.checkln("Local Stellar network is healthy and running.");
         }
-        Ok(Inputs {
-            extensions: plan.extensions.clone(),
-            env_label: network,
-            plan: Some(plan),
-        })
+        Ok(())
     }
 
     fn packages(&self, metadata: &Metadata) -> Result<Vec<Package>, Error> {

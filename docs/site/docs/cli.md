@@ -98,6 +98,8 @@ Options:
 
 `build` validates `scaffold.yml` before compiling and stops if it has errors. To only compile, use `stellar contract build`. Contracts that do not list the selected network are skipped: they are not deployed and not exported from the generated clients `index.ts`. Clients removed from `scaffold.yml` are dropped from `index.ts` on the next build.
 
+A project with no Cargo workspace, such as a TypeScript-only app, can still run `build` as long as no contract it lists for the selected network is `type: workspace`. Nothing is compiled, so neither `Cargo.toml` nor a Rust toolchain is needed: `build` generates clients for the contracts `scaffold.yml` references. See [Projects without Rust contracts](./configuration.md#projects-without-rust-contracts).
+
 ## Dev Command
 
 Start development mode with hot reloading:

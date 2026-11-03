@@ -267,6 +267,18 @@ impl Environment {
         }
         Ok(current_env)
     }
+
+    /// Version 2 contracts built from a crate (`type: workspace`), which need
+    /// cargo to compile and an account to deploy. Contracts referenced by
+    /// `id` need neither.
+    pub fn workspace_contracts(&self) -> Vec<&str> {
+        self.contracts
+            .iter()
+            .flatten()
+            .filter(|(_, contract)| contract.crate_name().is_some())
+            .map(|(name, _)| &**name)
+            .collect()
+    }
 }
 
 impl From<&Network> for stellar_cli::config::network::Args {
