@@ -243,6 +243,10 @@ fn rewrite_root_workspaces(root: &Path) -> Result<(), Error> {
 
 /// pnpm-workspace.yaml contents mirroring the instantiated workspaces. pnpm
 /// reads workspace globs from this file rather than `package.json`.
+///
+/// `linkWorkspacePackages` is required because templates depend on
+/// `@stellar-scaffold/app-lib` via `"*"` (parsable by npm rather than pnpm's
+/// preferred `"workspace:*"`). Newer versions of pnpm default to false.
 fn pnpm_workspace_yaml() -> String {
     let mut out = String::from("packages:\n");
     for ws in INSTANTIATED_WORKSPACES {
@@ -250,6 +254,7 @@ fn pnpm_workspace_yaml() -> String {
         out.push_str(ws);
         out.push_str("\"\n");
     }
+    out.push_str("linkWorkspacePackages: true\n");
     out
 }
 
@@ -553,6 +558,8 @@ mod tests {
         assert!(yaml.contains("- \"app\""));
         assert!(yaml.contains("- \"app-lib\""));
         assert!(yaml.contains("- \"app-lib/clients/*\""));
+        // the leading `\n` ensures this is a top-level key, not nested under packages
+        assert!(yaml.contains("\nlinkWorkspacePackages: true\n"));
 
         let config = fs::read_to_string(root.join("scaffold.yml")).unwrap();
         assert!(config.contains("  contracts-dir: contracts\n  package-manager: pnpm@1.2.3\n"));
