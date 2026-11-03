@@ -1,6 +1,6 @@
 //! End-to-end tests through [`super::load`] and [`super::resolved_view`].
 
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 use super::{Code, Loaded, VersionError, check_version, load, project, resolved_view};
 
@@ -309,6 +309,40 @@ fn check_version_accepts_version_2() {
         check_version(empty.path()),
         Err(VersionError::MissingVersion)
     ));
+}
+
+/// The version errors must give advice that works and links that resolve
+/// (#607): adding the line `MissingVersion` suggests to a version-less
+/// `scaffold.yml` passes `check_version`, and the repository link in each
+/// message points at a file that exists in this checkout.
+#[test]
+fn version_errors_give_working_advice_and_live_links() {
+    let missing = VersionError::MissingVersion.to_string();
+    let line = missing
+        .split('\'')
+        .find(|s| s.starts_with("version: "))
+        .expect("MissingVersion names the line to add");
+    let fixed = write_config(&format!("{line}\nnetworks: {{}}\n"));
+    assert!(
+        check_version(fixed.path()).is_ok(),
+        "following `{missing}` must give a valid scaffold.yml"
+    );
+
+    let workspace = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
+    for message in [
+        missing,
+        VersionError::UnsupportedVersion { found: 1 }.to_string(),
+    ] {
+        let path = message
+            .split_whitespace()
+            .find_map(|w| w.strip_prefix("https://github.com/stellar-scaffold/cli/blob/main/"))
+            .expect("the message links into this repository")
+            .trim_end_matches('.');
+        assert!(
+            workspace.join(path).is_file(),
+            "`{path}` linked from `{message}` does not exist"
+        );
+    }
 }
 
 #[test]
